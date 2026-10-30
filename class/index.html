@@ -77,14 +77,23 @@ label.inline{display:inline-flex;gap:6px;align-items:center;font-size:.86rem;col
 .small-btn{border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:8px;padding:4px 10px;font:inherit;font-size:.8rem;cursor:pointer}
 .stale{font-size:.78rem;color:var(--muted);text-align:right;margin:2px 0 0}
 :focus-visible{outline:2px solid var(--ochre);outline-offset:2px}
+.login .field+.field{margin-top:0}
+.ok{flex:none;font-size:.72rem;font-weight:700;padding:1px 7px;border-radius:9px;background:color-mix(in srgb,var(--green) 18%,var(--paper));color:var(--green)}
+.no{flex:none;font-size:.72rem;font-weight:700;padding:1px 7px;border-radius:9px;background:color-mix(in srgb,var(--sun) 15%,var(--paper));color:var(--sun)}
+.card.msg{border-color:var(--ochre);box-shadow:inset 4px 0 0 var(--ochre)}
+.msgtext{white-space:pre-wrap}
+.msg .note.new .msgtext{font-weight:600}
+nav button{position:relative}
+.badge{position:absolute;top:4px;left:calc(50% + 6px);min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--sun);color:#fff;font-size:.66rem;line-height:16px}
 </style>
 </head>
 <body>
 <div id="loginView" class="login" hidden>
   <img src="icon-192.png" alt="">
   <h1>우리 반 알림</h1>
-  <p class="hint">조·종례 공지, 학사일정, 제출물 마감, 시간표를 볼 수 있어요.<br>비밀번호는 담임 선생님께 받아요.</p>
+  <p class="hint">조·종례 공지, 학사일정, 제출물, 내 시간표를 볼 수 있어요.<br>번호와 비밀번호는 담임 선생님께 받아요.</p>
   <form id="loginForm">
+    <input id="no" class="field" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" autocomplete="username" placeholder="번호 (예: 7)" aria-label="출석 번호">
     <input id="pw" class="field" type="password" inputmode="text" autocomplete="current-password" placeholder="비밀번호" aria-label="비밀번호" required>
     <label class="inline"><input type="checkbox" id="remember" checked> 이 기기 기억하기 (다음부터 비밀번호 없이)</label>
     <p class="err" id="loginErr" role="alert"></p>
@@ -135,13 +144,14 @@ const linkify = t => String(t).split(/(https?:\/\/[^\s]+)/g).map((p, i) => i % 2
 
 function showLogin(msg){
   $("appView").hidden = true; $("loginView").hidden = false; $("loginErr").textContent = msg || "";
-  setTimeout(() => $("pw").focus(), 0);
+  setTimeout(() => $("no").focus(), 0);
 }
 $("loginForm").onsubmit = async e => {
   e.preventDefault();
   const b = $("loginBtn"); b.disabled = true; $("loginErr").textContent = "";
   try{
-    const r = await api({ pw: $("pw").value });
+    const no = $("no").value.trim();
+    const r = await api(no ? { no, pw: $("pw").value } : { pw: $("pw").value });
     if(r.error) throw new Error(r.error);
     const keep = $("remember").checked;
     store.del("classToken"); store.set("classToken", r.token, keep);
@@ -149,7 +159,7 @@ $("loginForm").onsubmit = async e => {
   }catch(x){ $("loginErr").textContent = x.message || "들어가지 못했어요. 잠시 뒤 다시 해 주세요."; }
   b.disabled = false;
 };
-$("logout").onclick = () => { if(!confirm("이 기기에서 나갈까요? 다시 보려면 비밀번호를 넣어야 해요.")) return; store.del("classToken"); store.del("classData"); data = null; showLogin(); };
+$("logout").onclick = () => { if(!confirm("이 기기에서 나갈까요? 다시 보려면 비밀번호를 넣어야 해요.")) return; store.del("classToken"); store.del("classData"); store.del("msgSeen"); data = null; showLogin(); };
 $("refresh").onclick = () => load(true);
 document.querySelectorAll("nav button").forEach(b => b.onclick = () => { view = b.dataset.v; store.set("classView", view, true); draw(); window.scrollTo(0, 0); });
 document.addEventListener("visibilitychange", () => { if(!document.hidden && Date.now() - lastFetch > 5 * 60e3 && store.get("classToken")) load(); });
@@ -171,11 +181,24 @@ async function load(manual){
 function draw(){
   if(!data) return;
   $("title").firstChild.textContent = (data.cls ? data.cls + " " : "") + "우리 반 ";
-  const t = new Date(); $("sub").textContent = (t.getMonth() + 1) + "월 " + t.getDate() + "일 " + WD[t.getDay()] + "요일";
-  document.querySelectorAll("nav button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.v === view)));
+  const t = new Date(), my = data.my;
+  $("sub").textContent = (t.getMonth() + 1) + "월 " + t.getDate() + "일 " + WD[t.getDay()] + "요일" + (my ? " · " + my.no + "번 " + (my.name || "") + (my.who === "p" ? " 학부모" : "") : "");
+  document.querySelectorAll("nav button").forEach(b => { b.setAttribute("aria-selected", String(b.dataset.v === view)); b.querySelector(".badge")?.remove(); });
+  const unseen = view === "notes" ? 0 : newMsgs().length;
+  if(unseen) document.querySelector('nav button[data-v="notes"]').append(el("span",{className:"badge",textContent:unseen,"aria-label":"새 알림 " + unseen + "개"}));
   const parts = [installTip(), ({ notes:drawNotes, events:drawEvents, checks:drawChecks, tt:drawTT })[view]?.() || drawNotes(),
     el("p",{className:"stale",textContent: "받은 시각 " + new Date(lastFetch).toLocaleTimeString("ko-KR", { hour:"2-digit", minute:"2-digit" })})];
   $("view").replaceChildren(...parts.filter(Boolean));
+}
+// 개별 알림: 공지 탭을 열기 전까지 새 것은 탭에 숫자로 표시
+const seenAt = () => Number(store.get("msgSeen")) || 0;
+const newMsgs = () => (data.my?.msgs || []).filter(m => m.at > seenAt());
+function drawMsgs(){
+  const ms = data.my?.msgs || []; if(!ms.length) return "";
+  const before = seenAt(); store.set("msgSeen", String(Math.max(before, ...ms.map(m => m.at))), true);
+  const when = at => { const d = new Date(at); return label(ymd(d)) + " " + d.toLocaleTimeString("ko-KR", { hour:"2-digit", minute:"2-digit" }); };
+  return [el("h2",{}, "나에게 온 알림", el("small",{textContent:"담임 선생님이 보냄"})),
+    el("div",{className:"card msg"}, ...ms.slice(0, 10).map(m => el("div",{className:"note" + (m.at > before ? " new" : "")}, el("div",{className:"date",textContent:(m.at > before ? "새 알림 · " : "") + when(m.at)}), el("div",{className:"msgtext"}, ...linkify(m.text)))))];
 }
 function drawNotes(){
   const by = {}; data.notes.forEach(n => (by[n.date] ||= []).push(n));
@@ -183,7 +206,7 @@ function drawNotes(){
   const card = k => el("div",{className:"card" + (k === t ? " today" : "")}, el("div",{className:"date",textContent:(k === t ? "오늘 · " : "") + label(k)}),
     ...by[k].map(n => el("div",{className:"note"}, n.type ? el("span",{className:"tag",textContent:n.type}) : "", ...linkify(n.text), n.detail ? el("div",{className:"detail"}, ...linkify(n.detail)) : "")));
   const next = keys.filter(k => k > t).sort(), past = keys.filter(k => k < t).sort().reverse();
-  return el("section",{},
+  return el("section",{}, drawMsgs(),
     el("h2",{textContent:"오늘 공지"}), by[t] ? card(t) : el("p",{className:"empty",textContent:"오늘은 공지가 없어요."}),
     next.length ? [el("h2",{textContent:"앞으로"}), ...next.map(card)] : "",
     past.length ? [el("h2",{}, "지난 공지", el("small",{textContent:"최근 3주"})), ...past.map(card)] : "");
@@ -200,6 +223,7 @@ function drawChecks(){
   if(!data.checks.length) return el("p",{className:"empty",textContent:"지금 걷고 있는 제출물이 없어요."});
   return el("section",{}, el("h2",{}, "낼 것", el("small",{textContent:"담임 선생님께 내요"})),
     el("div",{className:"card"}, ...data.checks.map(c => el("div",{className:"ev"}, el("span",{className:"t",textContent:c.title}),
+      c.mine === true ? el("span",{className:"ok",textContent:"냈어요"}) : c.mine === false ? el("span",{className:"no",textContent:"아직"}) : "",
       c.due ? [el("span",{className:"d",textContent:label(c.due) + "까지"}), ddTag(c.due)] : el("span",{className:"d",textContent:"마감 없음"})))));
 }
 // 수업 시간: 선생님이 정한 것, 없으면 8:10 시작·50분 수업·10분 쉬고·4교시 뒤 점심 60분
@@ -209,13 +233,15 @@ function bells(){
   return out.map((d, i) => { const b = data.bells?.[i]; return b && b.s && b.e ? b : d; });
 }
 function drawTT(){
-  if(!data.tt) return el("p",{className:"empty",textContent:"우리 반 시간표가 아직 없어요."});
+  // 학생별로 들어왔고 개인 시간표가 있으면 그것을 (선택 과목·이동 교실까지)
+  const mine = data.my?.cells?.length ? { periods:data.my.cells.length, cells:data.my.cells } : null, tt = mine || data.tt;
+  if(!tt) return el("p",{className:"empty",textContent:"시간표가 아직 없어요."});
   const now = new Date(), wd = now.getDay() - 1, hm = String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0"), B = bells();
-  const cur = wd >= 0 && wd < 5 ? B.slice(0, data.tt.periods).findIndex(b => hm >= b.s && hm < b.e) : -1;
+  const cur = wd >= 0 && wd < 5 ? B.slice(0, tt.periods).findIndex(b => hm >= b.s && hm < b.e) : -1;
   const cell = v => { const [a, b] = String(v || "").split("\n"); return [a || "", b ? el("small",{textContent:b}) : ""]; };
-  return el("section",{}, el("h2",{textContent:"우리 반 시간표"}),
+  return el("section",{}, el("h2",{}, mine ? (data.my.name || data.my.no + "번") + " 시간표" : "우리 반 시간표", mine ? el("small",{textContent:"반 숫자는 이동 교실"}) : ""),
     el("table",{className:"tt"}, el("thead",{}, el("tr",{}, el("th",{textContent:"교시"}), ...DAYS.map((d, j) => el("th",{className:j === wd ? "on" : "",textContent:d})))),
-      el("tbody",{}, ...data.tt.cells.slice(0, data.tt.periods).map((r, i) => el("tr",{}, el("th",{}, String(i + 1), el("small",{textContent:B[i].s})),
+      el("tbody",{}, ...tt.cells.slice(0, tt.periods).map((r, i) => el("tr",{}, el("th",{}, String(i + 1), el("small",{textContent:B[i].s})),
         ...DAYS.map((_, j) => el("td",{className:(j === wd ? "on" : "") + (j === wd && i === cur ? " now" : "")}, ...cell(r[j]))))))),
     el("p",{className:"hint",textContent:"바뀐 수업은 조·종례 공지로 알려 줘요."}));
 }
