@@ -182,7 +182,7 @@ function draw(){
   if(!data) return;
   $("title").firstChild.textContent = (data.cls ? data.cls + " " : "") + "우리 반 ";
   const t = new Date(), my = data.my;
-  $("sub").textContent = (t.getMonth() + 1) + "월 " + t.getDate() + "일 " + WD[t.getDay()] + "요일" + (my ? " · " + my.no + "번 " + (my.name || "") + (my.who === "p" ? " 학부모" : "") : "");
+  $("sub").textContent = (t.getMonth() + 1) + "월 " + t.getDate() + "일 " + WD[t.getDay()] + "요일" + (my ? " · " + my.no + "번 " + (my.name || "") : "");
   document.querySelectorAll("nav button").forEach(b => { b.setAttribute("aria-selected", String(b.dataset.v === view)); b.querySelector(".badge")?.remove(); });
   const unseen = view === "notes" ? 0 : newMsgs().length;
   if(unseen) document.querySelector('nav button[data-v="notes"]').append(el("span",{className:"badge",textContent:unseen,"aria-label":"새 알림 " + unseen + "개"}));
