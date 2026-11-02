@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="robots" content="noindex">
 <title>우리 반 알림</title>
 <meta name="description" content="조·종례 공지, 학사일정, 제출물 마감, 우리 반 시간표">
@@ -62,6 +62,8 @@ a{color:var(--navy)}
 .tt td small{display:block;font-size:.66rem;color:var(--muted)}
 .tt .on{background:color-mix(in srgb,var(--navy) 9%,var(--paper))}
 .tt td.now{outline:3px solid var(--sun);outline-offset:-3px;font-weight:700}
+.tt thead th:first-child{width:2.8em}
+@media (max-width:420px){.ev{flex-wrap:wrap;row-gap:2px}.ev .t{min-width:55%}main{padding-left:10px;padding-right:10px}.tt{font-size:.72rem;letter-spacing:-.02em}.tt th,.tt td{padding:4px 1px}.tt td small,.tt th small{font-size:.58rem}}
 .login{max-width:360px;margin:12vh auto 0;padding:0 16px;text-align:center}
 .login h1{font:700 2.4rem var(--display);margin:12px 0 4px}
 .login img{width:84px;height:84px;border-radius:20px}
@@ -77,6 +79,8 @@ label.inline{display:inline-flex;gap:6px;align-items:center;font-size:.86rem;col
 .small-btn{border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:8px;padding:4px 10px;font:inherit;font-size:.8rem;cursor:pointer}
 .stale{font-size:.78rem;color:var(--muted);text-align:right;margin:2px 0 0}
 :focus-visible{outline:2px solid var(--ochre);outline-offset:2px}
+html{touch-action:manipulation;-webkit-text-size-adjust:100%}
+input,select,textarea{font-size:max(16px,1em)}
 .login .field+.field{margin-top:0}
 .ok{flex:none;font-size:.72rem;font-weight:700;padding:1px 7px;border-radius:9px;background:color-mix(in srgb,var(--green) 18%,var(--paper));color:var(--green)}
 .no{flex:none;font-size:.72rem;font-weight:700;padding:1px 7px;border-radius:9px;background:color-mix(in srgb,var(--sun) 15%,var(--paper));color:var(--sun)}
