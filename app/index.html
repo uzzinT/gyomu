@@ -715,18 +715,10 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
   body.onhome .notes{padding:10px 14px}
   body.onhome .tt th,body.onhome .tt td{height:28px;padding:2px;font-size:.76rem;line-height:1.25}
   body.onhome .panel.now{padding:12px 14px}
-  /* 남는 높이는 지금 수업(가운데)과 달력(오른쪽)이 나눠 가짐. 할 일·제출물·시간표는 내용만큼 */
-  body.onhome .home4 .col{display:flex;flex-direction:column}
-  body.onhome .home4 .col>.panel.now{flex:1 0 auto;display:flex;flex-direction:column;gap:10px}
-  body.onhome .panel.now .free{flex:1;display:flex;flex-direction:column;justify-content:center;min-height:96px;margin:0}
-  /* 내용은 칸 가운데쯤에 (위 제목 아래·맨 아래에 같은 여백) */
-  body.onhome .panel.now>.panel-head{margin-bottom:auto}
-  body.onhome .panel.now::after{content:"";margin-top:auto}
-  body.onhome .panel.now .cls{font-size:1.6rem;font-weight:800;letter-spacing:-.03em}
-  body.onhome .panel.now .when{font-size:.9rem}
-  body.onhome .home4 .col>.bigcal{flex:1 0 auto}
+  /* 칸은 모두 내용만큼 (아래를 억지로 채우지 않음) */
+  body.onhome .panel.now .cls{font-size:1.4rem;font-weight:800;letter-spacing:-.03em}
   /* 화면이 크면 시간표·달력 칸을 조금씩 키워 아래가 비지 않게 */
-  body.onhome .bigcal .grid>*{min-height:clamp(46px,calc((100dvh - 460px) / 6),80px)}
+  body.onhome .bigcal .grid>*{min-height:52px}
   body.onhome .desk{padding-bottom:14px;height:100dvh}
   body.onhome .book{height:100%;display:flex;flex-direction:column}
   body.onhome .inner{flex:1;min-height:0;display:flex;flex-direction:column;padding-bottom:16px}
