@@ -117,14 +117,16 @@ nav button[aria-selected="true"]{color:var(--navy)}nav button[aria-selected="tru
 .tt th{background:var(--paper2)}.tt .on{background:var(--mint)}.tt td.now{outline-color:var(--lime)}
 .login h1{font-weight:900;letter-spacing:-.03em}
 .ttpick{margin:6px 0 4px;text-align:left}
-.cal button.cd{border:0;font:inherit;text-align:left;cursor:pointer;color:var(--ink)}.cal .cd.sel{outline:2px solid var(--navy)}
+.cal button.cd{border:0;font:inherit;text-align:left;cursor:pointer;color:var(--ink)}.daydlg{border:0;border-radius:20px;padding:22px 20px 16px;width:min(420px,calc(100vw - 32px));background:var(--paper);color:var(--ink);box-shadow:0 20px 50px -20px rgba(0,0,0,.5)}
+.daydlg::backdrop{background:rgba(15,29,20,.45)}.daydlg h2{margin:0 0 10px;font-size:1.3rem}.daydlg h2.red{color:var(--sun)}
+.daydlg .ev{font-size:1.08rem;padding:12px 0}.daydlg .t{white-space:normal}.daydlg>.small-btn{display:block;margin:14px 0 0 auto}
 .calhead{display:flex;align-items:center;justify-content:space-between;gap:8px}.calhead h2{margin:10px 0}
 .cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;padding:8px}
 .cal .cw{text-align:center;font-size:.75rem;color:var(--muted);padding:2px 0 4px}
 .cal .cd{min-height:58px;border-radius:8px;padding:3px;background:var(--paper2);display:flex;flex-direction:column;gap:2px;min-width:0}
 .cal .cd b{font-size:.78rem;font-weight:700}.cal .red,.cal .red b{color:var(--sun)}
 .cal .cd.on{outline:2px solid var(--lime);background:var(--mint)}
-.cal .ce{font-size:.64rem;line-height:1.25;background:var(--paper);border-radius:4px;padding:1px 3px;overflow:hidden;word-break:break-all;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;color:var(--ink)}.cal .ce.mine{box-shadow:inset 2px 0 0 var(--green)}
+.cal .ce{font-size:.64rem;line-height:1.25;background:var(--paper);border-radius:4px;padding:1px 3px;word-break:break-all;color:var(--ink)}.cal .ce.mine{box-shadow:inset 2px 0 0 var(--green)}
 .setrow{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px dashed var(--line)}.setrow:first-of-type{border-top:0}
 .setrow b{flex:1}.setrow .small-btn{min-width:2.4em}
 </style>
@@ -330,28 +332,30 @@ function drawNotes(){
     next.length ? [el("h2",{textContent:"앞으로"}), ...next.map(card)] : "",
     past.length ? [el("h2",{}, "지난 공지", el("small",{textContent:"최근 3주"})), ...past.map(card)] : "");
 }
-// 일정: 달력. 날짜를 누르면 아래에 그날 일정 전체
-let evMon = 0, evDay = "";
+// 일정: 달력 (칸 안에 일정 이름 전부). 날짜를 누르면 그날 일정을 큰 창으로
+let evMon = 0;
 function drawEvents(){ return el("section",{}, drawCal()); }
 function drawCal(){
   const t = today(), b = new Date(); b.setDate(1); b.setMonth(b.getMonth() + evMon);
   const y = b.getFullYear(), mo = b.getMonth(), pre = `${y}-${String(mo + 1).padStart(2, "0")}`;
   const by = {}; data.events.filter(e => e.date.startsWith(pre)).forEach(e => (by[e.date] ||= []).push(e));
   const cells = Array(b.getDay()).fill(null).concat(Array.from({ length:new Date(y, mo + 1, 0).getDate() }, (_, i) => pre + "-" + String(i + 1).padStart(2, "0")));
-  const nav = (txt, d, lab) => { const x = el("button",{type:"button",className:"small-btn",textContent:txt,"aria-label":lab}); x.onclick = () => { evMon += d; evDay = ""; draw(); }; return x; };
-  const sel = evDay.startsWith(pre) ? evDay : t.startsWith(pre) ? t : "";
+  const nav = (txt, d, lab) => { const x = el("button",{type:"button",className:"small-btn",textContent:txt,"aria-label":lab}); x.onclick = () => { evMon += d; draw(); }; return x; };
   const red = d => (by[d] || []).some(e => HOLI.test(e.title.replace(/\([^)]*\)/g, "")));
   return [el("div",{className:"calhead"}, nav("‹", -1, "이전 달"), el("h2",{textContent:`${y}년 ${mo + 1}월`}), nav("›", 1, "다음 달")),
     el("div",{className:"card cal"}, ..."일월화수목금토".split("").map((w, i) => el("div",{className:"cw" + (i === 0 ? " red" : ""),textContent:w})),
       ...cells.map((d, i) => { if(!d) return el("div",{});
-        const c = el("button",{type:"button",className:"cd" + (d === t ? " on" : "") + (d === sel ? " sel" : "") + (i % 7 === 0 || red(d) ? " red" : "")},
+        const c = el("button",{type:"button",className:"cd" + (d === t ? " on" : "") + (i % 7 === 0 || red(d) ? " red" : "")},
           el("b",{textContent:Number(d.slice(8))}), ...(by[d] || []).map(e => el("span",{className:"ce" + (e.mine ? " mine" : ""),textContent:e.title})));
-        c.onclick = () => { evDay = d; draw(); }; return c; })),
-    // 칸이 좁아 이름이 잘리니, 고른 날의 일정은 아래에 다 보여 줌
-    sel ? el("div",{className:"card"}, el("div",{className:"date",textContent:(sel === t ? "오늘 · " : "") + label(sel)}),
-      ...(by[sel] || []).map(e => el("div",{className:"ev" + (red(sel) ? " red" : "")}, el("span",{className:"t"}, e.mine ? el("span",{className:"tag",textContent:"학급"}) : "", e.title), sel >= t ? ddTag(sel) : "")),
-      by[sel] ? "" : el("p",{className:"empty",textContent:"이날은 일정이 없어요."}))
-      : el("p",{className:"empty",textContent:"날짜를 누르면 그날 일정이 다 보여요."})];
+        c.onclick = () => dayModal(d, by[d] || [], red(d)); return c; }))];
+}
+function dayModal(d, evs, isRed){
+  const t = today(), x = el("button",{type:"button",className:"small-btn",textContent:"닫기"});
+  const dlg = el("dialog",{className:"daydlg"}, el("h2",{className:isRed ? "red" : "",textContent:(d === t ? "오늘 · " : "") + label(d)}),
+    evs.length ? el("div",{}, ...evs.map(e => el("div",{className:"ev"}, el("span",{className:"t"}, e.mine ? el("span",{className:"tag",textContent:"학급"}) : "", e.title), d >= t ? ddTag(d) : "")))
+      : el("p",{className:"empty",textContent:"이날은 일정이 없어요."}), x);
+  x.onclick = () => dlg.close(); dlg.onclose = () => dlg.remove(); dlg.onclick = ev => { if(ev.target === dlg) dlg.close(); };
+  document.body.append(dlg); dlg.showModal();
 }
 // 걷는 중인 것은 위에, 선생님이 완료한 것은 아래에 접어서 (서버가 최근 것부터 보내 줌)
 function drawChecks(){
