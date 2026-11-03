@@ -707,6 +707,62 @@ dialog::backdrop{background:rgba(16,32,21,.45);backdrop-filter:blur(2px)}
 .attweek td,.attweek th{text-align:center;vertical-align:middle}.attweek tbody th{text-align:left;white-space:nowrap}
 .attweek .holi{background:color-mix(in srgb,var(--sun) 7%,var(--paper))}
 .attalerts{margin:0;padding-left:1.2em;color:var(--danger);font-weight:600;display:grid;gap:4px}
+/* 학급 출결 (학급 올인원 워크스페이스와 같은 기능, 교무수첩 모양) */
+.atthead{flex-wrap:wrap}
+.attseg{flex-wrap:wrap;border-radius:14px;width:max-content;max-width:100%}
+.attseg button{display:inline-flex;align-items:center;gap:5px}
+.tbadge{min-width:17px;height:17px;padding:0 5px;border-radius:9px;background:var(--sun);color:#fff;font-size:.66rem;line-height:17px;text-align:center}
+.attgrid{display:grid;gap:14px}
+.dcards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.dcard{display:grid;gap:2px;justify-items:center;padding:12px;border-radius:16px;background:var(--paper);border:1px solid var(--line);border-left:4px solid var(--c);font:inherit;color:var(--ink)}
+button.dcard{cursor:pointer}
+.dcard b{font-size:1.7rem;font-weight:900;color:var(--c);line-height:1.1}.dcard span{font-size:.78rem;color:var(--muted)}
+.typegroups{flex:1;display:grid;gap:6px;min-width:0}
+.tgroup{display:flex;flex-wrap:wrap;gap:5px}
+.tchip{font:inherit;font-size:.82rem;font-weight:600;padding:5px 11px;border-radius:999px;border:1.5px solid var(--c);background:var(--paper);color:var(--c);cursor:pointer}
+.tchip.on{background:var(--c);color:#fff}
+.kidgrid{flex:1;display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:5px;min-width:0}
+.kbtn{position:relative;font:inherit;font-size:.8rem;padding:7px 4px;border-radius:10px;border:1px solid var(--line);background:var(--paper);color:var(--ink);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kbtn[aria-pressed="true"]{background:var(--forest);border-color:var(--forest);color:#fff}
+.kbtn.filled{background:var(--c);border-color:var(--c);color:#fff;font-weight:700;overflow:visible}
+.kbtn:disabled{opacity:.55;cursor:default}
+.kbtn.alert{border-color:var(--danger);color:var(--danger);background:color-mix(in srgb,var(--danger) 6%,var(--paper));font-weight:700}
+.kbadge{position:absolute;top:-6px;right:-5px;min-width:16px;height:16px;border-radius:8px;background:var(--ochre);color:#fff;font-size:.62rem;line-height:16px;padding:0 3px}
+.perwrap{flex:1;display:grid;gap:4px;min-width:0}
+.pergrid{display:flex;flex-wrap:wrap;gap:5px}.pbtn{min-width:3.6em;flex:none}
+.docrow{flex:1;display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.docbtn{font:inherit;font-size:.76rem;font-weight:700;padding:3px 10px;border-radius:999px;border:1px solid #ec4899;background:#fdf2f8;color:#be185d;cursor:pointer}
+.docbtn.done{border-color:var(--line);background:var(--paper2);color:var(--muted);text-decoration:line-through}
+.docbtn:disabled{cursor:default}
+.attline.click{cursor:pointer;border-radius:8px}.attline.click:hover{background:var(--paper2)}
+.attline .dot{flex:none;width:9px;height:9px;border-radius:50%;background:var(--c)}
+.attline .ty{font-weight:700;color:var(--c,var(--ink))}.attline .ty small{color:var(--danger);font-weight:500}
+.attline .days{color:var(--danger)}
+.calweek{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.calday{display:grid;align-content:start;gap:5px;padding:8px;border-radius:14px;background:var(--paper2);border:1px solid var(--line);min-height:160px}
+.calday.istoday,.calcell.istoday{border-color:var(--accent);box-shadow:inset 0 3px 0 var(--lime)}
+.calday.holi,.calcell.holi{background:color-mix(in srgb,var(--sun) 6%,var(--paper));border-style:dashed}
+.calhd{display:flex;gap:5px;flex-wrap:wrap;align-items:baseline;font-weight:700;font-size:.82rem}.calhd small{font-weight:500;color:var(--sun);font-size:.68rem}.calhd .cnt{color:var(--danger)}
+.calitem{display:grid;text-align:left;font:inherit;font-size:.74rem;line-height:1.35;padding:6px 8px;border:0;border-left:3px solid var(--c);border-radius:8px;background:var(--paper);color:var(--ink);cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.calitem .ty{color:var(--c);font-weight:700}.calitem small{color:var(--danger)}.calitem small.hint{color:var(--muted)}
+.calmonth{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}
+.calwd{text-align:center;font-weight:700;font-size:.8rem;color:var(--muted)}
+.calcell{display:grid;align-content:start;gap:3px;min-height:84px;padding:4px;border-radius:10px;border:1px solid var(--line);background:var(--paper)}
+.calcell.other{opacity:.5}
+.attstat th,.attstat td{padding:4px 3px;font-size:.76rem;white-space:nowrap}.attstat .sub{font-weight:500;font-size:.68rem}
+.attstat .zero{color:var(--line)}.attstat .tot{background:var(--paper2);font-weight:800;color:var(--danger)}.attstat .tot.zero{color:var(--line)}
+.attstat tr.click{cursor:pointer}.attstat tr.click:hover td,.attstat tr.click:hover th{background:var(--mint)}
+.alertbox{border-color:color-mix(in srgb,var(--danger) 40%,var(--line))}
+.alertrule{display:grid;gap:6px;padding:8px 0;border-top:1px dashed var(--line)}.alertrule>b{color:var(--danger)}
+.setlist{display:grid;gap:6px}
+.setrow{display:flex;gap:6px;align-items:center}.setrow .field{min-width:0;width:auto;flex:1;margin:0}.setrow select.field{flex:.6}
+.rulecard{display:grid;gap:6px;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--paper2)}
+.rulecard .field{width:auto;min-width:0;margin:0}.rulecard input[type="number"]{width:5em;flex:none}
+.colchip{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border:1px solid var(--line);border-radius:999px;font-size:.82rem;font-weight:600}
+.colchip input{width:24px;height:24px;border:0;padding:0;background:none;cursor:pointer}
+.orderlist{display:grid;gap:4px;margin-top:6px}
+.trash>summary{cursor:pointer;font-weight:700}
+@media (max-width:700px){.dcards{grid-template-columns:repeat(2,minmax(0,1fr))}.calweek{grid-template-columns:1fr}.calday{min-height:0}.attrow .attlbl{width:100%}.setrow{flex-wrap:wrap}}
 /* 따로 쓰는 앱 탭: 남은 화면 높이만큼 */
 .extwrap{display:grid;gap:8px}
 .extcard{display:grid;gap:10px;justify-items:start;padding:28px;border-radius:18px;background:var(--paper2);max-width:560px}
@@ -819,7 +875,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="backend.js?v=ece70c66"></script>
+<script src="backend.js?v=9583de74"></script>
 <style>
 #fbGate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--desk)}
 #fbGate .fbbox{background:var(--paper);border-radius:22px;padding:36px 32px;text-align:center;box-shadow:0 18px 40px -24px rgba(20,40,25,.35);max-width:340px}
@@ -853,7 +909,7 @@ const el = (tag, props = {}, ...kids) => {
     if(k.includes("-")){ if(v !== undefined && v !== null && v !== false) e.setAttribute(k, String(v)); }
     else e[k] = v;
   }
-  e.append(...kids.filter(k => k != null && k !== false)); // 빈 값(null·undefined)이 글자로 찍히지 않게
+  e.append(...kids.flat(2).filter(k => k != null && k !== false)); // 목록은 펼치고, 빈 값(null·undefined)은 글자로 찍히지 않게
   return e;
 };
 const cloth = c => `var(--${CLOTHS.includes(c) ? c : "slate"})`;
@@ -1018,159 +1074,420 @@ function renderExt(x){
     x.embed ? el("iframe",{className:"extframe",src:x.url,title:x.name,allow:"clipboard-write"})
       : el("div",{className:"extcard"}, el("b",{}, x.note || x.name), el("p",{className:"hint"}, "이 앱은 다른 화면 안에 넣는 것을 막아 두어서 새 창으로 열려요. 교무수첩 탭은 그대로 남아 있어요."), open)));
 }
-// ---------- 학급 출결: 설정에서 이은 '스마트 출결 관리' 구글 시트를 출결 앱과 같이 씀 (Firebase 교무수첩에서) ----------
-// 시트 탭: 학생명부 · 출결기록(시작일, 종료일, 학번, 이름, 출결종류, 교시, 사유, 증빙서류, 제출상태 JSON, 입력일시) · 교시설정 · 출결알림 · 화면설정 · 출결종류 · 학사일정 · 휴지통
-// 처음엔 선생님이 알려 준 출결 시트를 씀 (설정에서 바꿀 수 있음)
+// ---------- 학급 출결: 설정에서 이은 '학급 올인원 워크스페이스(스마트 출결 관리)' 구글 시트를 그 앱과 같은 모양으로 함께 씀 (Firebase 교무수첩에서) ----------
+// 기록 모양·교시 글(종일, 조회~3교시, 3교시~종례, 2교시, 5교시)·휴지통·하루 대표 출결 집계 규칙을 그 앱과 똑같이 맞춤
 const ATT_DEFAULT = "https:" + "/" + "/docs.google.com/spreadsheets/d/1ZyTxkGiztnKSzCfs1OEeoaPMGiJbm6n_5dcPgY02EPU/edit";
 const attCfg = () => ({ on:true, url:ATT_DEFAULT, pos:0, posSet:false, ...(config.attend || {}) });
-let att = { data:null, loading:false, err:"", view:"input", week:0, synced:false, pick:new Set(), periods:new Set() };
+const attOn = () => homeroom() && attCfg().on !== false; // 담임 모드를 끄면 학급 출결 탭도 숨김
+const ATT_VIEWS = [["input","출결 입력"],["docs","서류 관리"],["cal","주간/월간 캘린더"],["stats","누적 통계 & 알림"],["holi","학사일정"],["set","설정"]];
+let att = { data:null, loading:false, err:"", view:"input", synced:false, f:null, week:0, month:0, docQ:"", docS:"", docE:"", docStu:"", docHide:true, statS:"", statE:"", qS:"", qE:"", qStu:"", qTypes:new Set(), result:null, calStu:"" };
 const normD = v => { const m = String(v || "").match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m ? m[1] + "-" + m[2].padStart(2, "0") + "-" + m[3].padStart(2, "0") : ""; };
-const ATT_KIND = n => /결석/.test(n) ? "결석" : /지각/.test(n) ? "지각" : /조퇴/.test(n) ? "조퇴" : /결과/.test(n) ? "결과" : "기타";
-// 짧은 표시: 미인정→미, 질병→질, 인정(생리통)→생, 인정→인 + 결/지/조/과
-const attShort = t => (/^미인정/.test(t.name) ? "미" : /^질병/.test(t.name) ? "질" : /생리/.test(t.name) ? "생" : /^인정/.test(t.name) ? "인" : t.name.slice(0, 1)) + ATT_KIND(t.name).slice(0, 1);
+const pad2a = n => String(n).padStart(2, "0");
+const stuLabel = (num, name) => (isNaN(parseInt(num)) ? "?" : pad2a(parseInt(num))) + ". " + name;
+const splitDocs = s => String(s || "").split(",").map(x => x.trim()).filter(Boolean);
+const attSY = () => { const d = new Date(); return d.getMonth() < 2 ? d.getFullYear() - 1 : d.getFullYear(); };
 function attParse(t){
-  const colors = {}; (t["화면설정"] || []).slice(1).forEach(r => { if(r[0] === "색상그룹" && r[1]) colors[r[1]] = r[2]; });
-  const types = (t["출결종류"] || []).slice(1).filter(r => r[0]).map(r => ({ name:r[0], docs:String(r[1] || "").split(/\s*,\s*/).filter(Boolean), group:r[2] || "", color:colors[r[2]] || "#94a3b8" }));
-  const recs = (t["출결기록"] || []).slice(1).map((r, i) => { let st = {}; try{ st = JSON.parse(r[8] || "{}") || {}; }catch{}
-    return { n:i + 1, raw:r, s:normD(r[0]), e:normD(r[1]) || normD(r[0]), no:Number(r[2]) || 0, name:r[3] || "", type:r[4] || "", periods:String(r[5] || "").match(/\d+/g) || [], reason:r[6] || "",
-      docs:String(r[7] || "").split(/\s*,\s*/).filter(Boolean), status:st, at:r[9] || "" }; }).filter(x => x.s && x.type);
-  const rules = (t["출결알림"] || []).slice(1).filter(r => r[0]).map(r => ({ name:r[0], how:r[1], days:Number(r[3]) || 0, types:String(r[4] || "").split(/\s*,\s*/).filter(Boolean) }));
-  const per = (t["교시설정"] || []).slice(1, 6).map(r => Number(r[1]) || 0);
-  const roster = (t["학생명부"] || []).slice(1).filter(r => Number(r[0])).map(r => ({ no:Number(r[0]), name:r[1] || r[2] || "" }));
-  return { types, recs, rules, per, roster, holi:(t["학사일정"] || []).slice(1).map(r => normD(r[1])).filter(Boolean), tabs:t };
+  const ui = (t["화면설정"] || []).slice(1), colors = {}, statRules = {};
+  ui.forEach(r => { if(r[0] === "색상그룹" && r[1]) colors[r[1]] = r[2]; if(r[0] === "집계규칙"){ try{ if(r[1] === "사유순서") statRules.reasonOrder = JSON.parse(r[2]); if(r[1] === "종류순서") statRules.tieOrder = JSON.parse(r[2]); }catch{} } });
+  const types = (t["출결종류"] || []).slice(1).filter(r => r[0]).map(r => ({ name:String(r[0]).trim(), doc:String(r[1] || "").trim(), group:String(r[2] || "").trim() }));
+  const recs = (t["출결기록"] || []).slice(1).filter(r => r[0] || r[3]).map(r => { let st = {}; try{ st = JSON.parse(r[8] || "{}") || {}; }catch{}
+    return { id:r[10] || "", startDate:normD(r[0]), endDate:normD(r[1]), num:r[2], name:r[3] || "", type:r[4] || "", period:r[5] || "", reason:r[6] || "", doc:r[7] || "", docStatus:st, at:r[9] || "" }; }).filter(r => r.startDate);
+  const trash = (t["휴지통"] || []).slice(1).filter(r => r[0] && r[4]).map(r => ({ tid:r[0], startDate:normD(r[1]), endDate:normD(r[2]), num:r[3], name:r[4], type:r[5], period:r[6], reason:r[7], deletedAt:r[11] || "" })).reverse();
+  const rules = (t["출결알림"] || []).slice(1).filter(r => r[0]).map(r => ({ name:String(r[0]).trim(), how:String(r[1] || "cumulative").trim(), period:String(r[2] || "all").trim(), days:parseInt(r[3]) || 3, types:String(r[4] || "").split(",").map(x => x.trim()).filter(Boolean), s:normD(r[5]), e:normD(r[6]) }));
+  const per = { 1:6, 2:6, 3:6, 4:6, 5:6 }; (t["교시설정"] || []).slice(1).forEach(r => { const d = parseInt(r[0]); if(d >= 1 && d <= 5) per[d] = parseInt(r[1]) || 6; });
+  const roster = (t["학생명부"] || []).slice(1).filter(r => r[0] && r[0] !== "학번").map(r => ({ num:r[0], name:r[1] || r[2] || "", sPhone:r[3] || "", pRel:r[4] || "", pPhone:r[5] || "", msg:r[6] || "" }));
+  const holidays = (t["학사일정"] || []).slice(1).filter(r => r[0]).map(r => ({ name:r[0], start:normD(r[1]), end:normD(r[2]) || normD(r[1]), type:r[3] || "" })).filter(h => h.start);
+  return { types, colors, statRules, recs, trash, rules, per, roster, holidays };
 }
-const attType = n => att.data?.types.find(t => t.name === n) || { name:n, docs:[], group:"", color:"#94a3b8" };
-const attKids = () => students.length ? students.map(s => ({ no:s.no, name:s.name })) : (att.data?.roster || []);
-// 교무수첩 → 출결 시트로 보낼 것 (학생 명단, 쉬는 날, 요일별 교시 수)
+const AD = () => att.data;
+const groupOf = n => AD().types.find(t => t.name === n)?.group || (/체험학습/.test(n) ? "체험학습" : /질병/.test(n) ? "질병" : /미인정/.test(n) ? "미인정" : /인정/.test(n) ? "인정" : "기타");
+const typeColor = n => AD().colors[groupOf(n)] || "#94a3b8";
+const attKids = () => AD()?.roster.length ? AD().roster : students.map(s => ({ num:s.no, name:s.name, sPhone:s.phone || "", pRel:s.parents?.[0]?.rel || "", pPhone:s.parents?.[0]?.phone || "", msg:"" }));
+// 수업일: 주말·교무수첩 쉬는 날·출결 시트 학사일정 제외
+function holiName(k){
+  const w = parseYmd(k).getDay(); if(w === 0 || w === 6) return "주말";
+  const e = events.find(x => x.date === k && isHoliday(x)); if(e) return e.title;
+  const h = AD().holidays.find(x => k >= x.start && k <= x.end); return h ? h.name : "";
+}
+const isSchoolDayA = k => !holiName(k);
+const recOn = (r, k) => k >= r.startDate && k <= (r.endDate || r.startDate);
+const pendingOf = r => splitDocs(r.doc).filter(d => r.docStatus[d] !== true);
+// 교시: 0=조회, 1~N, 99=종례 (그 앱과 같은 규칙으로 고름)
+const PN = p => p === 0 ? "조회" : p === 99 ? "종례" : p + "교시";
+const range1 = (a, b) => Array.from({ length:Math.max(0, b - a + 1) }, (_, i) => a + i);
+function periodText(ps, type){ if(!ps.length) return ""; if(/결과/.test(type)) return ps.map(PN).join(", "); const mn = Math.min(...ps), mx = Math.max(...ps); return mn === mx ? PN(mn) : PN(mn) + "~" + PN(mx); }
+function clickPeriod(sel, p, type, maxP){
+  if(/지각/.test(type)) return p === 0 ? [0] : p === 99 ? [0, ...range1(1, maxP), 99] : [0, ...range1(1, p)];
+  if(/조퇴/.test(type)) return p === 0 ? [0, ...range1(1, maxP), 99] : p === 99 ? [99] : [...range1(p, maxP), 99];
+  if(/결과/.test(type)){ const s = new Set(sel); s.has(p) ? s.delete(p) : s.add(p); return [...s].sort((a, b) => a - b); }
+  return [p];
+}
+function parsePeriods(text, maxP){
+  const t = String(text || "").replace(/조회/g, "0").replace(/종례/g, "99").replace(/교시/g, "").trim(); if(!t || t === "종일" || t === "-") return [];
+  if(t.includes("~")){ const [a, b] = t.split("~").map(x => parseInt(x)); const out = []; if(a === 0) out.push(0); range1(Math.max(1, a), b === 99 ? maxP : b).forEach(i => out.push(i)); if(b === 99) out.push(99); return out; }
+  return t.split(",").map(x => parseInt(x)).filter(n => !isNaN(n));
+}
+const maxPOf = k => { let w = parseYmd(k).getDay(); if(w === 0) w = 1; if(w === 6) w = 5; return AD().per[w] || 6; };
+// ----- 하루 대표 출결 (그 앱의 집계 규칙과 같음) -----
+const DEF_REASON = ["미인정","인정","질병","기타"], DEF_TIE = ["지각","조퇴","결과"];
+const bigCat = n => /결석/.test(n) ? "결석" : /지각/.test(n) ? "지각" : /조퇴/.test(n) ? "조퇴" : /결과/.test(n) ? "결과" : null;
+const subCat = n => /질병/.test(n) ? "질병" : /미인정/.test(n) ? "미인정" : /인정/.test(n) ? "인정" : "기타";
+const normOrder = (a, base) => { const o = []; (Array.isArray(a) ? a : []).forEach(n => { if(base.includes(n) && !o.includes(n)) o.push(n); }); base.forEach(n => { if(!o.includes(n)) o.push(n); }); return o; };
+const reasonOrder = () => normOrder(AD().statRules.reasonOrder, DEF_REASON), tieOrder = () => normOrder(AD().statRules.tieOrder, DEF_TIE);
+function periodCount(p, k){
+  p = String(p || ""); if(!p) return 0; if(p.includes("종일")) return 99;
+  const maxP = maxPOf(k), num = s => s.includes("조회") ? 0 : s.includes("종례") ? maxP + 1 : (isNaN(parseInt(s)) ? null : parseInt(s));
+  return p.split(",").reduce((c, part) => { if(part.includes("~")){ const [a, b] = part.split("~").map(num); return a !== null && b !== null ? c + Math.abs(b - a) + 1 : c; } return num(part) !== null ? c + 1 : c; }, 0);
+}
+function compareDaily(a, b, k){
+  const ba = bigCat(a.type), bb = bigCat(b.type), ra = ba === "결석" ? 0 : ba ? 1 : 2, rb = bb === "결석" ? 0 : bb ? 1 : 2; if(ra !== rb) return ra - rb;
+  const RO = reasonOrder(), ia = RO.indexOf(subCat(a.type)), ib = RO.indexOf(subCat(b.type)); if(ia !== ib) return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  const pa = periodCount(a.period, k), pb = periodCount(b.period, k); if(pa !== pb) return pb - pa;
+  const TO = tieOrder(); return (TO.indexOf(ba) < 0 ? 99 : TO.indexOf(ba)) - (TO.indexOf(bb) < 0 ? 99 : TO.indexOf(bb));
+}
+// { 이름: { num, name, days: { 날짜: { all:[...], chosen } } } } (수업일만)
+function dailyReps(s, e){
+  const by = {};
+  AD().recs.forEach(r => { const rs = r.startDate, re = r.endDate || rs; if(re < s || rs > e) return;
+    for(let d = parseYmd(rs < s ? s : rs); ymd(d) <= (re > e ? e : re); d.setDate(d.getDate() + 1)){ const k = ymd(d); if(!isSchoolDayA(k)) continue;
+      ((by[r.name] ||= { num:r.num, name:r.name, days:{} }).days[k] ||= { all:[] }).all.push(r); } });
+  Object.values(by).forEach(st => Object.keys(st.days).forEach(k => { st.days[k].chosen = st.days[k].all.slice().sort((a, b) => compareDaily(a, b, k))[0]; }));
+  return by;
+}
+function countReps(s, e, name, types){
+  const out = { byRec:new Map(), byType:{}, total:0 }, D = dailyReps(s, e);
+  Object.values(D).forEach(st => { if(name && st.name !== name) return; Object.values(st.days).forEach(d => { const c = d.chosen; if(types?.length && !types.includes(c.type)) return;
+    out.byRec.set(c, (out.byRec.get(c) || 0) + 1); out.byType[c.type] = (out.byType[c.type] || 0) + 1; out.total++; }); });
+  return out;
+}
+function ruleRange(r){
+  const d = new Date();
+  if(r.period === "month") return { s:ymd(new Date(d.getFullYear(), d.getMonth(), 1)), e:ymd(new Date(d.getFullYear(), d.getMonth() + 1, 0)) };
+  if(r.period === "custom" && r.s && r.e) return { s:r.s, e:r.e };
+  const sy = attSY(); return { s:sy + "-03-01", e:ymd(new Date(sy + 1, 2, 0)) };
+}
+function attAlerts(){
+  const out = [];
+  AD().rules.forEach(rule => { if(!rule.types.length) return; const R = ruleRange(rule), D = dailyReps(R.s, R.e);
+    Object.values(D).forEach(st => { const hits = Object.keys(st.days).sort().filter(k => rule.types.includes(st.days[k].chosen.type)); if(!hits.length) return;
+      let n = hits.length;
+      if(rule.how === "consecutive"){ const set = new Set(hits); let best = 0, cur = 0; for(let d = parseYmd(hits[0]); ymd(d) <= hits[hits.length - 1]; d.setDate(d.getDate() + 1)){ const k = ymd(d); if(!isSchoolDayA(k)) continue; cur = set.has(k) ? cur + 1 : 0; best = Math.max(best, cur); } n = best; }
+      if(n >= rule.days) out.push({ rule:rule.name, name:st.name, num:st.num, n, last:hits[hits.length - 1], how:rule.how }); }); });
+  return out.sort((a, b) => b.last.localeCompare(a.last));
+}
+// ----- 불러오기 · 맞추기 -----
 function attPayload(){
   const cells = classTT?.cells?.length ? classTT.cells : tt.cells;
   const periods = [0, 1, 2, 3, 4].map(j => { let n = 0; cells.forEach((r, i) => { if(String(r?.[j] || "").trim()) n = i + 1; }); return n || tt.periods || 7; });
-  const holidays = events.filter(isHoliday).map(e => ({ title:e.title, date:e.date })).sort((a, b) => a.date.localeCompare(b.date));
+  // 교무수첩 학사일정의 쉬는 날을 이어진 기간끼리 묶어서 보냄
+  const hs = events.filter(isHoliday).sort((a, b) => a.date.localeCompare(b.date)), holidays = [];
+  hs.forEach(e => { const last = holidays[holidays.length - 1], nx = last && ymd(new Date(parseYmd(last.end).getTime() + 864e5)); if(last && last.name === e.title && nx === e.date) last.end = e.date; else holidays.push({ name:e.title, start:e.date, end:e.date }); });
   return { students:students.map(s => ({ no:s.no, name:s.name, phone:s.phone || "", rel:s.parents?.[0]?.rel || "", parentPhone:s.parents?.[0]?.phone || "" })), holidays, periods };
 }
-// 시트 내용과 교무수첩이 다르면 맞춤 (한 번 열 때 한 번)
 function attNeedsSync(p){
-  const t = att.data.tabs, h = (t["학사일정"] || []).slice(1).filter(r => r[0]).map(r => r[0] + "|" + normD(r[1])).join(","), ph = p.holidays.map(x => x.title + "|" + x.date).join(",");
-  const per = att.data.per.join(","), pp = p.periods.join(","), st = (t["학생명부"] || []).slice(1).filter(r => r[0]).map(r => r[0] + "|" + r[1]).join(","), ps = p.students.map(s => s.no + "|" + s.name).join(",");
-  return h !== ph || per !== pp || (p.students.length && st !== ps);
+  const D = AD(), haveH = new Set(D.holidays.map(h => h.name + "|" + h.start + "|" + h.end));
+  return p.holidays.some(h => !haveH.has(h.name + "|" + h.start + "|" + h.end)) || [1, 2, 3, 4, 5].some((d, i) => D.per[d] !== p.periods[i])
+    || (p.students.length && D.roster.map(r => Number(r.num) + "|" + r.name).join(",") !== p.students.map(s => s.no + "|" + s.name).join(","));
 }
-async function attSyncNow(quiet){
-  const r = await call("attSync", attPayload()); att.data = attParse(r.data.tabs); att.url = r.data.url;
-  if(!quiet) say("출결 시트를 교무수첩과 맞췄어요: " + r.done.join(", "));
-}
+const attSet = r => { att.data = attParse(r.tabs); att.url = r.url; return r; };
+async function attSyncNow(quiet){ const r = await call("attSync", attPayload()); attSet(r.data); if(!quiet) say("출결 시트를 교무수첩과 맞췄어요" + (r.done.length ? ": " + r.done.join(", ") : "")); }
 async function loadAtt(){
   att.loading = true; att.err = "";
-  try{ const r = await call("attLoad"); att.data = attParse(r.tabs); att.url = r.url;
-    if(!att.synced && canWrite()){ att.synced = true; if(attNeedsSync(attPayload())) await attSyncNow(true); } }
+  try{ attSet(await call("attLoad")); if(!att.synced && canWrite()){ att.synced = true; if(attNeedsSync(attPayload())) await attSyncNow(true); } }
   catch(e){ att.err = e?.message || "출결 시트를 읽지 못했어요."; }
   att.loading = false; if(tab === "attend") renderAttend();
 }
-const attStamp = () => { const d = new Date(); return ymd(d) + " " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); };
-const holiSet = () => new Set([...events.filter(isHoliday).map(e => e.date), ...(att.data?.holi || [])]);
-const schoolDays = (s, e, H) => { const out = []; for(let d = parseYmd(s); ymd(d) <= e && out.length < 400; d.setDate(d.getDate() + 1)){ const w = d.getDay(); if(w > 0 && w < 6 && !H.has(ymd(d))) out.push(ymd(d)); } return out; };
-const attChip = (r, title) => { const t = attType(r.type), c = el("span",{className:"attchip",title:title || (r.type + (r.periods.length ? " · " + r.periods.join(",") + "교시" : "") + (r.reason ? " · " + r.reason : ""))}, attShort(t)); c.style.setProperty("--c", t.color); return c; };
+// 시트에 쓰고 새 내용으로 다시 그림
+async function attDo(fn, args, ok){ try{ const r = await call(fn, ...args); attSet(r); if(ok) say(ok); renderAttend(); return r; }catch(e){ say(e?.message || "저장하지 못했어요."); throw e; } }
+// ----- 화면 -----
+const chipBtn = (label, color, on, onclick, extra) => { const b = el("button",{type:"button",className:"tchip" + (on ? " on" : ""),...(extra || {})}, label); b.style.setProperty("--c", color); b.onclick = onclick; return b; };
 function renderAttend(){
   const A = attCfg(), V = $("view");
   if(!window.fbCall) return V.replaceChildren(el("section",{className:"extcard"}, el("b",{}, "학급 출결은 새 교무수첩에서 써요"), el("p",{className:"hint"}, "구글 로그인으로 출결 시트를 바로 읽고 써야 해서, uzzint.github.io/gyomu/app 에서 열어 주세요."),
     el("a",{className:"btn",href:"https:" + "/" + "/uzzint.github.io/gyomu/app/",target:"_blank",rel:"noopener noreferrer"}, "새 교무수첩 열기")));
-  if(!A.url) return V.replaceChildren(el("section",{className:"extcard"}, el("b",{}, "출결 시트를 먼저 이어 주세요"),
-    el("p",{className:"hint"}, "설정 → 학급 출결에서 '스마트 출결 관리' 구글 시트 주소를 넣으면 여기서 출결을 입력하고, 서류·주간 현황·통계를 볼 수 있어요. 출결 앱과 같은 시트를 함께 써요."),
-    navBtn("설정으로", () => go("settings"), "설정 탭으로")));
-  if(!att.data && !att.loading && !att.err){ loadAtt(); }
-  const views = [["input","입력"],["docs","서류"],["weekly","주간"],["stats","통계"]];
-  const seg = el("div",{className:"attseg",role:"tablist","aria-label":"학급 출결 보기"}, ...views.map(([k, n]) => { const b = el("button",{type:"button",role:"tab","aria-selected":String(att.view === k)}, n); b.onclick = () => { att.view = k; renderAttend(); }; return b; }));
+  if(!A.url) return V.replaceChildren(el("section",{className:"extcard"}, el("b",{}, "출결 시트를 먼저 이어 주세요"), el("p",{className:"hint"}, "설정 → 학급 출결에서 출결 시트 주소를 넣어 주세요."), navBtn("설정으로", () => go("settings"), "설정 탭으로")));
+  if(!att.data && !att.loading && !att.err) loadAtt();
+  const D = AD(), pend = D ? D.recs.reduce((n, r) => n + pendingOf(r).length, 0) : 0, today = ymd(new Date()), todayN = D ? D.recs.filter(r => recOn(r, today)).length : 0;
+  const alertsN = D ? attAlerts().length : 0;
+  const seg = el("div",{className:"attseg",role:"tablist","aria-label":"학급 출결 보기"}, ...ATT_VIEWS.map(([k, n]) => { const badge = k === "input" ? todayN : k === "docs" ? pend : k === "stats" ? alertsN : 0;
+    const b = el("button",{type:"button",role:"tab","aria-selected":String(att.view === k)}, n, badge ? el("span",{className:"tbadge"}, String(badge)) : ""); b.onclick = () => { att.view = k; renderAttend(); }; return b; }));
   const tools = el("div",{className:"tt-tools"},
     navBtn("새로 고침", () => { att.data = null; att.err = ""; renderAttend(); }, "출결 시트 다시 읽기"),
     navBtn("교무수첩과 맞추기", async () => { try{ await attSyncNow(); renderAttend(); }catch(e){ say(e?.message || "맞추지 못했어요."); } }, "학생 명단·쉬는 날·교시 수를 출결 시트에 보내기", !canWrite()),
     el("a",{className:"btn ghost small",href:att.url || A.url,target:"_blank",rel:"noopener noreferrer"}, "시트 열기"));
-  const body = att.err ? el("p",{className:"miss"}, att.err) : !att.data ? el("p",{className:"hint"}, "출결 시트를 읽는 중…")
-    : att.view === "docs" ? attDocsView() : att.view === "weekly" ? attWeekView() : att.view === "stats" ? attStatsView() : attInputView();
-  V.replaceChildren(el("section",{className:"attwrap"}, el("div",{className:"panel-head"}, el("h2",{}, "학급 출결"), seg, tools), body));
+  const body = att.err ? el("p",{className:"miss"}, att.err) : !D ? el("p",{className:"hint"}, "출결 시트를 읽는 중…")
+    : ({ input:attInput, docs:attDocs, cal:attCal, stats:attStats, holi:attHoli, set:attSettings }[att.view] || attInput)();
+  V.replaceChildren(el("section",{className:"attwrap"}, el("div",{className:"panel-head atthead"}, el("h2",{}, "학급 출결"), tools), seg, body));
 }
-function attInputView(){
-  const D = att.data, today = ymd(new Date());
-  const s = el("input",{type:"date",className:"field",value:today,"aria-label":"시작일"}), e = el("input",{type:"date",className:"field","aria-label":"종료일 (하루면 비워 둠)"});
-  const groups = [...new Set(D.types.map(t => t.group))];
-  const type = el("select",{className:"field","aria-label":"출결 종류"}, ...groups.map(g => el("optgroup",{label:g || "기타"}, ...D.types.filter(t => t.group === g).map(t => el("option",{value:t.name}, t.name)))));
-  const reason = el("input",{type:"text",className:"field",maxLength:200,placeholder:"사유 (예: 감기, 병원 진료)","aria-label":"사유"});
-  const docs = el("input",{type:"text",className:"field",maxLength:300,"aria-label":"증빙서류"});
-  const kidBox = el("div",{className:"stuchips"}), perBox = el("div",{className:"stuchips perchips"}), perRow = el("div",{className:"attrow"}, el("span",{className:"attlbl"}, "교시"), perBox);
-  const drawKids = () => kidBox.replaceChildren(...attKids().map(k => { const b = el("button",{type:"button",className:"kchip","aria-pressed":String(att.pick.has(k.no))}, k.no + " " + k.name); b.onclick = () => { att.pick.has(k.no) ? att.pick.delete(k.no) : att.pick.add(k.no); drawKids(); }; return b; }));
-  const drawPer = () => { const w = parseYmd(s.value || today).getDay(), n = (D.per[w - 1] || tt.periods || 7);
-    perBox.replaceChildren(...Array.from({ length:n }, (_, i) => { const p = String(i + 1), b = el("button",{type:"button",className:"kchip","aria-pressed":String(att.periods.has(p))}, p); b.onclick = () => { att.periods.has(p) ? att.periods.delete(p) : att.periods.add(p); drawPer(); }; return b; }));
-    perRow.hidden = ATT_KIND(type.value) === "결석"; };
-  const onType = () => { docs.value = attType(type.value).docs.join(", "); drawPer(); };
-  type.onchange = onType; s.onchange = drawPer; drawKids(); onType();
-  const save = el("button",{type:"button",className:"btn",disabled:!canWrite()}, "기록하기");
+// 1. 출결 입력
+function attInput(){
+  const D = AD(), today = ymd(new Date());
+  const f = att.f ||= { s:today, e:"", type:"", kids:new Set(), ps:[], maxP:maxPOf(today), docs:[], st:{}, reason:"" };
+  const todays = D.recs.filter(r => recOn(r, today)), pend = D.recs.reduce((n, r) => n + pendingOf(r).length, 0);
+  const card = (n, label, c, on) => { const b = el(on ? "button" : "div",{className:"dcard",type:on ? "button" : undefined}, el("b",{}, String(n)), el("span",{}, label)); b.style.setProperty("--c", c); if(on) b.onclick = on; return b; };
+  const s = el("input",{type:"date",className:"field",value:f.s,"aria-label":"시작일"}), e = el("input",{type:"date",className:"field",value:f.e,"aria-label":"종료일 (하루면 비워 둠)"});
+  const typeBox = el("div",{className:"typegroups"}), kidBox = el("div",{className:"kidgrid"}), perBox = el("div",{className:"pergrid"}), perHint = el("span",{className:"hint"}), docBox = el("div",{className:"docrow"});
+  const drawTypes = () => { const groups = [...new Set(D.types.map(t => t.group))];
+    typeBox.replaceChildren(...groups.map(g => el("div",{className:"tgroup"}, ...D.types.filter(t => t.group === g).map(t => chipBtn(t.name, typeColor(t.name), f.type === t.name, () => {
+      f.type = f.type === t.name ? "" : t.name; f.ps = /결석/.test(f.type) ? [0, ...range1(1, f.maxP), 99] : []; f.docs = splitDocs(attTypeDoc(f.type)); f.st = {};
+      if(/생리/.test(f.type) && !reason.value) reason.value = "생리통"; drawTypes(); drawPer(); drawDocs(); }))))); };
+  const attTypeDoc = n => D.types.find(t => t.name === n)?.doc || "";
+  const drawKids = () => { const kids = attKids(), max = Math.max(0, ...kids.map(k => parseInt(k.num) || 0));
+    kidBox.replaceChildren(...range1(1, max).map(i => { const k = kids.find(x => parseInt(x.num) === i); if(!k) return el("span",{});
+      const b = el("button",{type:"button",className:"kbtn","aria-pressed":String(f.kids.has(String(k.num)))}, stuLabel(k.num, k.name)); b.onclick = () => { const id = String(k.num); f.kids.has(id) ? f.kids.delete(id) : f.kids.add(id); drawKids(); }; return b; })); };
+  const drawPer = () => { const ab = /결석/.test(f.type);
+    perHint.textContent = ab ? "종일 처리돼요." : /지각/.test(f.type) ? "도착한 교시를 눌러요" : /조퇴/.test(f.type) ? "나간 교시를 눌러요" : /결과/.test(f.type) ? "여러 교시를 고를 수 있어요" : f.type ? "" : "출결 종류를 먼저 골라요";
+    perBox.replaceChildren(...[0, ...range1(1, f.maxP), 99].map(p => { const b = el("button",{type:"button",className:"kbtn pbtn","aria-pressed":String(f.ps.includes(p)),disabled:!f.type || ab}, PN(p));
+      b.onclick = () => { f.ps = clickPeriod(f.ps, p, f.type, f.maxP); drawPer(); }; return b; }),
+      navBtn("+", () => { f.maxP++; drawPer(); }, "교시 하나 더"), navBtn("−", () => { f.maxP = Math.max(1, f.maxP - 1); f.ps = f.ps.filter(p => p <= f.maxP || p === 99); drawPer(); }, "교시 하나 빼기")); };
+  const drawDocs = () => docBox.replaceChildren(...(f.docs.length ? f.docs.map(d => { const b = el("button",{type:"button",className:"docbtn" + (f.st[d] ? " done" : ""),title:"눌러서 제출 표시"}, d); b.onclick = () => { f.st[d] = !f.st[d]; drawDocs(); }; return b; }) : [el("span",{className:"hint"}, "서류 없음")]),
+    navBtn("+ 서류", () => { const n = prompt("추가할 서류 이름"); if(n && n.trim() && !f.docs.includes(n.trim())){ f.docs.push(n.trim()); drawDocs(); } }, "서류 더하기"));
+  const reason = el("input",{type:"text",className:"field",value:f.reason,maxLength:300,placeholder:"사유","aria-label":"사유"});
+  s.onchange = () => { f.s = s.value; f.maxP = maxPOf(s.value || today); if(/결석/.test(f.type)) f.ps = [0, ...range1(1, f.maxP), 99]; drawPer(); };
+  e.onchange = () => { f.e = e.value; }; reason.oninput = () => { f.reason = reason.value; };
+  reason.onkeydown = ev => { if(ev.key === "Enter" && !ev.isComposing){ ev.preventDefault(); save.click(); } };
+  drawTypes(); drawKids(); drawPer(); drawDocs();
+  const save = el("button",{type:"button",className:"btn",disabled:!canWrite()}, "기록 일괄 저장");
   save.onclick = async () => {
-    const kids = attKids().filter(k => att.pick.has(k.no)); if(!kids.length) return say("학생을 골라 주세요.");
-    if(!s.value) return say("날짜를 넣어 주세요."); if(e.value && e.value < s.value) return say("종료일이 시작일보다 빨라요.");
-    const kind = ATT_KIND(type.value), per = kind === "결석" ? [] : [...att.periods].sort((a, b) => a - b);
-    if(kind !== "결석" && kind !== "기타" && !per.length) return say(kind + "은 교시를 골라 주세요.");
-    const dl = docs.value.split(/\s*,\s*/).filter(Boolean), stamp = attStamp();
+    if(!f.s) return say("시작일을 넣어 주세요."); if(!f.kids.size) return say("학생을 골라 주세요."); if(f.e && f.e < f.s) return say("종료일이 시작일보다 빨라요.");
+    const pt = /결석/.test(f.type) ? "종일" : periodText(f.ps, f.type), kids = attKids().filter(k => f.kids.has(String(k.num)));
     save.disabled = true;
-    try{ const r = await call("attAdd", kids.map(k => [s.value, e.value && e.value !== s.value ? e.value : "", String(k.no), k.name, type.value, per.join(","), reason.value.trim(), dl.join(", "), JSON.stringify(Object.fromEntries(dl.map(d => [d, false]))), stamp]));
-      att.data = attParse(r.tabs); att.pick.clear(); att.periods.clear(); say(kids.length + "명 " + type.value + " 기록했어요."); renderAttend(); }
-    catch(x){ save.disabled = false; say(x?.message || "기록하지 못했어요."); }
+    try{ await attDo("attAdd", [kids.map(k => ({ startDate:f.s, endDate:f.e, num:k.num, name:k.name, type:f.type, period:pt, reason:reason.value.trim(), doc:f.docs.join(", "), docStatus:Object.fromEntries(f.docs.map(d => [d, !!f.st[d]])) }))], kids.length + "명 기록했어요.");
+      att.f = { ...f, kids:new Set(), type:"", ps:[], docs:[], st:{}, reason:"" }; renderAttend(); }
+    catch{ save.disabled = false; }
   };
-  // 최근 기록 (2주): 지우면 출결 시트의 휴지통으로
-  const since = ymd(new Date(Date.now() - 14 * 864e5)), recent = D.recs.filter(r => r.e >= since).sort((a, b) => b.s.localeCompare(a.s) || b.n - a.n).slice(0, 60);
-  const list = recent.length ? el("div",{className:"attlist"}, ...recent.map(r => { const x = navBtn("지우기", async () => {
-      if(!confirm(r.s + " " + r.no + "번 " + r.name + " " + r.type + " 기록을 지울까요? (출결 시트의 휴지통으로 가요)")) return;
-      try{ const d = await call("attDelete", r.n, r.raw); att.data = attParse(d.tabs); renderAttend(); }catch(e){ say(e?.message || "지우지 못했어요."); } }, "기록 지우기", !canWrite());
-    return el("div",{className:"attline"}, attChip(r), el("span",{className:"d"}, dayLabel(parseYmd(r.s)) + (r.e !== r.s ? " ~ " + dayLabel(parseYmd(r.e)) : "")), el("b",{}, r.no + " " + r.name),
-      el("span",{className:"t"}, r.type + (r.periods.length ? " · " + r.periods.join(",") + "교시" : "") + (r.reason ? " · " + r.reason : "")), x); }))
-    : el("p",{className:"hint"}, "최근 2주 기록이 없어요.");
-  return el("div",{className:"attcols"},
-    el("section",{className:"notes attform"}, el("h3",{className:"nt-title"}, "출결 입력"),
+  const sms = navBtn("선택 학생 연락 (문자·전화)", () => attSms(attKids().filter(k => f.kids.has(String(k.num)))), "선택 학생 연락");
+  // 오늘 학생 현황 (오늘 기록이 있으면 그 색으로, 안 낸 서류 수 표시)
+  const kids = attKids(), max = Math.max(0, ...kids.map(k => parseInt(k.num) || 0));
+  const stuGrid = el("div",{className:"kidgrid"}, ...range1(1, max).map(i => { const k = kids.find(x => parseInt(x.num) === i); if(!k) return el("span",{});
+    const r = todays.find(x => x.name === k.name), pn = D.recs.filter(x => x.name === k.name).reduce((n, x) => n + pendingOf(x).length, 0);
+    const b = el("button",{type:"button",className:"kbtn" + (r ? " filled" : "")}, stuLabel(k.num, k.name), pn ? el("span",{className:"kbadge"}, String(pn)) : ""); if(r) b.style.setProperty("--c", typeColor(r.type)); b.onclick = () => attStudent(k.name); return b; }));
+  return el("div",{className:"attgrid"},
+    el("div",{className:"dcards"}, card(kids.length, "전체 학생", "#3b82f6"), card(new Set(todays.map(r => r.name)).size, "오늘 출결 학생", "#f59e0b"), card(todays.length, "오늘 처리 건수", "#ef4444"),
+      card(pend, "미제출 서류 →", pend ? "#f59e0b" : "#94a3b8", () => { att.view = "docs"; renderAttend(); })),
+    el("section",{className:"notes attform"},
       el("div",{className:"attrow"}, el("span",{className:"attlbl"}, "날짜"), s, el("span",{}, "~"), e),
-      el("div",{className:"attrow"}, el("span",{className:"attlbl"}, "종류"), type),
-      el("div",{className:"attrow top"}, el("span",{className:"attlbl"}, "학생"), kidBox), perRow,
+      el("div",{className:"attrow top"}, el("span",{className:"attlbl"}, "종류"), typeBox),
+      el("div",{className:"attrow top"}, el("span",{className:"attlbl"}, "학생"), kidBox),
+      el("div",{className:"attrow top"}, el("span",{className:"attlbl"}, "교시"), el("div",{className:"perwrap"}, perBox, perHint)),
       el("div",{className:"attrow"}, el("span",{className:"attlbl"}, "사유"), reason),
-      el("div",{className:"attrow"}, el("span",{className:"attlbl"}, "서류"), docs),
-      el("div",{className:"actions"}, el("span",{className:"spacer"}), save)),
-    el("section",{className:"notes"}, el("h3",{className:"nt-title"}, "최근 2주 기록"), list));
+      el("div",{className:"attrow top"}, el("span",{className:"attlbl"}, "서류"), docBox),
+      el("div",{className:"actions"}, sms, el("span",{className:"spacer"}), save)),
+    el("section",{className:"notes"}, el("div",{className:"panel-head"}, el("h3",{className:"nt-title"}, "학생 현황"), el("span",{className:"hint"}, dayLabel(new Date()))), stuGrid),
+    el("section",{className:"notes"}, el("h3",{className:"nt-title"}, "오늘 출결 기록"), recTable(todays.sort((a, b) => (parseInt(a.num) || 0) - (parseInt(b.num) || 0)), { noDate:true, empty:"오늘 출결 처리된 기록이 없어요. 전원 정상 출석!" })));
 }
-function attDocsView(){
-  const D = att.data, all = att.docAll === true;
-  const rows = D.recs.filter(r => r.docs.length && (all || r.docs.some(d => !r.status[d]))).sort((a, b) => b.s.localeCompare(a.s));
-  const toggle = el("label",{className:"inline"}, (() => { const c = el("input",{type:"checkbox",checked:all}); c.onchange = () => { att.docAll = c.checked; renderAttend(); }; return c; })(), " 다 낸 것도 보기");
-  return el("section",{className:"notes"}, el("div",{className:"panel-head"}, el("h3",{className:"nt-title"}, "증빙서류 " + (all ? "전체" : "미제출")), el("span",{className:"spacer"}), toggle),
-    rows.length ? el("div",{className:"attlist"}, ...rows.map(r => el("div",{className:"attline"}, attChip(r), el("span",{className:"d"}, dayLabel(parseYmd(r.s))), el("b",{}, r.no + " " + r.name), el("span",{className:"t"}, r.type),
-      el("span",{className:"docs"}, ...r.docs.map(d => { const b = el("button",{type:"button",className:"kchip","aria-pressed":String(!!r.status[d]),disabled:!canWrite(),title:r.status[d] ? "냄 (누르면 안 냄)" : "안 냄 (누르면 냄)"}, (r.status[d] ? "✓ " : "") + d);
-        b.onclick = async () => { const st = { ...r.status, [d]:!r.status[d] }, row = r.raw.slice(0, 10); while(row.length < 10) row.push(""); row[8] = JSON.stringify(st);
-          try{ const x = await call("attEdit", r.n, r.raw, row); att.data = attParse(x.tabs); renderAttend(); }catch(e){ say(e?.message || "바꾸지 못했어요."); } };
-        return b; }))))) : el("p",{className:"hint"}, all ? "서류가 필요한 기록이 없어요." : "안 낸 서류가 없어요."));
+// 기록 표 (누르면 고치기 창). 서류 단추는 눌러서 냄/안 냄
+function recTable(list, o = {}){
+  if(!list.length) return el("p",{className:"hint"}, o.empty || "기록이 없어요.");
+  return el("div",{className:"attlist"}, ...list.map(r => { const row = el("div",{className:"attline click",tabIndex:0,role:"button"},
+    el("span",{className:"dot"}), o.noDate ? "" : el("span",{className:"d"}, dayLabel(parseYmd(r.startDate)) + (r.endDate && r.endDate !== r.startDate ? " ~ " + dayLabel(parseYmd(r.endDate)) : "")),
+    el("b",{}, stuLabel(r.num, r.name)), el("span",{className:"ty"}, r.type || "-", el("small",{}, " (" + (r.period || "-") + ")")), el("span",{className:"t"}, r.reason || ""),
+    el("span",{className:"docs"}, ...splitDocs(r.doc).map(d => { const b = el("button",{type:"button",className:"docbtn" + (r.docStatus[d] === true ? " done" : ""),disabled:!canWrite()}, d);
+      b.onclick = ev => { ev.stopPropagation(); attDo("attDoc", [r.id, { ...r.docStatus, [d]:r.docStatus[d] !== true }]).catch(() => {}); }; return b; })));
+    row.style.setProperty("--c", typeColor(r.type)); row.onclick = () => attEdit(r); row.onkeydown = ev => { if(ev.key === "Enter") attEdit(r); }; return row; }));
 }
-function attWeekView(){
-  const D = att.data, mon = new Date(); mon.setHours(12, 0, 0, 0); mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7) + att.week * 7);
-  const days = [0, 1, 2, 3, 4].map(i => { const d = new Date(mon); d.setDate(mon.getDate() + i); return ymd(d); }), H = holiSet();
-  const nav = el("div",{className:"tt-tools"}, navBtn("‹", () => { att.week--; renderAttend(); }, "지난주"), navBtn("이번 주", () => { att.week = 0; renderAttend(); }, "이번 주", att.week === 0), navBtn("›", () => { att.week++; renderAttend(); }, "다음 주"));
-  const body = attKids().map(k => el("tr",{}, el("th",{}, k.no + " " + k.name), ...days.map(dk => { const rs = D.recs.filter(r => r.no === k.no && r.s <= dk && r.e >= dk);
-    return el("td",{className:H.has(dk) ? "holi" : ""}, ...rs.map(r => attChip(r))); })));
-  return el("section",{className:"notes"}, el("div",{className:"panel-head"}, el("h3",{className:"nt-title"}, dayLabel(parseYmd(days[0])) + " ~ " + dayLabel(parseYmd(days[4]))), nav),
-    el("div",{className:"tt-wrap"}, el("table",{className:"plan attweek"}, el("thead",{}, el("tr",{}, el("th",{}, "학생"), ...days.map(dk => el("th",{className:H.has(dk) ? "holi" : ""}, dayLabel(parseYmd(dk)))))), el("tbody",{}, ...body))),
-    el("p",{className:"hint"}, "미=미인정 · 질=질병 · 인=인정 · 생=생리통 / 결=결석 · 지=지각 · 조=조퇴 · 과=결과. 칸에 마우스를 올리면 자세히 보여요."));
+// 기록 고치기 · 복제 · 지우기
+function attEdit(r){
+  const D = AD(), g = { s:r.startDate, e:r.endDate || "", type:r.type, maxP:maxPOf(r.startDate), docs:splitDocs(r.doc), st:{ ...r.docStatus } };
+  g.ps = /결석/.test(g.type) ? [0, ...range1(1, g.maxP), 99] : parsePeriods(r.period, g.maxP);
+  const s = el("input",{type:"date",className:"field",value:g.s}), e = el("input",{type:"date",className:"field",value:g.e});
+  const stu = el("select",{className:"field","aria-label":"학생"}, ...attKids().map(k => el("option",{value:k.num + "|" + k.name}, stuLabel(k.num, k.name)))); stu.value = r.num + "|" + r.name;
+  const typeBox = el("div",{className:"typegroups"}), perBox = el("div",{className:"pergrid"}), docBox = el("div",{className:"docrow"}), reason = el("input",{type:"text",className:"field",value:r.reason,maxLength:300});
+  const drawT = () => typeBox.replaceChildren(...[...new Set(D.types.map(t => t.group))].map(gr => el("div",{className:"tgroup"}, ...D.types.filter(t => t.group === gr).map(t => chipBtn(t.name, typeColor(t.name), g.type === t.name, () => {
+    g.type = t.name; g.ps = /결석/.test(g.type) ? [0, ...range1(1, g.maxP), 99] : []; g.docs = splitDocs(t.doc); g.st = {}; drawT(); drawP(); drawD(); })))));
+  const drawP = () => perBox.replaceChildren(...[0, ...range1(1, g.maxP), 99].map(p => { const b = el("button",{type:"button",className:"kbtn pbtn","aria-pressed":String(g.ps.includes(p)),disabled:/결석/.test(g.type)}, PN(p)); b.onclick = () => { g.ps = clickPeriod(g.ps, p, g.type, g.maxP); drawP(); }; return b; }));
+  const drawD = () => docBox.replaceChildren(...g.docs.map(d => { const b = el("button",{type:"button",className:"docbtn" + (g.st[d] ? " done" : "")}, d); b.onclick = () => { g.st[d] = !g.st[d]; drawD(); }; return b; }),
+    navBtn("+ 서류", () => { const n = prompt("추가할 서류 이름"); if(n && n.trim() && !g.docs.includes(n.trim())){ g.docs.push(n.trim()); drawD(); } }, "서류 더하기"));
+  s.onchange = () => { g.s = s.value; g.maxP = maxPOf(s.value); drawP(); }; drawT(); drawP(); drawD();
+  const rec = () => { const [num, name] = stu.value.split("|"); return { startDate:s.value, endDate:e.value && e.value !== s.value ? e.value : "", num, name, type:g.type, period:/결석/.test(g.type) ? "종일" : periodText(g.ps, g.type), reason:reason.value.trim(), doc:g.docs.join(", "), docStatus:Object.fromEntries(g.docs.map(d => [d, !!g.st[d]])) }; };
+  const save = el("button",{type:"button",className:"btn",disabled:!canWrite()}, "수정");
+  save.onclick = async () => { if(!s.value) return say("시작일을 넣어 주세요."); try{ await attDo("attUpdate", [r.id, rec()], "고쳤어요."); $("dayDlg").close(); }catch{} };
+  const dup = navBtn("복제", async () => { const x = rec(); x.docStatus = Object.fromEntries(g.docs.map(d => [d, false])); try{ await attDo("attAdd", [[x]], "복제했어요."); $("dayDlg").close(); }catch{} }, "기록 복제", !canWrite());
+  const del = navBtn("지우기", async () => { if(!confirm("이 기록을 지울까요? (출결 시트 휴지통으로 가요)")) return;
+    try{ const x = await attDo("attTrash", [r.id]); $("dayDlg").close(); attUndoToast(x.trashId); }catch{} }, "기록 지우기", !canWrite());
+  modal(stuLabel(r.num, r.name) + " 출결 고치기",
+    el("div",{className:"attrow"}, el("span",{className:"attlbl"}, "날짜"), s, el("span",{}, "~"), e),
+    el("div",{className:"attrow"}, el("span",{className:"attlbl"}, "학생"), stu),
+    el("div",{className:"attrow top"}, el("span",{className:"attlbl"}, "종류"), typeBox),
+    el("div",{className:"attrow top"}, el("span",{className:"attlbl"}, "교시"), perBox),
+    el("div",{className:"attrow"}, el("span",{className:"attlbl"}, "사유"), reason),
+    el("div",{className:"attrow top"}, el("span",{className:"attlbl"}, "서류"), docBox),
+    el("div",{className:"actions"}, del, dup, el("span",{className:"spacer"}), save));
 }
-function attStatsView(){
-  const D = att.data, H = holiSet(), kinds = ["결석","지각","조퇴","결과"];
-  const stat = k => { const o = { 결석:0, 지각:0, 조퇴:0, 결과:0 }, by = {}; D.recs.filter(r => r.no === k.no).forEach(r => { const n = schoolDays(r.s, r.e, H).length || 1, kd = ATT_KIND(r.type); if(o[kd] !== undefined) o[kd] += n; by[r.type] = (by[r.type] || 0) + n; }); return { o, by }; };
-  // 출결알림 규칙: 연속(consecutive) / 누적(cumulative) 일수
-  const alerts = [];
-  attKids().forEach(k => D.rules.forEach(rule => {
-    const ds = [...new Set(D.recs.filter(r => r.no === k.no && rule.types.includes(r.type)).flatMap(r => schoolDays(r.s, r.e, H)))].sort();
-    let best = ds.length;
-    if(rule.how === "consecutive"){ best = 0; let run = 0, prev = null; ds.forEach(d => { run = prev && schoolDays(prev, d, H).length === 2 ? run + 1 : 1; prev = d; best = Math.max(best, run); }); }
-    if(rule.days && best >= rule.days) alerts.push(k.no + " " + k.name + " · " + rule.name + " (" + best + "일)");
-  }));
-  return el("div",{className:"attcols"},
-    el("section",{className:"notes"}, el("h3",{className:"nt-title"}, "학생별 누적 (학교 가는 날 기준)"),
-      el("div",{className:"tt-wrap"}, el("table",{className:"plan"}, el("thead",{}, el("tr",{}, el("th",{}, "학생"), ...kinds.map(x => el("th",{className:"c"}, x)), el("th",{}, "자세히"))),
-        el("tbody",{}, ...attKids().map(k => { const s = stat(k); return el("tr",{}, el("td",{}, k.no + " " + k.name), ...kinds.map(x => el("td",{className:"c"}, s.o[x] || "")), el("td",{className:"hint"}, Object.entries(s.by).map(([t, n]) => t + " " + n).join(" · "))); }))))),
-    el("section",{className:"notes"}, el("h3",{className:"nt-title"}, "출결 알림"), alerts.length ? el("ul",{className:"attalerts"}, ...alerts.map(a => el("li",{}, a))) : el("p",{className:"hint"}, "규칙에 걸린 학생이 없어요."),
-      el("p",{className:"hint"}, "규칙은 출결 시트의 '출결알림' 탭에서 고쳐요.")));
+// 지운 뒤 바로 되살리기
+function attUndoToast(tid){
+  if(!tid) return;
+  const t = $("status"); t.textContent = "지웠어요. "; const b = el("button",{type:"button",className:"linkbtn"}, "되살리기");
+  b.onclick = () => attDo("attRestore", [tid], "되살렸어요.").catch(() => {}); t.append(b);
 }
-// 설정 탭: 출결 시트 잇기 · 시트 열기 · 탭 위치 · 보이기
+// 학생 한 명: 안 낸 서류 · 최근 기록 · 이번 학년도 합계
+function attStudent(name){
+  const D = AD(), k = attKids().find(x => x.name === name) || { num:"?", name }, mine = D.recs.filter(r => r.name === name).sort((a, b) => b.startDate.localeCompare(a.startDate));
+  const sy = attSY(), c = countReps(sy + "-03-01", ymd(new Date(sy + 1, 2, 0)), name);
+  const pend = mine.filter(r => pendingOf(r).length);
+  modal(stuLabel(k.num, name) + " 출결",
+    el("p",{className:"miss"}, Object.keys(c.byType).length ? "이번 학년도: " + Object.entries(c.byType).map(([t, n]) => t + " " + n + "일/회").join(", ") : "이번 학년도 출결 기록이 없어요."),
+    pend.length ? [el("h3",{className:"nt-title"}, "안 낸 서류"), recTable(pend)] : el("p",{className:"hint"}, "안 낸 서류가 없어요."),
+    el("h3",{className:"nt-title"}, "기록 (최근 순)"), recTable(mine.slice(0, 40)),
+    el("div",{className:"actions"}, navBtn("연락하기", () => attSms([k]), "연락하기")));
+}
+// 문자·전화 (학생·보호자, 미등교 안내 문구)
+function attSms(list){
+  if(!list.length) return say("연락할 학생을 골라 주세요.");
+  const link = (href, label) => el("a",{className:"btn ghost small",href}, label);
+  modal("학생·학부모 연락", el("p",{className:"hint"}, "휴대폰에서 누르면 문자 앱·전화가 열려요. 문자 내용은 출결 시트 '학생명부'의 메시지내용이에요."),
+    ...list.map(k => el("div",{className:"notes"}, el("b",{}, stuLabel(k.num, k.name)), el("p",{className:"hint pre"}, k.msg || "(메시지 내용 없음)"),
+      el("div",{className:"actions"}, k.sPhone ? [link("sms:" + k.sPhone + "?body=" + encodeURIComponent(k.msg || ""), "학생 문자"), link("tel:" + k.sPhone, "학생 전화")] : el("span",{className:"hint"}, "학생 번호 없음"),
+        k.pPhone ? [link("sms:" + k.pPhone + "?body=" + encodeURIComponent(k.msg || ""), (k.pRel || "보호자") + " 문자"), link("tel:" + k.pPhone, (k.pRel || "보호자") + " 전화")] : el("span",{className:"hint"}, "보호자 번호 없음"),
+        navBtn("내용 복사", () => copyText(k.msg || "", "문자 내용"), "문자 내용 복사")))));
+}
+// 2. 서류 관리 (+ 휴지통)
+function attDocs(){
+  const D = AD(), q = el("input",{type:"search",className:"field",value:att.docQ,placeholder:"이름·사유·종류 찾기","aria-label":"찾기"});
+  const s = el("input",{type:"date",className:"field",value:att.docS}), e = el("input",{type:"date",className:"field",value:att.docE});
+  const stu = el("select",{className:"field","aria-label":"학생"}, el("option",{value:""}, "모든 학생"), ...attKids().map(k => el("option",{value:k.name}, stuLabel(k.num, k.name)))); stu.value = att.docStu;
+  const hide = el("input",{type:"checkbox",checked:att.docHide});
+  const list = el("div",{});
+  const draw = () => { const t = q.value.trim().toLowerCase();
+    const rows = D.recs.filter(r => (!stu.value || r.name === stu.value) && (!t || (r.name + " " + r.type + " " + r.reason + " " + r.num).toLowerCase().includes(t))
+      && (!s.value || !e.value || (r.startDate >= s.value && r.startDate <= e.value)) && (!hide.checked || pendingOf(r).length)).sort((a, b) => b.startDate.localeCompare(a.startDate) || (parseInt(a.num) || 0) - (parseInt(b.num) || 0));
+    list.replaceChildren(recTable(rows, { empty:hide.checked ? "안 낸 서류가 없어요." : "조건에 맞는 기록이 없어요." })); };
+  q.oninput = () => { att.docQ = q.value; draw(); }; [s, e, stu].forEach(x => { x.onchange = () => { att.docS = s.value; att.docE = e.value; att.docStu = stu.value; draw(); }; }); hide.onchange = () => { att.docHide = hide.checked; draw(); };
+  draw();
+  const trash = el("details",{className:"notes trash"}, el("summary",{}, "휴지통 ", el("small",{className:"hint"}, D.trash.length + "개")),
+    D.trash.length ? el("div",{className:"attlist"}, ...D.trash.slice(0, 200).map(r => el("div",{className:"attline"}, el("span",{className:"d"}, dayLabel(parseYmd(r.startDate))), el("b",{}, stuLabel(r.num, r.name)),
+      el("span",{className:"ty"}, r.type, el("small",{}, " (" + (r.period || "-") + ")")), el("span",{className:"t"}, r.reason), el("span",{className:"hint"}, r.deletedAt),
+      navBtn("되살리기", () => attDo("attRestore", [r.tid], "되살렸어요.").catch(() => {}), "되살리기", !canWrite()),
+      navBtn("아주 지우기", () => { if(confirm("완전히 지울까요? 되살릴 수 없어요.")) attDo("attPurge", [r.tid], "완전히 지웠어요.").catch(() => {}); }, "아주 지우기", !canWrite()))),
+      el("div",{className:"actions"}, el("span",{className:"spacer"}), navBtn("휴지통 비우기", () => { if(confirm("휴지통을 모두 비울까요? 되살릴 수 없어요.")) attDo("attPurge", ["ALL"], "휴지통을 비웠어요.").catch(() => {}); }, "휴지통 비우기", !canWrite())))
+      : el("p",{className:"hint"}, "비어 있어요."));
+  return el("div",{className:"attgrid"}, el("section",{className:"notes"},
+    el("div",{className:"attrow"}, q, s, el("span",{}, "~"), e, stu, el("label",{className:"inline"}, hide, " 다 낸 것 숨기기"),
+      navBtn("초기화", () => { att.docQ = att.docS = att.docE = att.docStu = ""; renderAttend(); }, "찾기 조건 비우기")), list), trash);
+}
+// 3. 주간·월간 캘린더 + 월별 통계
+function attCal(){
+  const D = AD(), mon = new Date(); mon.setHours(12, 0, 0, 0); mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7) + att.week * 7);
+  const days = [0, 1, 2, 3, 4].map(i => { const d = new Date(mon); d.setDate(mon.getDate() + i); return ymd(d); }), today = ymd(new Date());
+  const item = r => { const b = el("button",{type:"button",className:"calitem"}, el("b",{}, stuLabel(r.num, r.name)), el("span",{className:"ty"}, r.type), el("small",{}, "(" + (r.period || "-") + ")"), r.reason ? el("small",{className:"hint"}, r.reason) : "");
+    b.style.setProperty("--c", typeColor(r.type)); b.onclick = () => attEdit(r); return b; };
+  const sortR = a => a.slice().sort((x, y) => (parseInt(x.num) || 0) - (parseInt(y.num) || 0));
+  const week = el("div",{className:"calweek"}, ...days.map(k => { const rs = sortR(D.recs.filter(r => recOn(r, k))), hn = holiName(k);
+    return el("div",{className:"calday" + (k === today ? " istoday" : "") + (hn ? " holi" : "")}, el("div",{className:"calhd"}, dayLabel(parseYmd(k)), hn ? el("small",{}, hn) : "", rs.length ? el("small",{className:"cnt"}, rs.length + "건/" + new Set(rs.map(r => r.name)).size + "명") : ""),
+      ...(rs.length ? rs.map(item) : [el("p",{className:"hint c"}, hn || "기록 없음")])); }));
+  // 월간 (월~금만)
+  const base = new Date(); base.setDate(1); base.setMonth(base.getMonth() + att.month); const y = base.getFullYear(), m = base.getMonth();
+  const first = new Date(y, m, 1), start = new Date(first); start.setDate(1 - ((first.getDay() + 6) % 7)); const last = new Date(y, m + 1, 0);
+  const stuSel = el("select",{className:"field","aria-label":"학생"}, el("option",{value:""}, "모든 학생"), ...attKids().map(k => el("option",{value:k.name}, stuLabel(k.num, k.name)))); stuSel.value = att.calStu; stuSel.onchange = () => { att.calStu = stuSel.value; renderAttend(); };
+  const cells = []; for(let d = new Date(start); d <= last || d.getDay() !== 1; d.setDate(d.getDate() + 1)){ if(d.getDay() === 0 || d.getDay() === 6) continue; if(d > last && d.getDay() === 1) break; const k = ymd(d), hn = holiName(k);
+    const rs = sortR(D.recs.filter(r => recOn(r, k) && (!att.calStu || r.name === att.calStu)));
+    cells.push(el("div",{className:"calcell" + (d.getMonth() !== m ? " other" : "") + (k === today ? " istoday" : "") + (hn ? " holi" : "")}, el("div",{className:"calhd"}, String(d.getDate()), hn ? el("small",{}, hn) : ""), ...rs.map(item))); }
+  // 월별 통계 (하루 대표 출결, 총계는 인정 제외)
+  const ms = att.statS || ymd(new Date(y, m, 1)), me = att.statE || ymd(new Date(y, m + 1, 0));
+  const ss = el("input",{type:"date",className:"field",value:ms}), se = el("input",{type:"date",className:"field",value:me}); ss.onchange = se.onchange = () => { att.statS = ss.value; att.statE = se.value; renderAttend(); };
+  const reps = dailyReps(ms, me), BIG = ["결석","지각","조퇴","결과"], SUB = ["질병","미인정","기타","인정"];
+  const statRows = attKids().map(k => { const st = reps[k.name], cnt = {}; if(st) Object.values(st.days).forEach(d => { const b = bigCat(d.chosen.type); if(b){ const key = b + "-" + subCat(d.chosen.type); cnt[key] = (cnt[key] || 0) + 1; } });
+    const tr = el("tr",{className:"click"}, el("th",{}, stuLabel(k.num, k.name)), ...BIG.flatMap(b => SUB.map(sb => el("td",{className:"c" + (cnt[b + "-" + sb] ? "" : " zero")}, String(cnt[b + "-" + sb] || 0)))),
+      ...BIG.map(b => { const n = SUB.filter(sb => sb !== "인정").reduce((a, sb) => a + (cnt[b + "-" + sb] || 0), 0); return el("td",{className:"c tot" + (n ? "" : " zero")}, String(n)); }));
+    tr.onclick = () => attStudent(k.name); return tr; });
+  return el("div",{className:"attgrid"},
+    el("section",{className:"notes"}, el("div",{className:"panel-head"}, el("h3",{className:"nt-title"}, "주간 캘린더 · " + dayLabel(parseYmd(days[0])) + " ~ " + dayLabel(parseYmd(days[4]))),
+      el("div",{className:"tt-tools"}, navBtn("‹", () => { att.week--; renderAttend(); }, "지난주"), navBtn("이번 주", () => { att.week = 0; renderAttend(); }, "이번 주", !att.week), navBtn("›", () => { att.week++; renderAttend(); }, "다음 주"))), week),
+    el("section",{className:"notes"}, el("div",{className:"panel-head"}, el("h3",{className:"nt-title"}, "월간 캘린더 · " + y + "년 " + (m + 1) + "월"),
+      el("div",{className:"tt-tools"}, stuSel, navBtn("‹", () => { att.month--; att.statS = att.statE = ""; renderAttend(); }, "지난달"), navBtn("이번 달", () => { att.month = 0; att.statS = att.statE = ""; renderAttend(); }, "이번 달", !att.month), navBtn("›", () => { att.month++; att.statS = att.statE = ""; renderAttend(); }, "다음 달"))),
+      el("div",{className:"calmonth"}, ...["월","화","수","목","금"].map(w => el("div",{className:"calwd"}, w)), ...cells)),
+    el("section",{className:"notes"}, el("div",{className:"panel-head"}, el("h3",{className:"nt-title"}, "월별 출결 통계"), el("div",{className:"tt-tools"}, ss, el("span",{}, "~"), se)),
+      el("p",{className:"hint"}, "같은 날 출결이 여러 개면 하루 대표 출결 하나만 세요: 결석 우선 → 사유 " + reasonOrder().join(" > ") + " → 빠진 교시 많은 순 → 종류 " + tieOrder().join(" > ") + ". 총계는 인정 출결을 빼요. 이름을 누르면 자세히 보여요."),
+      el("div",{className:"tt-wrap"}, el("table",{className:"plan attstat"}, el("thead",{}, el("tr",{}, el("th",{rowSpan:2}, "성명"), ...BIG.map(b => el("th",{colSpan:4,className:"c"}, b)), ...BIG.map(b => el("th",{rowSpan:2,className:"c tot"}, b + " 총계"))),
+        el("tr",{}, ...BIG.flatMap(() => SUB.map(sb => el("th",{className:"c sub"}, sb))))), el("tbody",{}, ...statRows)))));
+}
+// 4. 누적 통계 & 알림
+function attStats(){
+  const D = AD(), al = attAlerts(), by = {}; al.forEach(a => (by[a.rule] ||= []).push(a));
+  const sy = attSY(), qs = el("input",{type:"date",className:"field",value:att.qS || sy + "-03-01"}), qe = el("input",{type:"date",className:"field",value:att.qE || ymd(new Date(sy + 1, 2, 0))});
+  const stu = el("select",{className:"field","aria-label":"학생"}, el("option",{value:""}, "전체 학생"), ...attKids().map(k => el("option",{value:k.name}, stuLabel(k.num, k.name)))); stu.value = att.qStu;
+  const chips = el("div",{className:"typegroups"}); const drawC = () => chips.replaceChildren(...[...new Set(D.types.map(t => t.group))].map(g => el("div",{className:"tgroup"}, ...D.types.filter(t => t.group === g).map(t => chipBtn(t.name, typeColor(t.name), att.qTypes.has(t.name), () => { att.qTypes.has(t.name) ? att.qTypes.delete(t.name) : att.qTypes.add(t.name); drawC(); }))))); drawC();
+  const res = el("div",{});
+  const run = () => { att.qS = qs.value; att.qE = qe.value; att.qStu = stu.value; if(!qs.value || !qe.value || qs.value > qe.value) return say("기간을 확인해 주세요.");
+    const types = [...att.qTypes], c = countReps(qs.value, qe.value, stu.value || null, types);
+    const rows = D.recs.filter(r => (!stu.value || r.name === stu.value) && (!types.length || types.includes(r.type)) && !(((r.endDate || r.startDate) < qs.value) || r.startDate > qe.value)).sort((a, b) => a.startDate.localeCompare(b.startDate));
+    res.replaceChildren(el("p",{className:"miss"}, "검색 결과: " + rows.length + "건 / 실제 수업일 기준 " + c.total + "일" + (Object.keys(c.byType).length ? " · " + Object.entries(c.byType).map(([t, n]) => t + " " + n + "일").join(", ") : "")),
+      el("div",{className:"attlist"}, ...rows.map(r => { const n = c.byRec.get(r) || 0, line = el("div",{className:"attline click"}, el("span",{className:"dot"}), el("span",{className:"d"}, dayLabel(parseYmd(r.startDate)) + (r.endDate && r.endDate !== r.startDate ? " ~ " + dayLabel(parseYmd(r.endDate)) : "")),
+        el("b",{}, stuLabel(r.num, r.name)), el("span",{className:"ty"}, r.type, el("small",{}, " (" + (r.period || "-") + ")")), el("span",{className:"t"}, r.reason), el("b",{className:n ? "days" : "hint",title:n ? "" : "같은 날 다른 출결이 대표로 세어졌거나 쉬는 날이에요"}, n ? n + "일" : "0 (제외)"));
+        line.style.setProperty("--c", typeColor(r.type)); line.onclick = () => attEdit(r); return line; }))); };
+  const go2 = el("button",{type:"button",className:"btn"}, "실제 수업일 기준 검색"); go2.onclick = run;
+  return el("div",{className:"attgrid"},
+    el("section",{className:"notes alertbox"}, el("h3",{className:"nt-title"}, "누적 통계 알림 " + (al.length ? al.length + "건" : "")),
+      al.length ? Object.entries(by).map(([rule, list]) => el("div",{className:"alertrule"}, el("b",{}, rule + " · " + list.length + "명"),
+        el("div",{className:"stuchips"}, ...list.map(a => { const b = el("button",{type:"button",className:"kbtn alert"}, stuLabel(a.num, a.name) + " " + (a.how === "consecutive" ? "연속 " : "누적 ") + a.n + "일"); b.onclick = () => attStudent(a.name); return b; }))))
+        : el("p",{className:"hint"}, "지금 알림 조건에 걸린 학생이 없어요."), el("p",{className:"hint"}, "규칙은 학급 출결 → 설정에서 고쳐요.")),
+    el("section",{className:"notes attform"}, el("h3",{className:"nt-title"}, "출결 맞춤 검색 (주말·쉬는 날 빼고)"),
+      el("div",{className:"attrow"}, el("span",{className:"attlbl"}, "기간"), qs, el("span",{}, "~"), qe, stu),
+      el("div",{className:"attrow top"}, el("span",{className:"attlbl"}, "종류"), chips),
+      el("div",{className:"actions"}, navBtn("종류 전체 선택/해제", () => { att.qTypes = att.qTypes.size === D.types.length ? new Set() : new Set(D.types.map(t => t.name)); drawC(); }, "종류 전체"), el("span",{className:"spacer"}), go2), res));
+}
+// 5. 학사일정 (출결 시트의 쉬는 날: 결석 일수에서 빠짐)
+function attHoli(){
+  const D = AD(), name = el("input",{type:"text",className:"field",placeholder:"명칭 (예: 개교기념일)",maxLength:60}), s = el("input",{type:"date",className:"field"}), e = el("input",{type:"date",className:"field"});
+  const add = navBtn("+ 추가", () => { if(!name.value.trim() || !s.value) return say("명칭과 시작일을 넣어 주세요."); attDo("attHolidayAdd", [[{ name:name.value.trim(), start:s.value, end:e.value || s.value }]], "학사일정에 더했어요.").catch(() => {}); }, "학사일정 추가", !canWrite());
+  const list = D.holidays.slice().sort((a, b) => a.start.localeCompare(b.start));
+  return el("div",{className:"attgrid"}, el("section",{className:"notes attform"},
+    el("div",{className:"panel-head"}, el("h3",{className:"nt-title"}, "학사일정 (쉬는 날·방학)"), navBtn("교무수첩 쉬는 날 가져오기", () => attDo("attHolidayAdd", [attPayload().holidays], "교무수첩 학사일정의 쉬는 날을 더했어요.").catch(() => {}), "교무수첩 학사일정에서 가져오기", !canWrite())),
+    el("p",{className:"hint"}, "여기 있는 날과 주말, 교무수첩 학사일정의 공휴일·재량휴업일·방학은 결석 일수 계산에서 빠져요. 교무수첩의 쉬는 날은 학급 출결을 열 때 알아서 더해져요."),
+    el("div",{className:"attrow"}, name, s, el("span",{}, "~"), e, add),
+    list.length ? el("div",{className:"attlist"}, ...list.map(h => el("div",{className:"attline"}, el("span",{className:"tag"}, h.end !== h.start ? "기간" : "단일"), el("b",{}, h.name), el("span",{className:"d"}, h.start + (h.end !== h.start ? " ~ " + h.end : "")), el("span",{className:"spacer"}),
+      navBtn("지우기", () => { if(confirm(h.name + " 일정을 지울까요?")) attDo("attHolidayDel", [h], "지웠어요.").catch(() => {}); }, "학사일정 지우기", !canWrite())))) : el("p",{className:"hint"}, "등록된 학사일정이 없어요.")));
+}
+// 6. 설정: 출결 종류 · 알림 규칙 · 색상 그룹 · 하루 대표 출결 집계 규칙 · 요일별 교시
+function attSettings(){
+  const D = AD(), groups = () => Object.keys(D.colors);
+  // 출결 종류
+  const tRows = D.types.map(t => ({ ...t })), tBox = el("div",{className:"setlist"});
+  const drawTypes = () => tBox.replaceChildren(...tRows.map((t, i) => { const n = el("input",{type:"text",className:"field",value:t.name,placeholder:"출결 명칭"}), d = el("input",{type:"text",className:"field",value:t.doc,placeholder:"필요 서류 (쉼표로)"});
+    const g = el("select",{className:"field"}, el("option",{value:""}, "그룹"), ...groups().map(x => el("option",{value:x}, x))); g.value = t.group;
+    n.oninput = () => { t.name = n.value; }; d.oninput = () => { t.doc = d.value; }; g.onchange = () => { t.group = g.value; };
+    return el("div",{className:"setrow"}, el("span",{className:"swatch"}), n, g, d, navBtn("↑", () => { if(i){ [tRows[i - 1], tRows[i]] = [tRows[i], tRows[i - 1]]; drawTypes(); } }, "위로", !i), navBtn("×", () => { tRows.splice(i, 1); drawTypes(); }, "지우기")); }));
+  drawTypes();
+  const saveTypes = el("button",{type:"button",className:"btn",disabled:!canWrite()}, "출결 종류 저장");
+  saveTypes.onclick = () => { const seen = new Set(), rows = tRows.map(t => ({ ...t, name:t.name.trim() })).filter(t => t.name && !seen.has(t.name) && seen.add(t.name)); if(!rows.length) return say("출결 종류가 비어 있어요.");
+    attDo("attSaveTab", ["출결종류", rows.map(t => [t.name, t.doc.trim(), t.group])], "출결 종류를 저장했어요.").catch(() => {}); };
+  // 알림 규칙
+  const rRows = D.rules.map(r => ({ ...r, types:[...r.types] })), rBox = el("div",{className:"setlist"});
+  const drawRules = () => rBox.replaceChildren(...rRows.map((r, i) => { const n = el("input",{type:"text",className:"field",value:r.name,placeholder:"규칙 이름"});
+    const how = el("select",{className:"field"}, el("option",{value:"cumulative"}, "누적"), el("option",{value:"consecutive"}, "연속 (쉬는 날 건너뜀)")); how.value = r.how;
+    const per = el("select",{className:"field"}, el("option",{value:"all"}, "이번 학년도"), el("option",{value:"month"}, "이번 달"), el("option",{value:"custom"}, "기간 지정")); per.value = r.period;
+    const days = el("input",{type:"number",className:"field",min:1,value:r.days,"aria-label":"기준 일수"}), cs = el("input",{type:"date",className:"field",value:r.s || "",hidden:r.period !== "custom"}), ce = el("input",{type:"date",className:"field",value:r.e || "",hidden:r.period !== "custom"});
+    n.oninput = () => { r.name = n.value; }; how.onchange = () => { r.how = how.value; }; per.onchange = () => { r.period = per.value; cs.hidden = ce.hidden = per.value !== "custom"; }; days.oninput = () => { r.days = parseInt(days.value) || 1; }; cs.onchange = () => { r.s = cs.value; }; ce.onchange = () => { r.e = ce.value; };
+    const tc = el("div",{className:"tgroup"}, ...D.types.map(t => chipBtn(t.name, typeColor(t.name), r.types.includes(t.name), function(){ r.types.includes(t.name) ? r.types.splice(r.types.indexOf(t.name), 1) : r.types.push(t.name); this.classList.toggle("on"); })));
+    return el("div",{className:"rulecard"}, el("div",{className:"attrow"}, n, navBtn("규칙 지우기", () => { rRows.splice(i, 1); drawRules(); }, "규칙 지우기")), el("div",{className:"attrow"}, how, per, cs, ce, days, el("span",{className:"hint"}, "일 이상")), tc); }));
+  drawRules();
+  const saveRules = el("button",{type:"button",className:"btn",disabled:!canWrite()}, "알림 규칙 저장");
+  saveRules.onclick = () => attDo("attSaveTab", ["출결알림", rRows.filter(r => r.name.trim()).map(r => [r.name.trim(), r.how, r.period, String(r.days), r.types.join(","), r.period === "custom" ? r.s || "" : "", r.period === "custom" ? r.e || "" : ""])], "알림 규칙을 저장했어요.").catch(() => {});
+  // 색상 그룹
+  const cols = { ...D.colors }, cBox = el("div",{className:"stuchips"});
+  const drawCols = () => cBox.replaceChildren(...Object.keys(cols).map(k => { const c = el("input",{type:"color",value:/^#[0-9a-f]{6}$/i.test(cols[k]) ? cols[k] : "#94a3b8","aria-label":k + " 색"}); c.oninput = () => { cols[k] = c.value; };
+    return el("span",{className:"colchip"}, c, k, el("button",{type:"button",className:"linkbtn","aria-label":k + " 그룹 지우기"}, "×")); }));
+  drawCols(); cBox.onclick = ev => { const b = ev.target.closest("button.linkbtn"); if(b){ delete cols[b.parentElement.textContent.replace("×", "").trim()]; drawCols(); } };
+  const newG = el("input",{type:"text",className:"field",placeholder:"새 그룹 이름",maxLength:20});
+  const addG = navBtn("+ 그룹", () => { const k = newG.value.trim(); if(k && !cols[k]){ cols[k] = "#3b82f6"; newG.value = ""; drawCols(); } }, "그룹 더하기");
+  const saveCols = el("button",{type:"button",className:"btn",disabled:!canWrite()}, "색상 저장"); saveCols.onclick = () => attDo("attSaveUi", [{ colors:cols }], "색상 그룹을 저장했어요.").catch(() => {});
+  // 하루 대표 출결 집계 규칙
+  const ro = reasonOrder(), to = tieOrder();
+  const orderList = (arr, key) => el("div",{className:"orderlist"}, ...arr.map((n, i) => el("div",{className:"attrow"}, el("b",{}, (i + 1) + ". " + n), el("span",{className:"spacer"}),
+    navBtn("▲", () => { if(!i) return; const a = arr.slice(); [a[i - 1], a[i]] = [a[i], a[i - 1]]; attDo("attSaveUi", [{ statRules:{ reasonOrder:key === "r" ? a : ro, tieOrder:key === "t" ? a : to } }], "집계 규칙을 바꿨어요.").catch(() => {}); }, "위로", !i || !canWrite()),
+    navBtn("▼", () => { if(i === arr.length - 1) return; const a = arr.slice(); [a[i + 1], a[i]] = [a[i], a[i + 1]]; attDo("attSaveUi", [{ statRules:{ reasonOrder:key === "r" ? a : ro, tieOrder:key === "t" ? a : to } }], "집계 규칙을 바꿨어요.").catch(() => {}); }, "아래로", i === arr.length - 1 || !canWrite()))));
+  return el("div",{className:"attgrid"},
+    el("section",{className:"notes attform"}, el("h3",{className:"nt-title"}, "출결 종류와 서류"), tBox, el("div",{className:"actions"}, navBtn("+ 출결 종류", () => { tRows.push({ name:"", doc:"", group:"" }); drawTypes(); }, "출결 종류 더하기"), el("span",{className:"spacer"}), saveTypes)),
+    el("section",{className:"notes attform"}, el("h3",{className:"nt-title"}, "맞춤 결석 알림 규칙"), el("p",{className:"hint"}, "하루에 출결이 여러 개면 하루 대표 출결만 세요."), rBox,
+      el("div",{className:"actions"}, navBtn("+ 규칙", () => { rRows.push({ name:"", how:"cumulative", period:"all", days:3, types:[], s:"", e:"" }); drawRules(); }, "규칙 더하기"), el("span",{className:"spacer"}), saveRules)),
+    el("section",{className:"notes attform"}, el("h3",{className:"nt-title"}, "색상 그룹"), el("p",{className:"hint"}, "같은 그룹의 출결 종류는 같은 색으로 보여요."), cBox, el("div",{className:"actions"}, newG, addG, el("span",{className:"spacer"}), saveCols)),
+    el("section",{className:"notes attform"}, el("h3",{className:"nt-title"}, "하루 대표 출결 집계 규칙"),
+      el("p",{className:"hint"}, "하루에 기록이 여러 개면: ① 결석이 있으면 결석 ② 사유 순서가 앞선 것 ③ 빠진 교시가 많은 것 ④ 종류 순서가 앞선 것 하나만 세요."),
+      el("div",{className:"attcols"}, el("div",{}, el("b",{}, "사유 순서"), orderList(ro, "r")), el("div",{}, el("b",{}, "종류 순서 (교시 수가 같을 때)"), orderList(to, "t"))),
+      el("div",{className:"actions"}, navBtn("기본값으로", () => attDo("attSaveUi", [{ statRules:{ reasonOrder:DEF_REASON, tieOrder:DEF_TIE } }], "기본값으로 되돌렸어요.").catch(() => {}), "기본값으로", !canWrite()))),
+    el("section",{className:"notes"}, el("h3",{className:"nt-title"}, "요일별 교시 수"), el("p",{className:"hint"}, [1, 2, 3, 4, 5].map(d => "월화수목금"[d - 1] + " " + D.per[d] + "교시").join(" · ") + " — 교무수첩의 우리 반 시간표에 맞춰 알아서 바뀌어요.")));
+}
+// 설정 탭: 출결 시트 잇기 · 시트 열기 · 탭 위치 · 보이기 (담임 모드일 때만 탭이 보임)
 function renderAttendBox(){
   const A = attCfg(), url = el("input",{type:"url",className:"field",value:A.url,placeholder:"https://docs.google.com/spreadsheets/d/…","aria-label":"출결 시트 주소"});
   const save = p => store.saveConfigPatch({ attend:{ ...attCfg(), ...p } }).then(() => { att = { ...att, data:null, err:"", synced:false }; say("학급 출결 설정을 저장했어요."); }).catch(e => say(e?.message || "저장하지 못했어요."));
@@ -1178,7 +1495,7 @@ function renderAttendBox(){
   const pos = el("select",{className:"field","aria-label":"학급 출결 탭 위치"}, ...Array.from({ length:config.areas.length + 1 }, (_, i) => el("option",{value:String(i)}, "'" + (i ? config.areas[i - 1].name : "오늘") + "' 다음")));
   pos.value = String(Math.min(A.posSet ? A.pos : config.areas.length, config.areas.length)); pos.onchange = () => save({ pos:Number(pos.value), posSet:true });
   const box = el("section",{className:"set-area noticebox"}, el("h3",{className:"nt-title"}, "학급 출결"),
-    el("p",{className:"hint"}, "'스마트 출결 관리' 구글 시트를 이어서 출결 앱과 함께 써요. 학생 명단, 학사일정의 쉬는 날, 요일별 교시 수는 교무수첩 것으로 맞춰져요."),
+    el("p",{className:"hint"}, "'학급 올인원 워크스페이스' 출결 시트를 이어서 그 앱과 함께 써요. 학생 명단, 학사일정의 쉬는 날, 요일별 교시 수는 교무수첩 것으로 맞춰져요." + (homeroom() ? "" : " 지금은 담임 모드가 꺼져 있어서 탭이 보이지 않아요.")),
     el("div",{className:"actions"}, url, navBtn("잇기", () => { const v = url.value.trim(); if(v && !/^https:\/\/docs\.google\.com\/spreadsheets\//.test(v)) return say("구글 시트 주소를 넣어 주세요."); save({ url:v }); }, "출결 시트 잇기", !canWrite()),
       A.url ? el("a",{className:"btn ghost small",href:A.url,target:"_blank",rel:"noopener noreferrer"}, "시트 열기") : ""),
     el("div",{className:"actions"}, el("label",{className:"inline"}, on, " 탭 보이기"), el("label",{className:"inline"}, "위치 ", pos),
@@ -1189,7 +1506,7 @@ function renderAttendBox(){
 function setCover(){ const a = areaOf(tab); $("book").style.setProperty("--cover", a ? cloth(a.color) : "var(--slate)"); }
 function renderTabs(){
   const tabs = [["home","오늘"], ...config.areas.map(a => [a.id, a.name])], A = attCfg();
-  if(A.on !== false) tabs.splice(1 + Math.min(A.posSet ? A.pos : config.areas.length, config.areas.length), 0, ["attend","학급 출결"]);
+  if(attOn()) tabs.splice(1 + Math.min(A.posSet ? A.pos : config.areas.length, config.areas.length), 0, ["attend","학급 출결"]);
   tabs.push(...EXT_TABS.filter(x => x.embed).map(x => [x.id, x.name]), ["settings","설정"]);
   $("tabs").replaceChildren(...tabs.map(([k,n]) => {
     const b = el("button",{type:"button",role:"tab",className:k==="settings"?"gear":""}, n);
@@ -1207,7 +1524,7 @@ function go(k, isBack){
   tab = k; cat = null; query = ""; $("q").value = ""; draft = null; viewTerm = null;
   render(); window.scrollTo(0, 0);
 }
-const tabName = k => k === "home" ? "오늘" : k === "settings" ? "설정" : k === "attend" ? (attCfg().on !== false ? "학급 출결" : "") : areaOf(k)?.name || extOf(k)?.name || "";
+const tabName = k => k === "home" ? "오늘" : k === "settings" ? "설정" : k === "attend" ? (attOn() ? "학급 출결" : "") : areaOf(k)?.name || extOf(k)?.name || "";
 function addTabBack(){
   while(tabHist.length && !tabName(tabHist[tabHist.length - 1])) tabHist.pop(); // 지운 영역은 건너뜀
   // 머리띠의 탭 줄 오른쪽 끝에 (본문을 밀어내지 않게)
@@ -3878,7 +4195,7 @@ async function saveSettings(btn, err){
 }
 
 function render(){
-  if(tab !== "home" && tab !== "settings" && !areaOf(tab) && !extOf(tab) && !(tab === "attend" && attCfg().on !== false)) tab = "home"; // 지운 영역을 보고 있었으면 홈으로
+  if(tab !== "home" && tab !== "settings" && !areaOf(tab) && !extOf(tab) && !(tab === "attend" && attOn())) tab = "home"; // 지운 영역을 보고 있었으면 홈으로
   setCover(); renderTabs(); renderHdrPins();
   document.body.classList.toggle("onhome", tab === "home"); // 넓은 화면에서 홈은 한 화면에 (칸 안에서만 스크롤)
   const isArea = !!areaOf(tab);
