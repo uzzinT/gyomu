@@ -13,6 +13,9 @@
   const TABLES = ["cfg", "items", "events", "memos", "notes", "checks", "logs", "todos", "teachers", "classRosters", "attend", "pmsg"];
   const EMPTY = { cfg: {}, classRosters: {} };
   let uid = null, DB = null, token = null, tokenAt = 0;
+  // 구글 열쇠는 이 탭에서만 1시간 기억 (새로 고침해도 다시 묻지 않게)
+  try { const t = JSON.parse(sessionStorage.getItem("gtok") || "null"); if (t && Date.now() - t.at < 50 * 60e3) { token = t.v; tokenAt = t.at; } } catch (e) {}
+  const keepToken = () => { try { sessionStorage.setItem("gtok", JSON.stringify({ v: token, at: tokenAt })); } catch (e) {} };
   const col = () => fs.collection("users").doc(uid).collection("data");
   const get = t => DB[t] ?? (EMPTY[t] !== undefined ? structuredClone(EMPTY[t]) : []);
   // 표 하나를 통째로 저장 (선생님 혼자 쓰니 마지막에 쓴 것이 남음)
@@ -36,7 +39,7 @@
   }
   async function login() {
     const p = new firebase.auth.GoogleAuthProvider(); SCOPES.forEach(s => p.addScope(s));
-    try { const r = await auth.signInWithPopup(p); token = r.credential && r.credential.accessToken; tokenAt = Date.now(); }
+    try { const r = await auth.signInWithPopup(p); token = r.credential && r.credential.accessToken; tokenAt = Date.now(); keepToken(); }
     catch (e) {
       // 팝업이 막히면 이 창에서 구글 로그인 화면으로 넘어갔다 돌아오는 방법을 보여 줌
       const blocked = e.code === "auth/popup-blocked" || e.code === "auth/cancelled-popup-request" || e.code === "auth/popup-closed-by-user";
@@ -46,14 +49,24 @@
     }
   }
   // 이 창에서 로그인하고 돌아왔을 때 구글 열쇠 받기
-  auth.getRedirectResult().then(r => { if (r && r.credential) { token = r.credential.accessToken; tokenAt = Date.now(); } }).catch(e => gate(true, "로그인하지 못했어요: " + (e.message || e.code)));
+  auth.getRedirectResult().then(r => { if (r && r.credential) { token = r.credential.accessToken; tokenAt = Date.now(); keepToken(); } }).catch(e => gate(true, "로그인하지 못했어요: " + (e.message || e.code)));
   auth.onAuthStateChanged(async u => {
     if (!u) { uid = null; gate(true); return; }
     uid = u.uid; gate(false);
     await load();
-    if (!DB.cfg) importBanner();
+    if (!DB.cfg) importBanner(); else if (!DB.cfg.archives) archiveBanner();
     readyRes();
   });
+  // 이미 가져왔지만 지난 학년도 보관 시트를 아직 안 찾았을 때
+  function archiveBanner() {
+    const b = document.createElement("div"); b.id = "fbImport";
+    b.innerHTML = '<div><b>지난 학년도 자료를 이어 둘까요?</b><br><small>드라이브의 “교무수첩 ○○학년도” 보관 시트를 찾아 설정 → 학기에 보여 줘요. 보관 시트는 그대로 남아요.</small></div><button type="button" class="btn">찾기</button>';
+    document.body.append(b);
+    const btn = b.querySelector("button");
+    btn.onclick = async () => { btn.disabled = true; btn.textContent = "찾는 중…";
+      try { const m = await findArchives(), ys = Object.keys(m).sort(); b.querySelector("div").innerHTML = "<b>" + (ys.length ? ys.join(", ") + "학년도 보관 시트를 찾았어요." : "보관 시트가 없어요. 지난 학년도 자료는 지금 교무수첩 안에 함께 있어요.") + "</b><br><small>설정 → 학기에서 고른 것만 불러올 수 있어요.</small>"; btn.textContent = "닫기"; btn.disabled = false; btn.onclick = () => location.reload(); }
+      catch (e) { btn.disabled = false; btn.textContent = "다시 해 보기"; b.querySelector("small").textContent = e.message || String(e); } };
+  }
   // 처음 들어왔을 때 (아직 아무것도 없음): 예전 구글 시트에서 한 번에 가져오기
   function importBanner() {
     const b = document.createElement("div"); b.id = "fbImport";
@@ -77,7 +90,7 @@
     if (token && Date.now() - tokenAt < 50 * 60e3) return token;
     const p = new firebase.auth.GoogleAuthProvider(); SCOPES.forEach(s => p.addScope(s));
     const r = await auth.currentUser.reauthenticateWithPopup(p);
-    token = r.credential.accessToken; tokenAt = Date.now(); return token;
+    token = r.credential.accessToken; tokenAt = Date.now(); keepToken(); return token;
   }
 
   // ---------- 공통 정리 (Code.gs 와 같은 규칙) ----------
@@ -117,7 +130,9 @@
     get("memos").forEach(m => { if (!DATE_RE.test(m.date)) return; if (m.text || (m.files || []).length || m.due) { memos[m.date] = m.text || ""; if (m.due) dues[m.date] = true; if ((m.files || []).length) memoFiles[m.date] = m.files; } });
     const teachers = get("teachers");
     return structuredClone({
-      items: get("items"), config: cfgGet("config"), timetable: cfgGet("timetable"), archives: [], folder: null,
+      items: get("items"), config: cfgGet("config"), timetable: cfgGet("timetable"),
+      archives: Object.entries(cfgGet("archives") || {}).sort().reverse().map(([y, id]) => ({ year: Number(y), url: "https://docs.google.com/spreadsheets/d/" + id + "/edit" })),
+      folder: (() => { const y = curYear(), id = ((cfgGet("drive") || {}).years || {})[y]; return id ? { year: y, url: "https://drive.google.com/drive/folders/" + id } : null; })(),
       plans: cfgGet("plans") || {}, rosters: cfgGet("rosters") || {}, students: cfgGet("students") || [], classTT: cfgGet("classTT"),
       classRosters: get("classRosters"), allTT: teachers.length ? { periods: Number(cfgGet("periods")) || 7, teachers } : null, sheet: null,
       events: get("events"), memos, dues, memoFiles,
@@ -298,22 +313,154 @@
     // 지난 구글 시트에서 한 번에 옮겨 오기
     importFromSheet
   };
-  const LATER = ["uploadFile", "uploadNoteFile", "getStudentPhoto", "driveFileB64", "readSheet", "makeRosterSheet", "templateUrl", "inputTab", "readInputTab", "archiveBefore", "importFromArchive", "restoreArchive"];
-  LATER.forEach(n => { API[n] = () => fail("이 기능은 드라이브 연결(2단계)에서 이어져요. 지금은 예전 교무수첩에서 해 주세요."); });
+  // 아직 Firebase 로 옮기지 않은 것: 학년도 넘기기·되돌리기 (3월 학년도 시작 전에 이어 붙임)
+  ["archiveBefore", "restoreArchive"].forEach(n => { API[n] = () => fail("새 학년도로 넘기기는 아직 예전 교무수첩에서 해 주세요. (Firebase 버전은 학년도 시작 전에 이어 붙여요)"); });
+
+  // ---------- 구글 드라이브·시트 (로그인할 때 받은 구글 열쇠로 바로 부름) ----------
+  async function G(url, opts = {}) {
+    const r = await fetch(url, { ...opts, headers: { Authorization: "Bearer " + await gtoken(), ...(opts.headers || {}) } });
+    if (r.status === 401) { token = null; fail("구글 확인이 끝났어요. 한 번 더 눌러 주세요."); }
+    if (!r.ok) { let m = ""; try { m = (await r.json()).error.message; } catch (e) {} fail("구글 드라이브·시트에서 거절했어요 (" + r.status + ") " + m); }
+    return r;
+  }
+  const DRIVE = "https://www.googleapis.com/drive/v3/files", SHEETS = "https://sheets.googleapis.com/v4/spreadsheets";
+  const FOLDER = "application/vnd.google-apps.folder";
+  const q = s => encodeURIComponent(s);
+  async function findOne(query) { const j = await (await G(DRIVE + "?q=" + q(query + " and trashed=false") + "&fields=files(id,name,webViewLink)&pageSize=20&orderBy=createdTime")).json(); return j.files || []; }
+  async function makeFolder(name, parent) { return (await G(DRIVE + "?fields=id", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, mimeType: FOLDER, parents: parent ? [parent] : undefined }) })).json(); }
+  const curYear = () => { const t = termOf(cfgGet("config") && cfgGet("config").term); if (t) return Number(t.slice(0, 4)); const d = new Date(); return d.getMonth() + 1 <= 2 ? d.getFullYear() - 1 : d.getFullYear(); };
+  // 내 드라이브 › 교무수첩 › 2026학년도 (예전 교무수첩이 만든 폴더를 그대로 씀)
+  async function yearFolder() {
+    const y = curYear(), d = { ...(cfgGet("drive") || {}) };
+    if (d.years && d.years[y]) return d.years[y];
+    if (!d.root) d.root = ((await findOne("name='교무수첩' and mimeType='" + FOLDER + "' and 'root' in parents"))[0] || await makeFolder("교무수첩")).id;
+    const id = ((await findOne("name='" + y + "학년도' and mimeType='" + FOLDER + "' and '" + d.root + "' in parents"))[0] || await makeFolder(y + "학년도", d.root)).id;
+    d.years = { ...(d.years || {}), [y]: id }; await cfgPut({ drive: d }); return id;
+  }
+  const b64ToBytes = b => Uint8Array.from(atob(b), c => c.charCodeAt(0));
+  const bytesToB64 = buf => { const u = new Uint8Array(buf); let s = ""; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); };
+  async function driveUpload(p) {
+    const name = S(p.name, 200).trim(); if (!name) fail("파일 이름이 없어요.");
+    const bytes = b64ToBytes(String(p.data || "")); if (!bytes.length) fail("빈 파일은 올릴 수 없어요."); if (bytes.length > 20 * 1024 * 1024) fail("20MB보다 큰 파일은 올릴 수 없어요.");
+    const meta = { name, parents: [await yearFolder()] }, type = String(p.type || "") || "application/octet-stream";
+    const body = new Blob(["--b\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n" + JSON.stringify(meta) + "\r\n--b\r\nContent-Type: " + type + "\r\n\r\n", bytes, "\r\n--b--"]);
+    const f = await (await G("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink", { method: "POST", headers: { "Content-Type": "multipart/related; boundary=b" }, body })).json();
+    return { name, url: f.webViewLink, fileId: f.id, size: bytes.length };
+  }
+  const trash = id => id ? G(DRIVE + "/" + id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ trashed: true }) }).catch(() => {}) : null; // 휴지통으로만 (30일 동안 되살릴 수 있음)
+  const sheetId = url => { const m = String(url || "").match(/\/d\/([\w-]{20,})/); if (!m) fail("구글 시트 주소가 올바르지 않아요."); return m[1]; };
+  async function tabsOf(id) { return ((await (await G(SHEETS + "/" + id + "?fields=sheets.properties(sheetId,title)")).json()).sheets || []).map(s => s.properties); }
+  async function batchGet(id, ranges, render) {
+    const u = SHEETS + "/" + id + "/values:batchGet?valueRenderOption=" + (render || "UNFORMATTED_VALUE") + "&dateTimeRenderOption=FORMATTED_STRING&" + ranges.map(r => "ranges=" + q(r)).join("&");
+    return ((await (await G(u)).json()).valueRanges || []).map(v => v.values || []);
+  }
+  // 학기 초 세팅에 쓰는 입력 탭: 예전 교무수첩 시트 안에 그대로 둠
+  const INPUT_TABS = {
+    my: { name: "입력_내시간표", head: [["※ 교시마다 두 줄: 위 칸은 교과, 아래 칸은 교실(반)이에요. 교사 시간표를 그대로 붙여 넣어도 돼요."], [], ["교시", "월", "화", "수", "목", "금"]], rows: 7, pair: true },
+    class: { name: "입력_우리반시간표", head: [["※ 교시마다 두 줄: 위 칸은 과목, 아래 칸은 선생님이에요. 학반 시간표를 그대로 붙여 넣어도 돼요."], [], ["교시", "월", "화", "수", "목", "금"]], rows: 7, pair: true },
+    all: { name: "입력_전체교사시간표", head: [["※ 학교 전체 교사 시간표를 A3 칸부터 그대로 붙여 넣으세요 (요일 줄, 교시 번호 줄, 선생님 줄)."]] },
+    events: { name: "입력_학사일정", head: [["※ 한 줄에 하루씩. 기간은 2026.10.28~2026.10.30 처럼 써요."], [], ["날짜", "요일", "행사", "비고"]] },
+    students: { name: "입력_학생명단", head: [["※ 한 줄에 학생 한 명. 쓰지 않는 칸은 비워 두세요. 이 탭은 나만 볼 수 있어요."], [], ["번호", "이름", "학생 연락처", "보호자1 관계", "보호자1 연락처", "보호자2 관계", "보호자2 연락처", "비고"]] }
+  };
+  async function inputTab(key) {
+    const def = INPUT_TABS[key]; if (!def) fail("없는 입력 탭이에요.");
+    let t = (await tabsOf(OLD_SHEET)).find(s => s.title === def.name);
+    if (!t) {
+      const r = await (await G(SHEETS + "/" + OLD_SHEET + ":batchUpdate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requests: [{ addSheet: { properties: { title: def.name, gridProperties: { frozenRowCount: def.head.length } } } }] }) })).json();
+      t = r.replies[0].addSheet.properties;
+      const rows = def.head.map(r => r.length ? r : [""]);
+      if (def.rows) for (let i = 0; i < def.rows * (def.pair ? 2 : 1); i++) rows.push([def.pair ? (i % 2 ? "" : String(i / 2 + 1)) : String(i + 1)]);
+      await G(SHEETS + "/" + OLD_SHEET + "/values/" + q("'" + def.name + "'!A1") + "?valueInputOption=RAW", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ values: rows }) });
+    }
+    return "https://docs.google.com/spreadsheets/d/" + OLD_SHEET + "/edit#gid=" + t.sheetId;
+  }
+  Object.assign(API, {
+    async uploadFile(p) { const b = cleanBase(p), f = await driveUpload(p);
+      await put("items", get("items").concat({ ...b, id: uuid(), kind: "file", term: termOf(p.term), url: f.url, fileId: f.fileId, fileName: f.name, size: f.size, createdAt: Date.now(), pinned: false, body: "" })); return getAll(); },
+    async uploadNoteFile(p) { const f = await driveUpload(p); return { name: f.name, url: f.url, fileId: f.fileId }; },
+    async deleteItem(id) { const it = get("items").find(r => String(r.id) === String(id)); if (it && it.fileId) await trash(it.fileId); await dropRow("items", id); return getAll(); },
+    async getStudentPhoto(id) {
+      id = String(id || ""); const safe = id.replace(/[^\w-]/g, "");
+      const ok = id && ((cfgGet("students") || []).some(s => s.photo === id) || JSON.stringify(get("classRosters")).indexOf('"photo":"' + safe + '"') >= 0);
+      if (!ok) fail("사진을 찾지 못했어요.");
+      const r = await G(DRIVE + "/" + safe + "?alt=media"), type = r.headers.get("Content-Type") || "";
+      if (!/^image\//.test(type)) fail("사진 파일이 아니에요.");
+      return "data:" + type + ";base64," + bytesToB64(await r.arrayBuffer());
+    },
+    async driveFileB64(url) {
+      const id = sheetId(url), m = await (await G(DRIVE + "/" + id + "?fields=mimeType,size")).json();
+      if (!/spreadsheetml|ms-excel|text\/csv/.test(m.mimeType)) fail("엑셀 파일이 아니에요."); if (Number(m.size) > 20 * 1024 * 1024) fail("파일이 너무 커요.");
+      return bytesToB64(await (await G(DRIVE + "/" + id + "?alt=media")).arrayBuffer());
+    },
+    // 연결한 구글 시트의 모든 탭을 보이는 그대로(글자) 읽음
+    async readSheet(url) {
+      if (!SHEET_URL_RE.test(String(url || ""))) fail("구글 시트 주소가 올바르지 않아요.");
+      const id = sheetId(url), tabs = (await tabsOf(id)).slice(0, 10);
+      return (await batchGet(id, tabs.map(t => "'" + t.title + "'!A1:CB400"), "FORMATTED_VALUE")).map(rows => rows.map(r => r.map(v => String(v ?? ""))));
+    },
+    async makeRosterSheet(title, rows) {
+      title = S(title || "명렬표", 80).replace(/[\\/:*?"<>|]/g, " ").trim() || "명렬표";
+      const data = (Array.isArray(rows) ? rows : []).slice(0, 200).map(r => (Array.isArray(r) ? r : []).slice(0, 8).map(v => S(v, 60)));
+      if (data.length < 2) fail("명단이 비어 있어요.");
+      const ss = await (await G(SHEETS, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ properties: { title }, sheets: [{ properties: { gridProperties: { frozenRowCount: 2 } } }] }) })).json();
+      await G(SHEETS + "/" + ss.spreadsheetId + "/values/A1?valueInputOption=RAW", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ values: data }) });
+      await G(DRIVE + "/" + ss.spreadsheetId + "?addParents=" + await yearFolder() + "&removeParents=root&fields=id", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: "{}" }).catch(() => {});
+      return { url: ss.spreadsheetUrl };
+    },
+    // 양식 파일: 예전 교무수첩이 만들어 둔 '교무수첩 › 양식' 폴더의 파일
+    async templateUrl(name) {
+      const f = (await findOne("name='" + String(name).replace(/'/g, "\\'") + "' and not mimeType='" + FOLDER + "'"))[0];
+      if (!f) fail("양식 파일을 드라이브에서 찾지 못했어요. 예전 교무수첩에서 한 번 [양식]을 눌러 만들어 두면 여기서도 받을 수 있어요.");
+      return "https://drive.google.com/uc?export=download&id=" + f.id;
+    },
+    inputTab,
+    async readInputTab(key) {
+      const def = INPUT_TABS[key]; if (!def) fail("없는 입력 탭이에요.");
+      if (!(await tabsOf(OLD_SHEET)).some(s => s.title === def.name)) fail("아직 입력 탭이 없어요. '시트에 입력'을 먼저 눌러 주세요.");
+      return [(await batchGet(OLD_SHEET, ["'" + def.name + "'!A1:CB400"], "FORMATTED_VALUE"))[0].map(r => r.map(v => String(v ?? "")))];
+    },
+    // 지난 학년도 보관 시트('교무수첩 2025학년도')에서 고른 것만 가져옴 (보관 시트는 그대로)
+    async importFromArchive(year, parts) {
+      year = Number(year); const id = (cfgGet("archives") || {})[year]; if (!id) fail(year + "학년도 보관 시트가 없어요.");
+      parts = Array.isArray(parts) ? parts.map(String) : []; if (!parts.length) fail("불러올 것을 골라 주세요.");
+      const a = await parseBook(id), has = p => parts.indexOf(p) >= 0, patch = {};
+      if (has("timetable") && a.cfg.timetable) patch.timetable = a.cfg.timetable;
+      if (has("plans") && Object.keys(a.cfg.plans).length) patch.plans = a.cfg.plans;
+      if (has("classTT") && a.cfg.classTT) patch.classTT = a.cfg.classTT;
+      if (has("students")) { if (a.cfg.students.length) patch.students = a.cfg.students; if (Object.keys(a.cfg.rosters).length) patch.rosters = a.cfg.rosters;
+        if (a.meta && a.meta.homeroomClass && cfgGet("config")) patch.config = { ...cfgGet("config"), homeroomClass: a.meta.homeroomClass }; }
+      if (has("allTT") && a.teachers.length) { patch.periods = a.cfg.periods; await put("teachers", a.teachers); }
+      if (Object.keys(patch).length) await cfgPut(patch);
+      if (has("classRosters") && Object.keys(a.classRosters).length) await put("classRosters", a.classRosters);
+      if (has("events") && a.events.length) await put("events", a.events);
+      const term = termOf(cfgGet("config") && cfgGet("config").term);
+      if (has("items")) { const ids = new Set(get("items").map(r => r.id)); await put("items", get("items").concat(a.items.filter(r => !ids.has(r.id)).map(r => ({ ...r, term })))); }
+      if (has("todos")) { const ids = new Set(get("todos").map(r => r.id)); await put("todos", get("todos").concat(a.todos.filter(r => !r.done && !ids.has(r.id)))); }
+      return getAll();
+    },
+    findArchives
+  });
+  // 드라이브에서 '교무수첩 2025학년도' 같은 보관 시트를 찾아 둠 (목록은 설정 → 학기에 보임)
+  async function findArchives() {
+    const files = await findOne("mimeType='application/vnd.google-apps.spreadsheet' and name contains '교무수첩' and name contains '학년도'"), map = {};
+    files.forEach(f => { const m = f.name.match(/^교무수첩 (\d{4})학년도$/); if (m && f.id !== OLD_SHEET) map[m[1]] = f.id; });
+    await cfgPut({ archives: map }); return map;
+  }
 
   // ---------- 지난 구글 시트 → Firebase ----------
-  async function sheetValues(ranges) {
-    const tk = await gtoken();
-    const u = "https://sheets.googleapis.com/v4/spreadsheets/" + OLD_SHEET + "/values:batchGet?valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING&" + ranges.map(r => "ranges=" + encodeURIComponent(r)).join("&");
-    const r = await fetch(u, { headers: { Authorization: "Bearer " + tk } });
-    if (!r.ok) fail("구글 시트를 읽지 못했어요 (" + r.status + "). 로그인한 계정이 교무수첩 시트 주인인지 확인해 주세요.");
-    return (await r.json()).valueRanges.map(v => v.values || []);
-  }
   async function importFromSheet() {
-    const meta = await (await fetch("https://sheets.googleapis.com/v4/spreadsheets/" + OLD_SHEET + "?fields=sheets.properties.title", { headers: { Authorization: "Bearer " + await gtoken() } })).json();
-    const have = new Set((meta.sheets || []).map(s => s.properties.title));
+    const out = await parseBook(OLD_SHEET), keep = get("cfg");
+    out.cfg.drive = keep.drive; // 찾아 둔 드라이브 폴더는 그대로
+    for (const t of TABLES) await put(t, out[t]);
+    await findArchives().catch(() => {});
+    return { counts: Object.fromEntries(TABLES.filter(t => Array.isArray(out[t])).map(t => [t, out[t].length])), all: getAll() };
+  }
+  // 교무수첩 시트(지금 것이나 보관 시트) 하나를 Firebase 모양으로 읽음
+  async function parseBook(bookId) {
+    const have = new Set((await tabsOf(bookId)).map(s => s.title));
     const names = ["items", "events", "memos", "notes", "checks", "logs", "todos", "teachers", "classRosters", "attend", "pmsg", "알림앱 비밀번호"].filter(n => have.has(n));
-    const vals = await sheetValues(["config!A1:A12"].concat(names.map(n => "'" + n + "'!A2:Z")));
+    const vals = await batchGet(bookId, ["config!A1:B12"].concat(names.map(n => "'" + n + "'!A2:Z")));
+    const metaRaw = ((vals[0] || [])[0] || [])[1];
     const cfgCol = (vals[0] || []).map(r => r[0]), J = i => { try { return cfgCol[i] ? JSON.parse(cfgCol[i]) : null; } catch (e) { return null; } };
     const tab = {}; names.forEach((n, i) => { tab[n] = (vals[i + 1] || []).filter(r => r.some(v => v !== "" && v != null)); });
     const str = v => String(v == null ? "" : v).replace(/^'/, ""), tru = v => v === true || String(v).toUpperCase() === "TRUE", num = v => Number(v) || 0;
@@ -339,8 +486,8 @@
       pmsg: (tab.pmsg || []).filter(r => r[0]).map(r => ({ id: str(r[0]), no: num(r[1]), text: str(r[2]), at: num(r[3]) }))
     };
     (tab["알림앱 비밀번호"] || []).forEach(r => { const no = num(r[0]), v = str(r[2]).trim(); if (no > 0 && v) out.cfg.stuPw[no] = v; });
-    for (const t of TABLES) await put(t, out[t]);
-    return { counts: Object.fromEntries(TABLES.filter(t => Array.isArray(out[t])).map(t => [t, out[t].length])), all: getAll() };
+    try { out.meta = metaRaw ? JSON.parse(str(metaRaw)) : null; } catch (e) { out.meta = null; } // 보관 시트의 B1: 그 해 학기·우리 반
+    return out;
   }
 
   // 화면 코드가 부르는 곳: 로그인·자료 준비가 끝날 때까지 기다렸다가 같은 이름의 함수를 부름
