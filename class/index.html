@@ -428,7 +428,8 @@ function installTip(){
       return [el("span",{textContent:"지금은 앱 안 브라우저라 홈 화면에 추가할 수 없어요. "}), go,
         ios && !/KAKAOTALK/i.test(ua) ? el("small",{className:"hint",textContent:" 안 열리면 오른쪽 위 메뉴 → '다른 브라우저로 열기'"}) : ""]; })()
     : deferred ? (() => { const b = el("button",{className:"small-btn",type:"button",textContent:"홈 화면에 추가"}); b.onclick = async () => { deferred.prompt(); await deferred.userChoice; deferred = null; draw(); }; return [el("span",{textContent:"앱처럼 쓰려면 "}), b]; })()
-    : ios ? [el("span",{textContent:"앱처럼 쓰려면 사파리 아래 공유(□↑) → '홈 화면에 추가'를 누르세요."})]
+    // 아이폰은 사이트가 설치 단추를 띄울 수 없음: 공유 메뉴로만 (iOS 26 은 ⋯ 안에 공유)
+    : ios ? [el("span",{textContent:"아이폰은 직접 넣어야 해요: 사파리 아래 공유(□↑) 또는 ⋯ → 공유 → '홈 화면에 추가' → '웹 앱으로 열기' 켜고 추가."})]
     : [el("span",{textContent:"앱처럼 쓰려면 크롬 메뉴(⋮) → '홈 화면에 추가'를 누르세요."})];
   return el("div",{className:"install"}, el("img",{src:"icon-192.png",alt:""}), el("div",{}, ...body), x);
 }
