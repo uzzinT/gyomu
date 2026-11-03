@@ -79,7 +79,11 @@ label.inline{display:inline-flex;gap:6px;align-items:center;font-size:.86rem;col
 .small-btn{border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:8px;padding:4px 10px;font:inherit;font-size:.8rem;cursor:pointer}
 .stale{font-size:.78rem;color:var(--muted);text-align:right;margin:2px 0 0}
 :focus-visible{outline:2px solid var(--ochre);outline-offset:2px}
-html{touch-action:manipulation;-webkit-text-size-adjust:100%}
+html{touch-action:manipulation;-webkit-text-size-adjust:100%;scrollbar-gutter:stable} /* 탭마다 글 길이가 달라도 화면이 좌우로 움직이지 않게 */
+details.closed summary{cursor:pointer;font-weight:600;color:var(--muted);list-style-position:inside}
+details.closed summary small{font-weight:400;font-size:.76rem;margin-left:4px}
+details.closed[open] summary{margin-bottom:4px}
+details.closed .ev .t{color:var(--muted)}
 input,select,textarea{font-size:max(16px,1em)}
 .login .field+.field{margin-top:0}
 .ok{flex:none;font-size:.72rem;font-weight:700;padding:1px 7px;border-radius:9px;background:color-mix(in srgb,var(--green) 18%,var(--paper));color:var(--green)}
@@ -95,7 +99,7 @@ nav button{position:relative}
 <div id="loginView" class="login" hidden>
   <img src="icon-192.png" alt="">
   <h1>우리 반 알림</h1>
-  <p class="hint">조·종례 공지, 학사일정, 제출물, 내 시간표를 볼 수 있어요.<br>학번(5자리)과 비밀번호로 들어와요. 비밀번호는 담임 선생님께 받아요.</p>
+  <p class="hint">조·종례 공지, 학사일정, 제출물, 내 시간표를 볼 수 있어요.<br>학번(5자리)과 비밀번호로 들어와요. 비밀번호는 담임 선생님께 받아요.<br><small>선생님은 학번을 비우고 반 비밀번호로 들어와요.</small></p>
   <form id="loginForm">
     <input id="no" class="field" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="5" autocomplete="username" placeholder="학번 (예: 30301)" aria-label="학번 5자리">
     <input id="pw" class="field" type="password" inputmode="text" autocomplete="current-password" placeholder="비밀번호" aria-label="비밀번호" required>
@@ -225,12 +229,16 @@ function drawEvents(){
     el("div",{className:"card"}, ...by[m].map(e => el("div",{className:"ev" + (HOLI.test(e.title.replace(/\([^)]*\)/g, "")) ? " red" : "") + (e.date === t ? " on" : "")},
       el("span",{className:"d",textContent:label(e.date)}), el("span",{className:"t"}, e.mine ? el("span",{className:"tag",textContent:"학급"}) : "", e.title), e.date >= t ? ddTag(e.date) : "")))]));
 }
+// 걷는 중인 것은 위에, 선생님이 완료한 것은 아래에 접어서 (서버가 최근 것부터 보내 줌)
 function drawChecks(){
-  if(!data.checks.length) return el("p",{className:"empty",textContent:"지금 걷고 있는 제출물이 없어요."});
+  const open = data.checks.filter(c => !c.closed), done = data.checks.filter(c => c.closed);
+  const mineTag = c => c.mine === true ? el("span",{className:"ok",textContent:"냈어요"}) : c.mine === false ? el("span",{className:"no",textContent:c.closed ? "못 냄" : "아직"}) : "";
+  const row = c => el("div",{className:"ev"}, el("span",{className:"t",textContent:c.title}), mineTag(c),
+    c.closed ? (c.due ? el("span",{className:"d",textContent:label(c.due)}) : "")
+      : c.due ? [el("span",{className:"d",textContent:label(c.due) + "까지"}), ddTag(c.due)] : el("span",{className:"d",textContent:"마감 없음"}));
   return el("section",{}, el("h2",{}, "낼 것", el("small",{textContent:"담임 선생님께 내요"})),
-    el("div",{className:"card"}, ...data.checks.map(c => el("div",{className:"ev"}, el("span",{className:"t",textContent:c.title}),
-      c.mine === true ? el("span",{className:"ok",textContent:"냈어요"}) : c.mine === false ? el("span",{className:"no",textContent:"아직"}) : "",
-      c.due ? [el("span",{className:"d",textContent:label(c.due) + "까지"}), ddTag(c.due)] : el("span",{className:"d",textContent:"마감 없음"})))));
+    open.length ? el("div",{className:"card"}, ...open.map(row)) : el("p",{className:"empty",textContent:"지금 걷고 있는 제출물이 없어요."}),
+    done.length ? el("details",{className:"card closed"}, el("summary",{}, "마감된 제출물 ", el("small",{textContent:done.length + "개 · 최근 것부터"})), ...done.map(row)) : "");
 }
 // 수업 시간: 선생님이 정한 것, 없으면 8:10 시작·50분 수업·10분 쉬고·4교시 뒤 점심 60분
 function bells(){
