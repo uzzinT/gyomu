@@ -793,7 +793,12 @@ body.onhome .tt th,body.onhome .tt td{height:36px!important}
 /* 학급 출결 2차 */
 .kidgrid{grid-template-columns:repeat(10,minmax(0,1fr))}
 @media (max-width:1100px){.kidgrid{grid-template-columns:repeat(5,minmax(0,1fr))}}
-.attinput{grid-template-columns:minmax(0,1.9fr) minmax(300px,.85fr);align-items:start}
+.attinput{grid-template-columns:minmax(0,1.65fr) minmax(330px,1fr);align-items:start}
+/* 오늘 출결 기록: 모두 두 줄 (1줄 이름·종류, 2줄 사유·서류) */
+.attside .attline{row-gap:0}
+.attside .attline::after{content:"";order:1;flex-basis:100%}
+.attside .attline>.t{order:2;flex:1 1 0;min-width:0;min-height:1.4em;margin-top:4px;padding-left:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.attside .attline>.docs{order:3;flex:none;flex-basis:auto;flex-wrap:nowrap;padding-left:0;margin-top:4px}
 .attinput>.dcards{grid-column:1/-1}
 .attside{display:grid;gap:14px;align-content:start}
 .attside .kidgrid{grid-template-columns:repeat(5,minmax(0,1fr))}

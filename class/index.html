@@ -117,6 +117,14 @@ nav button[aria-selected="true"]{color:var(--navy)}nav button[aria-selected="tru
 .tt th{background:var(--paper2)}.tt .on{background:var(--mint)}.tt td.now{outline-color:var(--lime)}
 .login h1{font-weight:900;letter-spacing:-.03em}
 .ttpick{margin:6px 0 4px;text-align:left}
+.evtoggle{display:flex;gap:6px;justify-content:flex-end;margin:6px 0 2px}.evtoggle [aria-pressed="true"]{background:var(--navy);color:#fff;border-color:var(--navy)}
+.calhead{display:flex;align-items:center;justify-content:space-between;gap:8px}.calhead h2{margin:10px 0}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;padding:8px}
+.cal .cw{text-align:center;font-size:.75rem;color:var(--muted);padding:2px 0 4px}
+.cal .cd{min-height:58px;border-radius:8px;padding:3px;background:var(--paper2);display:flex;flex-direction:column;gap:2px;min-width:0}
+.cal .cd b{font-size:.78rem;font-weight:700}.cal .red,.cal .red b{color:var(--sun)}
+.cal .cd.on{outline:2px solid var(--lime);background:var(--mint)}
+.cal .ce{font-size:.64rem;line-height:1.25;background:var(--paper);border-radius:4px;padding:1px 3px;overflow:hidden;word-break:break-all;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;color:var(--ink)}.cal .ce.mine{box-shadow:inset 2px 0 0 var(--green)}
 .setrow{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px dashed var(--line)}.setrow:first-of-type{border-top:0}
 .setrow b{flex:1}.setrow .small-btn{min-width:2.4em}
 </style>
@@ -322,13 +330,37 @@ function drawNotes(){
     next.length ? [el("h2",{textContent:"앞으로"}), ...next.map(card)] : "",
     past.length ? [el("h2",{}, "지난 공지", el("small",{textContent:"최근 3주"})), ...past.map(card)] : "");
 }
+// 일정: 목록 / 달력 토글 (이 기기에 기억)
+let evMon = 0;
 function drawEvents(){
+  const cal = store.get("evMode") === "cal";
+  const tg = el("div",{className:"evtoggle",role:"group","aria-label":"일정 보기 방식"}, ...[["list","목록"],["cal","달력"]].map(([k, n]) => {
+    const b = el("button",{type:"button",className:"small-btn",textContent:n}); b.setAttribute("aria-pressed", String(cal === (k === "cal")));
+    b.onclick = () => { store.set("evMode", k, true); draw(); }; return b; }));
+  return el("section",{}, tg, cal ? drawCal() : drawEvList());
+}
+function drawCal(){
+  const t = today(), b = new Date(); b.setDate(1); b.setMonth(b.getMonth() + evMon);
+  const y = b.getFullYear(), mo = b.getMonth(), pre = `${y}-${String(mo + 1).padStart(2, "0")}`;
+  const by = {}; data.events.filter(e => e.date.startsWith(pre)).forEach(e => (by[e.date] ||= []).push(e));
+  const cells = Array(b.getDay()).fill(null).concat(Array.from({ length:new Date(y, mo + 1, 0).getDate() }, (_, i) => pre + "-" + String(i + 1).padStart(2, "0")));
+  const nav = (txt, d, lab) => { const x = el("button",{type:"button",className:"small-btn",textContent:txt,"aria-label":lab}); x.onclick = () => { evMon += d; draw(); }; return x; };
+  return [el("div",{className:"calhead"}, nav("‹", -1, "이전 달"), el("h2",{textContent:`${y}년 ${mo + 1}월`}), nav("›", 1, "다음 달")),
+    el("div",{className:"card cal"}, ..."일월화수목금토".split("").map((w, i) => el("div",{className:"cw" + (i === 0 ? " red" : ""),textContent:w})),
+      ...cells.map((d, i) => !d ? el("div",{}) : el("div",{className:"cd" + (d === t ? " on" : "") + (i % 7 === 0 || (by[d] || []).some(e => HOLI.test(e.title.replace(/\([^)]*\)/g, ""))) ? " red" : "")},
+        el("b",{textContent:Number(d.slice(8))}), ...(by[d] || []).map(e => el("span",{className:"ce" + (e.mine ? " mine" : ""),textContent:e.title}))))),
+    // 칸이 좁아 이름이 잘릴 수 있어 그달 일정을 아래에 한 번 더
+    Object.keys(by).length ? el("div",{className:"card"}, ...Object.keys(by).sort().flatMap(d => by[d].map(e => el("div",{className:"ev" + (HOLI.test(e.title.replace(/\([^)]*\)/g, "")) ? " red" : "") + (d === t ? " on" : "")},
+      el("span",{className:"d",textContent:label(d)}), el("span",{className:"t"}, e.mine ? el("span",{className:"tag",textContent:"학급"}) : "", e.title), d >= t ? ddTag(d) : ""))))
+      : el("p",{className:"empty",textContent:"이달에는 일정이 없어요."})];
+}
+function drawEvList(){
   const t = today(), list = data.events.filter(e => e.date >= ymd(new Date(Date.now() - 7 * 864e5)));
   if(!list.length) return el("p",{className:"empty",textContent:"다가오는 일정이 없어요."});
   const by = {}; list.forEach(e => (by[e.date.slice(0, 7)] ||= []).push(e));
-  return el("section",{}, ...Object.keys(by).sort().map(m => [el("h2",{textContent:Number(m.slice(5)) + "월"}),
+  return Object.keys(by).sort().map(m => [el("h2",{textContent:Number(m.slice(5)) + "월"}),
     el("div",{className:"card"}, ...by[m].map(e => el("div",{className:"ev" + (HOLI.test(e.title.replace(/\([^)]*\)/g, "")) ? " red" : "") + (e.date === t ? " on" : "")},
-      el("span",{className:"d",textContent:label(e.date)}), el("span",{className:"t"}, e.mine ? el("span",{className:"tag",textContent:"학급"}) : "", e.title), e.date >= t ? ddTag(e.date) : "")))]));
+      el("span",{className:"d",textContent:label(e.date)}), el("span",{className:"t"}, e.mine ? el("span",{className:"tag",textContent:"학급"}) : "", e.title), e.date >= t ? ddTag(e.date) : "")))]);
 }
 // 걷는 중인 것은 위에, 선생님이 완료한 것은 아래에 접어서 (서버가 최근 것부터 보내 줌)
 function drawChecks(){
