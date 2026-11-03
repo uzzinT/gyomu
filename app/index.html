@@ -1463,7 +1463,7 @@ function attDocs(){
 function attCal(){
   const D = AD(), mon = new Date(); mon.setHours(12, 0, 0, 0); mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7) + att.week * 7);
   const days = [0, 1, 2, 3, 4].map(i => { const d = new Date(mon); d.setDate(mon.getDate() + i); return ymd(d); }), today = ymd(new Date());
-  const item = r => { const b = el("button",{type:"button",className:"calitem"}, el("b",{}, stuLabel(r.num, r.name)), el("span",{className:"ty"}, r.type), el("small",{}, "(" + (r.period || "-") + ")"), r.reason ? el("small",{className:"hint"}, r.reason) : "");
+  const item = r => { const b = el("button",{type:"button",className:"calitem"}, el("b",{}, stuLabel(r.num, r.name)), el("span",{className:"ty"}, r.type, el("small",{}, " (" + (r.period || "-") + ")")), r.reason ? el("small",{className:"hint"}, r.reason) : "");
     b.style.setProperty("--c", typeColor(r.type)); b.onclick = () => attEdit(r); return b; };
   const sortR = a => a.slice().sort((x, y) => (parseInt(x.num) || 0) - (parseInt(y.num) || 0));
   const week = el("div",{className:"calweek"}, ...days.map(k => { const rs = sortR(D.recs.filter(r => recOn(r, k))), hn = holiName(k);
