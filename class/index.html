@@ -415,10 +415,19 @@ addEventListener("beforeinstallprompt", e => { e.preventDefault(); deferred = e;
 function installTip(){
   const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
   if(standalone || store.get("installTipOff")) return null;
-  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  if(!deferred && !ios && !/android/i.test(navigator.userAgent)) return null;
+  const ua = navigator.userAgent, ios = /iphone|ipad|ipod/i.test(ua);
+  if(!deferred && !ios && !/android/i.test(ua)) return null;
   const x = el("button",{className:"x",type:"button",textContent:"✕","aria-label":"안내 닫기"}); x.onclick = () => { store.set("installTipOff", "1", true); draw(); };
-  const body = deferred ? (() => { const b = el("button",{className:"small-btn",type:"button",textContent:"홈 화면에 추가"}); b.onclick = async () => { deferred.prompt(); await deferred.userChoice; deferred = null; draw(); }; return [el("span",{textContent:"앱처럼 쓰려면 "}), b]; })()
+  // 카톡·네이버·인스타 등 앱 안 브라우저는 '홈 화면에 추가'가 안 됨 → 바깥 브라우저로
+  const inApp = /KAKAOTALK|NAVER|Instagram|FBAN|FBAV|Line\/|DaumApps|everytimeApp|; wv\)/i.test(ua);
+  const body = inApp ? (() => {
+      const go = el("button",{className:"small-btn",type:"button",textContent:ios ? "사파리로 열기" : "크롬으로 열기"});
+      go.onclick = () => { const u = location.href;
+        location.href = /KAKAOTALK/i.test(ua) ? "kakaotalk://web/openExternal?url=" + encodeURIComponent(u)
+          : /android/i.test(ua) ? "intent://" + u.replace(/^https?:\/\//, "") + "#Intent;scheme=https;package=com.android.chrome;end" : u; };
+      return [el("span",{textContent:"지금은 앱 안 브라우저라 홈 화면에 추가할 수 없어요. "}), go,
+        ios && !/KAKAOTALK/i.test(ua) ? el("small",{className:"hint",textContent:" 안 열리면 오른쪽 위 메뉴 → '다른 브라우저로 열기'"}) : ""]; })()
+    : deferred ? (() => { const b = el("button",{className:"small-btn",type:"button",textContent:"홈 화면에 추가"}); b.onclick = async () => { deferred.prompt(); await deferred.userChoice; deferred = null; draw(); }; return [el("span",{textContent:"앱처럼 쓰려면 "}), b]; })()
     : ios ? [el("span",{textContent:"앱처럼 쓰려면 사파리 아래 공유(□↑) → '홈 화면에 추가'를 누르세요."})]
     : [el("span",{textContent:"앱처럼 쓰려면 크롬 메뉴(⋮) → '홈 화면에 추가'를 누르세요."})];
   return el("div",{className:"install"}, el("img",{src:"icon-192.png",alt:""}), el("div",{}, ...body), x);
