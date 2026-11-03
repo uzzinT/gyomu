@@ -172,7 +172,7 @@
       if (!cfg || !Array.isArray(cfg.areas) || cfg.areas.length < 1 || cfg.areas.length > 8) fail("영역은 1~8개여야 해요.");
       const seen = {}, carry = {};
       Object.keys(cfg.carry || {}).forEach(k => { if (TERM_RE.test(k) && Array.isArray(cfg.carry[k])) carry[k] = cfg.carry[k].filter(x => AREA_IDS.indexOf(x) >= 0); });
-      const clean = { term: termOf(cfg.term), carry, homeroom: cfg.homeroom !== false, homeroomClass: S(cfg.homeroomClass, 10).trim(), sources: cleanSources(cfg.sources),
+      const clean = { term: termOf(cfg.term), carry, homeroom: cfg.homeroom !== false, homeroomClass: S(cfg.homeroomClass, 10).trim(), sources: cleanSources(cfg.sources), attend: cfg.attend && typeof cfg.attend === "object" ? { url: SHEET_URL_RE.test(String(cfg.attend.url || "")) ? String(cfg.attend.url) : "", pos: Math.max(0, Math.min(9, Math.floor(Number(cfg.attend.pos)) || 0)), on: cfg.attend.on !== false, posSet: cfg.attend.posSet === true } : undefined,
         evCats: cleanEvCats(cfg.evCats), bells: cleanBells(cfg.bells), offWork: T.test(String(cfg.offWork)) ? cfg.offWork : undefined, onWork: T.test(String(cfg.onWork)) ? cfg.onWork : undefined,
         planRange: cfg.planRange && DATE_RE.test(String(cfg.planRange.s)) && DATE_RE.test(String(cfg.planRange.e)) ? { s: cfg.planRange.s, e: cfg.planRange.e } : undefined,
         planDays: cleanPlanDays(cfg.planDays),
@@ -595,6 +595,68 @@
     }
   });
   window.fbAutoSync = autoSync;
+
+  // ---------- 학급 출결: 설정에서 이어 둔 '스마트 출결 관리' 시트를 바로 읽고 씀 (그 시트에만 씀) ----------
+  const ATT_TABS = { 학생명부: "A1:H200", 출결기록: "A1:J6000", 교시설정: "A1:B10", 출결알림: "A1:G60", 화면설정: "A1:C80", 출결종류: "A1:C120", 학사일정: "A1:D600", 휴지통: "A1:L2000" };
+  const attId = () => { const c = cfgGet("config") || {}, u = c.attend && c.attend.url; if (!u) fail("설정 → 학급 출결에서 출결 시트를 먼저 이어 주세요."); return sheetId(u); };
+  const attTab = async (id, name) => { const t = (await tabsOf(id)).find(x => x.title === name); if (!t) fail("출결 시트에 '" + name + "' 탭이 없어요."); return t; };
+  const putRange = (id, range, values) => G(SHEETS + "/" + id + "/values/" + q(range) + "?valueInputOption=RAW", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ values }) });
+  Object.assign(API, {
+    async attLoad() {
+      const id = attId(), have = new Set((await tabsOf(id)).map(t => t.title)), names = Object.keys(ATT_TABS).filter(n => have.has(n));
+      const vals = await batchGet(id, names.map(n => "'" + n + "'!" + ATT_TABS[n]), "FORMATTED_VALUE"), out = {};
+      names.forEach((n, i) => { out[n] = vals[i].map(r => r.map(v => String(v ?? ""))); });
+      return { url: "https://docs.google.com/spreadsheets/d/" + id + "/edit", tabs: out };
+    },
+    // 출결기록에 줄 더하기
+    async attAdd(rows) {
+      const id = attId(); await attTab(id, "출결기록");
+      const data = (Array.isArray(rows) ? rows : []).slice(0, 60).map(r => (Array.isArray(r) ? r : []).slice(0, 10).map(v => S(v, 2000)));
+      if (!data.length) fail("넣을 기록이 없어요.");
+      await G(SHEETS + "/" + id + "/values/" + q("'출결기록'!A1:J1") + ":append?valueInputOption=RAW&insertDataOption=INSERT_ROWS", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ values: data }) });
+      return API.attLoad();
+    },
+    // n번째 줄(머리줄 = 0)을 고침. 그 사이 다른 곳에서 바뀌었으면 막음 (앞 다섯 칸으로 확인)
+    async attEdit(n, before, row) {
+      const id = attId(); n = Math.floor(Number(n)); if (!(n >= 1)) fail("기록을 찾지 못했어요.");
+      const cur = ((await batchGet(id, ["'출결기록'!A" + (n + 1) + ":J" + (n + 1)], "FORMATTED_VALUE"))[0][0] || []).map(String);
+      if ((before || []).slice(0, 5).join("|") !== cur.slice(0, 5).join("|")) fail("그 사이 출결 시트가 바뀌었어요. 새로 고침 한 뒤 다시 해 주세요.");
+      await putRange(id, "'출결기록'!A" + (n + 1) + ":J" + (n + 1), [row.slice(0, 10).map(v => S(v, 2000))]); return API.attLoad();
+    },
+    // 지우면 휴지통 탭으로 옮김 (출결 앱과 같은 방식)
+    async attDelete(n, before) {
+      const id = attId(), t = await attTab(id, "출결기록"); n = Math.floor(Number(n)); if (!(n >= 1)) fail("기록을 찾지 못했어요.");
+      const cur = ((await batchGet(id, ["'출결기록'!A" + (n + 1) + ":J" + (n + 1)], "FORMATTED_VALUE"))[0][0] || []).map(String);
+      if ((before || []).slice(0, 5).join("|") !== cur.slice(0, 5).join("|")) fail("그 사이 출결 시트가 바뀌었어요. 새로 고침 한 뒤 다시 해 주세요.");
+      const now = new Date(), stamp = ymd(now) + " " + String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0");
+      if ((await tabsOf(id)).some(x => x.title === "휴지통"))
+        await G(SHEETS + "/" + id + "/values/" + q("'휴지통'!A1:L1") + ":append?valueInputOption=RAW&insertDataOption=INSERT_ROWS", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ values: [[uuid().slice(0, 8), cur[0], cur[1], cur[2], cur[3], cur[4], cur[5], cur[6], cur[7], cur[8], cur[9], stamp]] }) });
+      await G(SHEETS + "/" + id + ":batchUpdate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requests: [{ deleteDimension: { range: { sheetId: t.sheetId, dimension: "ROWS", startIndex: n, endIndex: n + 1 } } }] }) });
+      return API.attLoad();
+    },
+    // 교무수첩 → 출결 시트: 학생 명단(번호·이름·연락처), 쉬는 날(학사일정), 요일별 교시 수
+    async attSync(p) {
+      const id = attId(), have = new Set((await tabsOf(id)).map(t => t.title)), done = [];
+      if (have.has("학생명부") && Array.isArray(p.students) && p.students.length) {
+        const old = (await batchGet(id, ["'학생명부'!A2:H200"], "FORMATTED_VALUE"))[0], byNo = {}; old.forEach(r => { byNo[String(r[0])] = r; });
+        const rows = p.students.slice(0, 60).map(s => { const o = byNo[String(s.no)] || [];
+          return [String(s.no), S(s.name, 20), S(s.name, 20), S(s.phone, 20), S(s.rel || o[4] || "", 10), S(s.parentPhone, 20), o[6] || "", o[7] || ""]; });
+        await G(SHEETS + "/" + id + "/values/" + q("'학생명부'!A2:H200") + ":clear", { method: "POST" });
+        await putRange(id, "'학생명부'!A2", rows); done.push("학생 " + rows.length + "명");
+      }
+      if (have.has("학사일정") && Array.isArray(p.holidays)) {
+        const rows = p.holidays.slice(0, 500).map(h => [S(h.title, 60), S(h.date, 10), "", "단일"]);
+        await G(SHEETS + "/" + id + "/values/" + q("'학사일정'!A2:D600") + ":clear", { method: "POST" });
+        if (rows.length) await putRange(id, "'학사일정'!A2", rows); done.push("쉬는 날 " + rows.length + "개");
+      }
+      if (have.has("교시설정") && Array.isArray(p.periods) && p.periods.length === 5) {
+        await putRange(id, "'교시설정'!A2:B6", p.periods.map((n, i) => [(i + 1) + " (" + "월화수목금"[i] + ")", String(Math.max(1, Math.min(10, Number(n) || 7)))])); done.push("요일별 교시 수");
+      }
+      await cfgPut({ attSyncAt: Date.now() });
+      return { done, data: await API.attLoad() };
+    }
+  });
 
   // 드라이브에서 '교무수첩 2025학년도' 같은 보관 시트를 찾아 둠 (목록은 설정 → 학기에 보임)
   async function findArchives() {
