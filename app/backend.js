@@ -15,8 +15,9 @@
   const EMPTY = { cfg: {}, classRosters: {} };
   let uid = null, DB = null, token = null, tokenAt = 0;
   // 구글 열쇠는 이 탭에서만 1시간 기억 (새로 고침해도 다시 묻지 않게)
-  try { const t = JSON.parse(sessionStorage.getItem("gtok") || "null"); if (t && Date.now() - t.at < 50 * 60e3) { token = t.v; tokenAt = t.at; } } catch (e) {}
-  const keepToken = () => { try { sessionStorage.setItem("gtok", JSON.stringify({ v: token, at: tokenAt })); } catch (e) {} };
+  try { const t = JSON.parse(localStorage.getItem("gtok") || "null"); if (t && Date.now() - t.at < 50 * 60e3) { token = t.v; tokenAt = t.at; } } catch (e) {}
+  // 구글 권한(1시간짜리)은 새 탭·다시 열기에도 이어 쓰게 이 기기에 둠
+  const keepToken = () => { try { localStorage.setItem("gtok", JSON.stringify({ v: token, at: tokenAt })); } catch (e) {} };
   const col = () => fs.collection("users").doc(uid).collection("data");
   const get = t => DB[t] ?? (EMPTY[t] !== undefined ? structuredClone(EMPTY[t]) : []);
   // 표 하나를 통째로 저장 (선생님 혼자 쓰니 마지막에 쓴 것이 남음)
@@ -903,6 +904,6 @@
     if (PUB_FNS.has(fn) && fn !== "sendStudentMessages") schedulePublish();
     return r;
   };
-  window.fbSignOut = () => auth.signOut().then(() => location.reload());
+  window.fbSignOut = () => { try { localStorage.removeItem("gtok"); } catch (e) {} return auth.signOut().then(() => location.reload()); };
   window.fbUser = () => auth.currentUser;
 })();
