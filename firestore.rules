@@ -1,0 +1,48 @@
+rules_version = '2';
+// 교무수첩 보안 규칙
+// - users/{uid}/...      : 선생님 본인만 읽고 씀 (교무수첩 전체 자료)
+// - notice/{tid}          : 학생 알림 앱에 보이는 반 공통 내용. 선생님만 쓰고, 선생님이 등록한 학생만 읽음
+// - notice/{tid}/members  : 선생님이 만든 학생 계정 목록 (uid → 학번). 학생은 자기 것만 읽음
+// - notice/{tid}/students : 학생 한 명 몫 (개인 시간표·개별 알림·제출 여부). 그 학번으로 등록된 학생만 읽음
+// - notice/{tid}/push     : 휴대폰 알림 받을 기기 (등록한 사람만 자기 것을 씀, 선생님만 읽음)
+service cloud.firestore {
+  match /databases/{db}/documents {
+    function signedIn() { return request.auth != null; }
+    function isTeacher(tid) { return signedIn() && request.auth.uid == tid; }
+    function member(tid) { return get(/databases/$(db)/documents/notice/$(tid)/members/$(request.auth.uid)); }
+    function isMember(tid) { return signedIn() && exists(/databases/$(db)/documents/notice/$(tid)/members/$(request.auth.uid)); }
+
+    match /users/{uid}/{doc=**} {
+      allow read, write: if isTeacher(uid);
+    }
+
+    match /notice/{tid} {
+      allow read: if isTeacher(tid) || isMember(tid);
+      allow write: if isTeacher(tid);
+
+      match /members/{m} {
+        allow read: if isTeacher(tid) || (signedIn() && request.auth.uid == m);
+        allow write: if isTeacher(tid);
+      }
+      match /students/{hb} {
+        allow read: if isTeacher(tid) || (isMember(tid) && member(tid).data.hakbun == hb);
+        allow write: if isTeacher(tid);
+      }
+      match /push/{id} {
+        allow create, update: if signedIn() && request.auth.uid == id && (isMember(tid) || isTeacher(tid));
+        allow read, delete: if isTeacher(tid) || (signedIn() && request.auth.uid == id);
+      }
+    }
+
+    // 학생 앱이 반 코드로 선생님을 찾는 곳 (반 이름과 선생님 uid 만, 누구나 읽음)
+    match /classes/{code} {
+      allow read: if true;
+      allow write: if signedIn() && request.resource.data.tid == request.auth.uid
+        && (resource == null || resource.data.tid == request.auth.uid);
+    }
+
+    match /{other=**} {
+      allow read, write: if false;
+    }
+  }
+}
