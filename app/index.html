@@ -713,6 +713,22 @@ dialog::backdrop{background:rgba(16,32,21,.45);backdrop-filter:blur(2px)}
 .atthead{flex-wrap:wrap}
 .attseg{flex-wrap:wrap;border-radius:14px;width:max-content;max-width:100%}
 .attseg button{display:inline-flex;align-items:center;gap:5px;padding:9px 16px}
+/* 휴대폰에서 화면 밖으로 안 나가게: 틀은 화면 너비, 넓은 것(탭·표·학생 단추)은 그 안에서 좌우로 밀기 */
+.attwrap{grid-template-columns:minmax(0,1fr)}.attwrap>*,.attgrid>*,.attinput>*{min-width:0}
+.atthead{flex-wrap:wrap;gap:8px}
+.book{overflow-x:clip}/* hidden 과 달리 옆으로 밀려 들어가지 않음 */
+@media (max-width:700px){
+  .tt-wrap{max-width:100%;overflow-x:auto}
+  .tt table{table-layout:fixed;width:100%!important;min-width:0!important}
+  .tt th,.tt td{font-size:.68rem!important;padding:3px 1px!important;overflow-wrap:anywhere;word-break:keep-all;line-height:1.25}
+  .tt thead th:first-child,.tt tbody th{width:3.4em}
+  .tt td small,.tt th small{font-size:.56rem}.tt tbody th,.tt tbody th small{white-space:normal!important;overflow-wrap:anywhere}
+  .attseg{flex-wrap:nowrap;overflow-x:auto;width:auto;max-width:100%;scrollbar-width:none}.attseg::-webkit-scrollbar{display:none}.attseg button{flex:none;white-space:nowrap}
+  .attwrap .tt-wrap,.attstat,.doctable{max-width:100%}.attwrap .tt-wrap{overflow-x:auto}
+  .attrow{flex-wrap:wrap}.attrow .field{min-width:0;flex:1 1 9em}
+  .kidgrid{grid-template-columns:repeat(5,minmax(0,1fr))!important}
+  .calweek,.calmonth{overflow-x:auto;padding-bottom:4px}.calweek{grid-template-columns:repeat(5,minmax(124px,1fr))}.calmonth{grid-template-columns:repeat(5,minmax(100px,1fr))}
+}
 /* 출결 고치기 창 넓게 · 종류는 그룹마다 한 줄 (넘치면 좌우로 밀기) */
 #dayDlg:has(.typegroups){width:min(860px,calc(100vw - 32px))}
 .tgroup{flex-wrap:nowrap;overflow-x:auto;padding-bottom:3px;scrollbar-width:thin}.tgroup>*{flex:none}

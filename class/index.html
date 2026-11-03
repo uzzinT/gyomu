@@ -99,9 +99,13 @@ nav button{position:relative}
 .login .alt .btn{background:var(--paper2);color:var(--ink);border:1px solid var(--line)}
 nav{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:1fr}
 .push{display:flex;gap:10px;align-items:center;background:var(--paper2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:4px 0 10px;font-size:.84rem}
+.push{flex-wrap:wrap}.push>span{flex:1 1 12em}.push .small-btn{white-space:nowrap;flex:none}
 .push .x{margin-left:auto;border:0;background:none;color:var(--muted);font-size:1.1rem;cursor:pointer}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
 .chip{font-size:.78rem;font-weight:600;padding:4px 10px;border-radius:999px;background:var(--paper2);border:1px solid var(--line)}
+/* 내 출결: 1줄 날짜(기간)·일수, 2줄 종류(교시) — 하루든 여러 날이든 같은 모양 */
+.att .ev{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;align-items:baseline}
+.att .ev .d{grid-column:1;grid-row:1;width:auto;min-width:0}.att .ev .days{grid-column:2;grid-row:1}.att .ev .t{grid-column:1 / -1;grid-row:2;min-width:0}
 .att .ev .d{width:auto;min-width:6.2em}.att .days{flex:none;font-weight:700;color:var(--sun);font-size:.84rem}
 body{background:var(--desk)!important;letter-spacing:-.01em}
 header{background:var(--navy);background-image:radial-gradient(420px 160px at 100% 0,color-mix(in srgb,var(--lime) 22%,transparent),transparent 70%)}
@@ -154,6 +158,7 @@ nav button[aria-selected="true"]{color:var(--navy)}nav button[aria-selected="tru
   <header>
     <h1 id="title">우리 반<small id="sub"></small></h1>
     <button class="hbtn" id="setBtn" type="button" aria-label="알림 앱 설정" hidden>⚙</button>
+    <button class="hbtn" id="pushBtn" type="button" hidden>🔕</button>
     <button class="hbtn" id="refresh" type="button" aria-label="새로 고침">↻</button>
     <button class="hbtn" id="logout" type="button">나가기</button>
   </header>
@@ -295,12 +300,22 @@ async function enablePush(btn){
     const reg = await navigator.serviceWorker.ready;
     const token = await firebase.messaging().getToken({ vapidKey:VAPID, serviceWorkerRegistration:reg });
     const u = auth.currentUser; await db.collection("notice").doc(tid).collection("push").doc(u.uid).set({ token, hakbun:isStudent(u) ? u.email.split("@")[0] : "", at:Date.now() });
-    store.set("pushOn", "1", true); btn.textContent = "알림 켜짐 ✓"; btn.disabled = true;
+    store.set("pushOn", "1", true); draw();
   }catch(x){ alert(x.message || "알림을 켜지 못했어요."); }
 }
+// 알림 그만 받기: 이 기기 등록을 지움 (선생님이 보내도 안 울림)
+async function disablePush(){
+  try{ await firebase.messaging().deleteToken().catch(() => {}); await db.collection("notice").doc(tid).collection("push").doc(auth.currentUser.uid).delete(); }
+  catch(x){ alert("알림을 끄지 못했어요: " + (x.message || x.code)); return; }
+  store.del("pushOn"); store.set("pushTipOff", "1", true); draw();
+}
+// 머리띠 🔔/🔕: 언제든 알림 받기 ↔ 받지 않기
+$("pushBtn").onclick = () => { if(store.get("pushOn")){ if(confirm("휴대폰 알림을 그만 받을까요?")) disablePush(); } else enablePush(); };
 
 function draw(){
   if(!data) return;
+  const pb = $("pushBtn"), on = !!store.get("pushOn"); pb.hidden = !VAPID || !auth.currentUser; pb.textContent = on ? "🔔" : "🔕";
+  pb.setAttribute("aria-label", on ? "알림 받는 중 (누르면 받지 않기)" : "알림 받지 않는 중 (누르면 받기)"); pb.title = pb.getAttribute("aria-label");
   $("title").firstChild.textContent = (data.cls ? data.cls + " " : "") + "우리 반 ";
   const t = new Date(), my = data.my;
   $("sub").textContent = (t.getMonth() + 1) + "월 " + t.getDate() + "일 " + WD[t.getDay()] + "요일" + (my ? " · " + hakbun(my.no) + " " + (my.name || "") : "");
@@ -405,9 +420,9 @@ function drawAtt(){
 // 휴대폰 알림 켜기 안내 (알림 열쇠가 있고 아직 안 켰을 때)
 function pushTip(){
   if(!VAPID || store.get("pushOn") || store.get("pushTipOff")) return null;
-  const b = el("button",{className:"small-btn",type:"button",textContent:"알림 받기"}); b.onclick = () => enablePush(b);
-  const x = el("button",{className:"x",type:"button",textContent:"✕","aria-label":"안내 닫기"}); x.onclick = () => { store.set("pushTipOff", "1", true); draw(); };
-  return el("div",{className:"push"}, el("span",{textContent:"🔔 선생님 알림을 휴대폰으로 받을까요?"}), b, x);
+  const b = el("button",{className:"small-btn",type:"button",textContent:"알림 받기"}); b.onclick = () => enablePush();
+  const x = el("button",{className:"small-btn",type:"button",textContent:"받지 않기"}); x.onclick = () => { store.set("pushTipOff", "1", true); draw(); };
+  return el("div",{className:"push"}, el("span",{}, "🔔 선생님 알림을 휴대폰으로 받을까요?", el("small",{className:"hint",textContent:" 나중에 위 🔕 단추로 바꿀 수 있어요."})), b, x);
 }
 // 홈 화면에 추가 안내 (이미 앱으로 열었거나 닫았으면 안 보임)
 let deferred = null;
