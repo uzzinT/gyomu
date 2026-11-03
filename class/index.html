@@ -95,9 +95,9 @@ nav button{position:relative}
 <div id="loginView" class="login" hidden>
   <img src="icon-192.png" alt="">
   <h1>우리 반 알림</h1>
-  <p class="hint">조·종례 공지, 학사일정, 제출물, 내 시간표를 볼 수 있어요.<br>번호와 비밀번호는 담임 선생님께 받아요.</p>
+  <p class="hint">조·종례 공지, 학사일정, 제출물, 내 시간표를 볼 수 있어요.<br>학번(5자리)과 비밀번호로 들어와요. 비밀번호는 담임 선생님께 받아요.</p>
   <form id="loginForm">
-    <input id="no" class="field" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" autocomplete="username" placeholder="번호 (예: 7)" aria-label="출석 번호">
+    <input id="no" class="field" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="5" autocomplete="username" placeholder="학번 (예: 30301)" aria-label="학번 5자리">
     <input id="pw" class="field" type="password" inputmode="text" autocomplete="current-password" placeholder="비밀번호" aria-label="비밀번호" required>
     <label class="inline"><input type="checkbox" id="remember" checked> 이 기기 기억하기 (다음부터 비밀번호 없이)</label>
     <p class="err" id="loginErr" role="alert"></p>
@@ -140,6 +140,7 @@ const parse = k => { const [y, m, d] = k.split("-").map(Number); return new Date
 const ymd = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 const label = k => { const d = parse(k); return (d.getMonth() + 1) + "/" + d.getDate() + " (" + WD[d.getDay()] + ")"; };
 const today = () => ymd(new Date());
+const hakbun = n => { const m = String(data?.cls || "").match(/^(\d)\s*-\s*(\d+)$/); return m ? m[1] + String(m[2]).padStart(2, "0") + String(n).padStart(2, "0") : n + "번"; };
 const dday = k => Math.round((parse(k) - parse(today())) / 864e5);
 const ddTag = k => { const n = dday(k); return el("span",{className:"dd" + (n < 0 ? " past" : n <= 2 ? " soon" : ""), textContent: n === 0 ? "오늘" : n > 0 ? "D-" + n : "지남"}); };
 const HOLI = /(공휴일|대체공휴일|휴업|방학|추석|설날|한글날|개천절|성탄절|어린이날|현충일|광복절|삼일절)/;
@@ -154,7 +155,8 @@ $("loginForm").onsubmit = async e => {
   e.preventDefault();
   const b = $("loginBtn"); b.disabled = true; $("loginErr").textContent = "";
   try{
-    const no = $("no").value.trim();
+    const no = $("no").value.replace(/\D/g, "");
+    if(no && no.length !== 5) throw new Error("학번 5자리로 넣어 주세요. (예: 30301)");
     const r = await api(no ? { no, pw: $("pw").value } : { pw: $("pw").value });
     if(r.error) throw new Error(r.error);
     const keep = $("remember").checked;
@@ -186,7 +188,7 @@ function draw(){
   if(!data) return;
   $("title").firstChild.textContent = (data.cls ? data.cls + " " : "") + "우리 반 ";
   const t = new Date(), my = data.my;
-  $("sub").textContent = (t.getMonth() + 1) + "월 " + t.getDate() + "일 " + WD[t.getDay()] + "요일" + (my ? " · " + my.no + "번 " + (my.name || "") : "");
+  $("sub").textContent = (t.getMonth() + 1) + "월 " + t.getDate() + "일 " + WD[t.getDay()] + "요일" + (my ? " · " + hakbun(my.no) + " " + (my.name || "") : "");
   document.querySelectorAll("nav button").forEach(b => { b.setAttribute("aria-selected", String(b.dataset.v === view)); b.querySelector(".badge")?.remove(); });
   const unseen = view === "notes" ? 0 : newMsgs().length;
   if(unseen) document.querySelector('nav button[data-v="notes"]').append(el("span",{className:"badge",textContent:unseen,"aria-label":"새 알림 " + unseen + "개"}));
