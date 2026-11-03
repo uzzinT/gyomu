@@ -12,7 +12,8 @@ const V = "10.14.1", head = [
   `<script src="https://www.gstatic.com/firebasejs/${V}/firebase-app-compat.js"></script>`,
   `<script src="https://www.gstatic.com/firebasejs/${V}/firebase-auth-compat.js"></script>`,
   `<script src="https://www.gstatic.com/firebasejs/${V}/firebase-firestore-compat.js"></script>`,
-  `<script src="backend.js"></script>`,
+  // 고칠 때마다 주소가 달라져서 브라우저가 예전 backend.js 를 쓰지 않게
+  `<script src="backend.js?v=${require("crypto").createHash("sha1").update(fs.readFileSync(path.join(__dirname, "backend.js"))).digest("hex").slice(0, 8)}"></script>`,
   `<style>
 #fbGate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--desk)}
 #fbGate .fbbox{background:var(--paper);border-radius:22px;padding:36px 32px;text-align:center;box-shadow:0 18px 40px -24px rgba(20,40,25,.35);max-width:340px}
