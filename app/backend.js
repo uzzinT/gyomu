@@ -173,7 +173,7 @@
       if (!cfg || !Array.isArray(cfg.areas) || cfg.areas.length < 1 || cfg.areas.length > 8) fail("영역은 1~8개여야 해요.");
       const seen = {}, carry = {};
       Object.keys(cfg.carry || {}).forEach(k => { if (TERM_RE.test(k) && Array.isArray(cfg.carry[k])) carry[k] = cfg.carry[k].filter(x => AREA_IDS.indexOf(x) >= 0); });
-      const clean = { term: termOf(cfg.term), carry, homeroom: cfg.homeroom !== false, homeroomClass: S(cfg.homeroomClass, 10).trim(), sources: cleanSources(cfg.sources), attend: cfg.attend && typeof cfg.attend === "object" ? { url: SHEET_URL_RE.test(String(cfg.attend.url || "")) ? String(cfg.attend.url) : "", pos: Math.max(0, Math.min(9, Math.floor(Number(cfg.attend.pos)) || 0)), on: cfg.attend.on !== false, posSet: cfg.attend.posSet === true } : undefined,
+      const clean = { term: termOf(cfg.term), carry, homeroom: cfg.homeroom !== false, homeroomClass: S(cfg.homeroomClass, 10).trim(), sources: cleanSources(cfg.sources), attend: cfg.attend && typeof cfg.attend === "object" ? { url: SHEET_URL_RE.test(String(cfg.attend.url || "")) ? String(cfg.attend.url) : "", pos: Math.max(0, Math.min(9, Math.floor(Number(cfg.attend.pos)) || 0)), on: cfg.attend.on !== false, posSet: cfg.attend.posSet === true, name: S(cfg.attend.name, 12).trim() } : undefined,
         evCats: cleanEvCats(cfg.evCats), bells: cleanBells(cfg.bells), offWork: T.test(String(cfg.offWork)) ? cfg.offWork : undefined, onWork: T.test(String(cfg.onWork)) ? cfg.onWork : undefined,
         planRange: cfg.planRange && DATE_RE.test(String(cfg.planRange.s)) && DATE_RE.test(String(cfg.planRange.e)) ? { s: cfg.planRange.s, e: cfg.planRange.e } : undefined,
         planDays: cleanPlanDays(cfg.planDays),
@@ -605,6 +605,7 @@
     휴지통: ["휴지통ID", "시작일", "종료일", "학번", "이름", "출결종류", "해당교시", "사유", "증빙서류목록", "서류제출상태", "입력일시", "삭제일시"],
     학생명부: ["학번", "이름", "학생 이름", "학생 연락처", "학부모", "학부모 연락처", "메시지내용", "비밀번호"], 교시설정: ["요일", "교시수"],
     출결알림: ["규칙이름", "알림방식", "기간", "기준일수", "적용출결종류", "시작일", "종료일"], 화면설정: ["항목", "키", "값"], 출결종류: ["출결 명칭", "필요 증빙서류", "색상 그룹"], 학사일정: ["명칭", "시작일", "종료일", "구분"] };
+  let lastAtt = null;
   const attId = () => { const c = cfgGet("config") || {}, u = c.attend && c.attend.url; if (!u) fail("설정 → 학급 출결에서 출결 시트를 먼저 이어 주세요."); return sheetId(u); };
   const JSONH = { "Content-Type": "application/json" };
   const putRange = (id, range, values) => G(SHEETS + "/" + id + "/values/" + q(range) + "?valueInputOption=RAW", { method: "PUT", headers: JSONH, body: JSON.stringify({ values }) });
@@ -613,10 +614,12 @@
   const sheetUpdate = (id, requests) => G(SHEETS + "/" + id + ":batchUpdate", { method: "POST", headers: JSONH, body: JSON.stringify({ requests }) });
   const nowStamp = () => { const d = new Date(), p = n => String(n).padStart(2, "0"); return ymd(d) + " " + p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds()); };
   // 없는 탭은 그 앱처럼 머리줄과 함께 만듦
+  const attTabsMemo = {}; // 탭 목록은 한 번 읽으면 이 창에서 기억 (불러오기를 빠르게)
   async function attTabs(id) {
+    if (attTabsMemo[id]) return attTabsMemo[id];
     let tabs = await tabsOf(id); const miss = Object.keys(ATT_HEAD).filter(n => !tabs.some(t => t.title === n));
     if (miss.length) { await sheetUpdate(id, miss.map(n => ({ addSheet: { properties: { title: n } } }))); for (const n of miss) await putRange(id, "'" + n + "'!A1", [ATT_HEAD[n]]); tabs = await tabsOf(id); }
-    return tabs;
+    return (attTabsMemo[id] = tabs);
   }
   // 기록ID(11번째 칸)로 줄 찾기 (머리줄 = 1)
   async function recRow(id, recId) {
@@ -635,7 +638,18 @@
       const recs = out["출결기록"] || [], fix = [];
       recs.forEach((r, i) => { if (i && (r[0] || r[3]) && !r[10]) { const rid = "R" + Date.now() + "_" + i; while (r.length < 11) r.push(""); r[10] = rid; fix.push({ range: "'출결기록'!K" + (i + 1), values: [[rid]] }); } });
       if (fix.length) await G(SHEETS + "/" + id + "/values:batchUpdate", { method: "POST", headers: JSONH, body: JSON.stringify({ valueInputOption: "RAW", data: fix }) });
+      lastAtt = { id, tabs: out };
       return { url: "https://docs.google.com/spreadsheets/d/" + id + "/edit", tabs: out };
+    },
+    // 하루 한 번 출결 시트 전체를 Firebase 에 따로 한 부 (users/{uid}/attBackup/날짜). 구글 시트의 버전 기록과 함께 이중 백업
+    async attBackup() {
+      if (!lastAtt) return false;
+      const day = ymd(new Date()); if (cfgGet("attBackupDay") === day) return false;
+      const text = JSON.stringify({ sheet: lastAtt.id, at: Date.now(), tabs: lastAtt.tabs }), parts = [];
+      for (let i = 0; i < text.length; i += 800000) parts.push(text.slice(i, i + 800000)); // 문서 하나 1MB 제한이라 나눠 씀
+      const c = fs.collection("users").doc(uid).collection("attBackup"), b = fs.batch();
+      parts.forEach((p, i) => b.set(c.doc(day + "_" + i), { v: p, part: i, parts: parts.length, at: Date.now() }));
+      await b.commit(); await cfgPut({ attBackupDay: day }); return true;
     },
     async attAdd(list) {
       const id = attId(), tabs = await attTabs(id), at = nowStamp(), base = Date.now();

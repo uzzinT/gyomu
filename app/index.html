@@ -763,6 +763,24 @@ button.dcard{cursor:pointer}
 .orderlist{display:grid;gap:4px;margin-top:6px}
 .trash>summary{cursor:pointer;font-weight:700}
 @media (max-width:700px){.dcards{grid-template-columns:repeat(2,minmax(0,1fr))}.calweek{grid-template-columns:1fr}.calday{min-height:0}.attrow .attlbl{width:100%}.setrow{flex-wrap:wrap}}
+/* 학급 출결 2차 */
+.kidgrid{grid-template-columns:repeat(10,minmax(0,1fr))}
+@media (max-width:1100px){.kidgrid{grid-template-columns:repeat(5,minmax(0,1fr))}}
+.attinput{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);align-items:start}
+.attinput>.dcards{grid-column:1/-1}
+.attside{display:grid;gap:14px;align-content:start}
+.attside .kidgrid{grid-template-columns:repeat(5,minmax(0,1fr))}
+@media (max-width:1100px){.attinput{grid-template-columns:minmax(0,1fr)}}
+.alertbox>summary{cursor:pointer;list-style-position:inside}
+.holichip{display:block;width:100%;text-align:left;font:inherit;font-size:.72rem;font-weight:700;padding:3px 6px;border-radius:6px;border:0;background:color-mix(in srgb,var(--sun) 16%,var(--paper));color:var(--sun);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.holichip.book{background:color-mix(in srgb,var(--sun) 7%,var(--paper));font-weight:500;cursor:default}
+.smscard{display:grid;gap:8px;padding:14px 16px;border:1px solid var(--line);border-radius:16px;background:var(--paper)}
+.smshead{display:flex;align-items:center;gap:8px}
+.smsmsg{margin:0;padding:10px 12px;border-radius:10px;background:var(--paper2);font-size:.86rem;white-space:pre-wrap;color:var(--ink)}
+.smsrow{display:flex;align-items:center;gap:8px;padding-top:6px;border-top:1px dashed var(--line)}
+.smswho{flex:none;min-width:4.5em;font-weight:700;font-size:.86rem}.smsnum{font-variant-numeric:tabular-nums;color:var(--muted);font-size:.84rem}
+.smsrow .btn{min-width:4.2em;text-align:center}
+.taborder{display:grid;gap:4px}
 /* 따로 쓰는 앱 탭: 남은 화면 높이만큼 */
 .extwrap{display:grid;gap:8px}
 .extcard{display:grid;gap:10px;justify-items:start;padding:28px;border-radius:18px;background:var(--paper2);max-width:560px}
@@ -875,7 +893,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="backend.js?v=9583de74"></script>
+<script src="backend.js?v=f65a481c"></script>
 <style>
 #fbGate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--desk)}
 #fbGate .fbbox{background:var(--paper);border-radius:22px;padding:36px 32px;text-align:center;box-shadow:0 18px 40px -24px rgba(20,40,25,.35);max-width:340px}
@@ -1079,6 +1097,7 @@ function renderExt(x){
 const ATT_DEFAULT = "https:" + "/" + "/docs.google.com/spreadsheets/d/1ZyTxkGiztnKSzCfs1OEeoaPMGiJbm6n_5dcPgY02EPU/edit";
 const attCfg = () => ({ on:true, url:ATT_DEFAULT, pos:0, posSet:false, ...(config.attend || {}) });
 const attOn = () => homeroom() && attCfg().on !== false; // 담임 모드를 끄면 학급 출결 탭도 숨김
+const attName = () => String(attCfg().name || "").trim() || "학급 출결";
 const ATT_VIEWS = [["input","출결 입력"],["docs","서류 관리"],["cal","주간/월간 캘린더"],["stats","누적 통계 & 알림"],["holi","학사일정"],["set","설정"]];
 let att = { data:null, loading:false, err:"", view:"input", synced:false, f:null, week:0, month:0, docQ:"", docS:"", docE:"", docStu:"", docHide:true, statS:"", statE:"", qS:"", qE:"", qStu:"", qTypes:new Set(), result:null, calStu:"" };
 const normD = v => { const m = String(v || "").match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m ? m[1] + "-" + m[2].padStart(2, "0") + "-" + m[3].padStart(2, "0") : ""; };
@@ -1189,11 +1208,13 @@ function attNeedsSync(p){
   return p.holidays.some(h => !haveH.has(h.name + "|" + h.start + "|" + h.end)) || [1, 2, 3, 4, 5].some((d, i) => D.per[d] !== p.periods[i])
     || (p.students.length && D.roster.map(r => Number(r.num) + "|" + r.name).join(",") !== p.students.map(s => s.no + "|" + s.name).join(","));
 }
-const attSet = r => { att.data = attParse(r.tabs); att.url = r.url; return r; };
+const attSet = r => { att.data = attParse(r.tabs); att.url = r.url; try{ localStorage.setItem(ATT_CACHE, JSON.stringify({ url:attCfg().url, r:{ url:r.url, tabs:r.tabs }, at:Date.now() })); }catch{} return r; };
 async function attSyncNow(quiet){ const r = await call("attSync", attPayload()); attSet(r.data); if(!quiet) say("출결 시트를 교무수첩과 맞췄어요" + (r.done.length ? ": " + r.done.join(", ") : "")); }
+const ATT_CACHE = "attCache";
 async function loadAtt(){
   att.loading = true; att.err = "";
-  try{ attSet(await call("attLoad")); if(!att.synced && canWrite()){ att.synced = true; if(attNeedsSync(attPayload())) await attSyncNow(true); } }
+  if(!att.data){ try{ const c = JSON.parse(localStorage.getItem(ATT_CACHE) || "null"); if(c && c.url === attCfg().url){ attSet(c.r); att.stale = true; if(tab === "attend") renderAttend(); } }catch{} }
+  try{ attSet(await call("attLoad")); att.stale = false; if(!att.synced && canWrite()){ att.synced = true; if(attNeedsSync(attPayload())) await attSyncNow(true); } call("attBackup").catch(() => {}); }
   catch(e){ att.err = e?.message || "출결 시트를 읽지 못했어요."; }
   att.loading = false; if(tab === "attend") renderAttend();
 }
@@ -1217,7 +1238,7 @@ function renderAttend(){
     el("a",{className:"btn ghost small",href:att.url || A.url,target:"_blank",rel:"noopener noreferrer"}, "시트 열기"));
   const body = att.err ? el("p",{className:"miss"}, att.err) : !D ? el("p",{className:"hint"}, "출결 시트를 읽는 중…")
     : ({ input:attInput, docs:attDocs, cal:attCal, stats:attStats, holi:attHoli, set:attSettings }[att.view] || attInput)();
-  V.replaceChildren(el("section",{className:"attwrap"}, el("div",{className:"panel-head atthead"}, el("h2",{}, "학급 출결"), tools), seg, body));
+  V.replaceChildren(el("section",{className:"attwrap"}, el("div",{className:"panel-head atthead"}, el("h2",{}, attName()), att.stale ? el("span",{className:"hint"}, "지난 내용을 먼저 보여 주는 중… 새로 읽고 있어요") : "", tools), seg, body));
 }
 // 1. 출결 입력
 function attInput(){
@@ -1262,7 +1283,7 @@ function attInput(){
   const stuGrid = el("div",{className:"kidgrid"}, ...range1(1, max).map(i => { const k = kids.find(x => parseInt(x.num) === i); if(!k) return el("span",{});
     const r = todays.find(x => x.name === k.name), pn = D.recs.filter(x => x.name === k.name).reduce((n, x) => n + pendingOf(x).length, 0);
     const b = el("button",{type:"button",className:"kbtn" + (r ? " filled" : "")}, stuLabel(k.num, k.name), pn ? el("span",{className:"kbadge"}, String(pn)) : ""); if(r) b.style.setProperty("--c", typeColor(r.type)); b.onclick = () => attStudent(k.name); return b; }));
-  return el("div",{className:"attgrid"},
+  return el("div",{className:"attgrid attinput"},
     el("div",{className:"dcards"}, card(kids.length, "전체 학생", "#3b82f6"), card(new Set(todays.map(r => r.name)).size, "오늘 출결 학생", "#f59e0b"), card(todays.length, "오늘 처리 건수", "#ef4444"),
       card(pend, "미제출 서류 →", pend ? "#f59e0b" : "#94a3b8", () => { att.view = "docs"; renderAttend(); })),
     el("section",{className:"notes attform"},
@@ -1273,8 +1294,10 @@ function attInput(){
       el("div",{className:"attrow"}, el("span",{className:"attlbl"}, "사유"), reason),
       el("div",{className:"attrow top"}, el("span",{className:"attlbl"}, "서류"), docBox),
       el("div",{className:"actions"}, sms, el("span",{className:"spacer"}), save)),
-    el("section",{className:"notes"}, el("div",{className:"panel-head"}, el("h3",{className:"nt-title"}, "학생 현황"), el("span",{className:"hint"}, dayLabel(new Date()))), stuGrid),
-    el("section",{className:"notes"}, el("h3",{className:"nt-title"}, "오늘 출결 기록"), recTable(todays.sort((a, b) => (parseInt(a.num) || 0) - (parseInt(b.num) || 0)), { noDate:true, empty:"오늘 출결 처리된 기록이 없어요. 전원 정상 출석!" })));
+    el("div",{className:"attside"},
+    el("section",{className:"notes"}, el("div",{className:"panel-head"}, el("h3",{className:"nt-title"}, "오늘 학생 현황"), el("span",{className:"hint"}, dayLabel(new Date()))), stuGrid),
+    el("section",{className:"notes"}, el("div",{className:"panel-head"}, el("h3",{className:"nt-title"}, "오늘 출결 기록"), todays.length ? navBtn("이 학생들에게 알림", () => attNotify(todays.map(r => r.num), "오늘 출결이 " + "기록되었어요. 확인해 주세요."), "오늘 출결 학생에게 개별 알림") : ""),
+      recTable(todays.sort((a, b) => (parseInt(a.num) || 0) - (parseInt(b.num) || 0)), { noDate:true, empty:"오늘 출결 처리된 기록이 없어요. 전원 정상 출석!" }))));
 }
 // 기록 표 (누르면 고치기 창). 서류 단추는 눌러서 냄/안 냄
 function recTable(list, o = {}){
@@ -1336,10 +1359,10 @@ function attSms(list){
   if(!list.length) return say("연락할 학생을 골라 주세요.");
   const link = (href, label) => el("a",{className:"btn ghost small",href}, label);
   modal("학생·학부모 연락", el("p",{className:"hint"}, "휴대폰에서 누르면 문자 앱·전화가 열려요. 문자 내용은 출결 시트 '학생명부'의 메시지내용이에요."),
-    ...list.map(k => el("div",{className:"notes"}, el("b",{}, stuLabel(k.num, k.name)), el("p",{className:"hint pre"}, k.msg || "(메시지 내용 없음)"),
-      el("div",{className:"actions"}, k.sPhone ? [link("sms:" + k.sPhone + "?body=" + encodeURIComponent(k.msg || ""), "학생 문자"), link("tel:" + k.sPhone, "학생 전화")] : el("span",{className:"hint"}, "학생 번호 없음"),
-        k.pPhone ? [link("sms:" + k.pPhone + "?body=" + encodeURIComponent(k.msg || ""), (k.pRel || "보호자") + " 문자"), link("tel:" + k.pPhone, (k.pRel || "보호자") + " 전화")] : el("span",{className:"hint"}, "보호자 번호 없음"),
-        navBtn("내용 복사", () => copyText(k.msg || "", "문자 내용"), "문자 내용 복사")))));
+    ...list.map(k => { const line = (who, phone) => el("div",{className:"smsrow"}, el("span",{className:"smswho"}, who), phone ? el("span",{className:"smsnum"}, phone) : el("span",{className:"hint"}, "번호 없음"),
+        el("span",{className:"spacer"}), phone ? [link("sms:" + phone + "?body=" + encodeURIComponent(k.msg || ""), "문자"), link("tel:" + phone, "전화")] : "");
+      return el("div",{className:"smscard"}, el("div",{className:"smshead"}, el("b",{}, stuLabel(k.num, k.name)), el("span",{className:"spacer"}), navBtn("내용 복사", () => copyText(k.msg || "", "문자 내용"), "문자 내용 복사")),
+        el("p",{className:"smsmsg"}, k.msg || "(메시지 내용 없음)"), line("학생", k.sPhone), line(k.pRel || "보호자", k.pPhone)); }));
 }
 // 2. 서류 관리 (+ 휴지통)
 function attDocs(){
@@ -1350,7 +1373,7 @@ function attDocs(){
   const list = el("div",{});
   const draw = () => { const t = q.value.trim().toLowerCase();
     const rows = D.recs.filter(r => (!stu.value || r.name === stu.value) && (!t || (r.name + " " + r.type + " " + r.reason + " " + r.num).toLowerCase().includes(t))
-      && (!s.value || !e.value || (r.startDate >= s.value && r.startDate <= e.value)) && (!hide.checked || pendingOf(r).length)).sort((a, b) => b.startDate.localeCompare(a.startDate) || (parseInt(a.num) || 0) - (parseInt(b.num) || 0));
+      && (!s.value || !e.value || (r.startDate >= s.value && r.startDate <= e.value)) && (!hide.checked || pendingOf(r).length)).sort((a, b) => a.startDate.localeCompare(b.startDate) || (parseInt(a.num) || 0) - (parseInt(b.num) || 0));
     list.replaceChildren(recTable(rows, { empty:hide.checked ? "안 낸 서류가 없어요." : "조건에 맞는 기록이 없어요." })); };
   q.oninput = () => { att.docQ = q.value; draw(); }; [s, e, stu].forEach(x => { x.onchange = () => { att.docS = s.value; att.docE = e.value; att.docStu = stu.value; draw(); }; }); hide.onchange = () => { att.docHide = hide.checked; draw(); };
   draw();
@@ -1417,8 +1440,9 @@ function attStats(){
         line.style.setProperty("--c", typeColor(r.type)); line.onclick = () => attEdit(r); return line; }))); };
   const go2 = el("button",{type:"button",className:"btn"}, "실제 수업일 기준 검색"); go2.onclick = run;
   return el("div",{className:"attgrid"},
-    el("section",{className:"notes alertbox"}, el("h3",{className:"nt-title"}, "누적 통계 알림 " + (al.length ? al.length + "건" : "")),
-      al.length ? Object.entries(by).map(([rule, list]) => el("div",{className:"alertrule"}, el("b",{}, rule + " · " + list.length + "명"),
+    el("details",{className:"notes alertbox",open:att.alertOpen !== false,ontoggle:function(){ att.alertOpen = this.open; }}, el("summary",{className:"nt-title"}, "누적 통계 알림 " + (al.length ? al.length + "건" : "")),
+      al.length ? Object.entries(by).map(([rule, list]) => el("div",{className:"alertrule"}, el("div",{className:"attrow"}, el("b",{}, rule + " · " + list.length + "명"), el("span",{className:"spacer"}),
+          navBtn("이 학생들에게 알림", () => attNotify(list.map(a => a.num), "[" + rule + "] 출결을 확인해 주세요. 궁금한 점은 담임 선생님께 연락해 주세요."), rule + " 학생에게 개별 알림")),
         el("div",{className:"stuchips"}, ...list.map(a => { const b = el("button",{type:"button",className:"kbtn alert"}, stuLabel(a.num, a.name) + " " + (a.how === "consecutive" ? "연속 " : "누적 ") + a.n + "일"); b.onclick = () => attStudent(a.name); return b; }))))
         : el("p",{className:"hint"}, "지금 알림 조건에 걸린 학생이 없어요."), el("p",{className:"hint"}, "규칙은 학급 출결 → 설정에서 고쳐요.")),
     el("section",{className:"notes attform"}, el("h3",{className:"nt-title"}, "출결 맞춤 검색 (주말·쉬는 날 빼고)"),
@@ -1435,8 +1459,30 @@ function attHoli(){
     el("div",{className:"panel-head"}, el("h3",{className:"nt-title"}, "학사일정 (쉬는 날·방학)"), navBtn("교무수첩 쉬는 날 가져오기", () => attDo("attHolidayAdd", [attPayload().holidays], "교무수첩 학사일정의 쉬는 날을 더했어요.").catch(() => {}), "교무수첩 학사일정에서 가져오기", !canWrite())),
     el("p",{className:"hint"}, "여기 있는 날과 주말, 교무수첩 학사일정의 공휴일·재량휴업일·방학은 결석 일수 계산에서 빠져요. 교무수첩의 쉬는 날은 학급 출결을 열 때 알아서 더해져요."),
     el("div",{className:"attrow"}, name, s, el("span",{}, "~"), e, add),
-    list.length ? el("div",{className:"attlist"}, ...list.map(h => el("div",{className:"attline"}, el("span",{className:"tag"}, h.end !== h.start ? "기간" : "단일"), el("b",{}, h.name), el("span",{className:"d"}, h.start + (h.end !== h.start ? " ~ " + h.end : "")), el("span",{className:"spacer"}),
-      navBtn("지우기", () => { if(confirm(h.name + " 일정을 지울까요?")) attDo("attHolidayDel", [h], "지웠어요.").catch(() => {}); }, "학사일정 지우기", !canWrite())))) : el("p",{className:"hint"}, "등록된 학사일정이 없어요.")));
+    attHoliCal(list)));
+}
+// 쉬는 날 달력 (월~금, 한 달씩). 출결 시트의 쉬는 날은 눌러서 지울 수 있음, 교무수첩 쉬는 날은 표시만
+function attHoliCal(list){
+  const base = new Date(); base.setDate(1); base.setMonth(base.getMonth() + (att.hm || 0)); const y = base.getFullYear(), m = base.getMonth();
+  const first = new Date(y, m, 1), start = new Date(first); start.setDate(1 - ((first.getDay() + 6) % 7)); const last = new Date(y, m + 1, 0), today = ymd(new Date());
+  const cells = [];
+  for(let d = new Date(start); ; d.setDate(d.getDate() + 1)){ if(d > last && d.getDay() === 1) break; if(d.getDay() === 0 || d.getDay() === 6) continue; const k = ymd(d);
+    const mine = list.filter(h => k >= h.start && k <= h.end), book = events.filter(e => e.date === k && isHoliday(e) && !mine.some(h => h.name === e.title));
+    cells.push(el("div",{className:"calcell" + (d.getMonth() !== m ? " other" : "") + (k === today ? " istoday" : "") + (mine.length || book.length ? " holi" : "")}, el("div",{className:"calhd"}, String(d.getDate())),
+      ...mine.map(h => { const b = el("button",{type:"button",className:"holichip",title:h.start + (h.end !== h.start ? " ~ " + h.end : "") + " · 누르면 지우기",disabled:!canWrite()}, h.name);
+        b.onclick = () => { if(confirm(h.name + " (" + h.start + (h.end !== h.start ? " ~ " + h.end : "") + ") 을 지울까요?")) attDo("attHolidayDel", [h], "지웠어요.").catch(() => {}); }; return b; }),
+      ...book.map(e => el("span",{className:"holichip book",title:"교무수첩 학사일정 (교무수첩 행정 탭에서 고쳐요)"}, e.title)))); }
+  const n = list.filter(h => h.end >= ymd(first) && h.start <= ymd(last)).length;
+  return el("div",{}, el("div",{className:"panel-head"}, el("h3",{className:"nt-title"}, y + "년 " + (m + 1) + "월 쉬는 날 " + (n ? n + "개" : "")),
+      el("div",{className:"tt-tools"}, navBtn("‹", () => { att.hm = (att.hm || 0) - 1; renderAttend(); }, "지난달"), navBtn("이번 달", () => { att.hm = 0; renderAttend(); }, "이번 달", !att.hm), navBtn("›", () => { att.hm = (att.hm || 0) + 1; renderAttend(); }, "다음 달"))),
+    el("div",{className:"calmonth"}, ...["월","화","수","목","금"].map(w => el("div",{className:"calwd"}, w)), ...cells),
+    el("p",{className:"hint"}, "진한 칸은 출결 시트의 쉬는 날(누르면 지우기), 옅은 칸은 교무수첩 학사일정의 쉬는 날이에요."));
+}
+// 알림 보내기: 우리 반 알림 앱 개별 알림 창을 받을 학생·내용을 채워서 엶
+function attNotify(nums, text){
+  const nos = [...new Set(nums.map(n => parseInt(n)).filter(Boolean))];
+  if(!nos.length) return say("보낼 학생이 없어요.");
+  openStudentMsg(null, { nos, text });
 }
 // 6. 설정: 출결 종류 · 알림 규칙 · 색상 그룹 · 하루 대표 출결 집계 규칙 · 요일별 교시
 function attSettings(){
@@ -1492,21 +1538,31 @@ function renderAttendBox(){
   const A = attCfg(), url = el("input",{type:"url",className:"field",value:A.url,placeholder:"https://docs.google.com/spreadsheets/d/…","aria-label":"출결 시트 주소"});
   const save = p => store.saveConfigPatch({ attend:{ ...attCfg(), ...p } }).then(() => { att = { ...att, data:null, err:"", synced:false }; say("학급 출결 설정을 저장했어요."); }).catch(e => say(e?.message || "저장하지 못했어요."));
   const on = el("input",{type:"checkbox",checked:A.on !== false}); on.onchange = () => save({ on:on.checked });
-  const pos = el("select",{className:"field","aria-label":"학급 출결 탭 위치"}, ...Array.from({ length:config.areas.length + 1 }, (_, i) => el("option",{value:String(i)}, "'" + (i ? config.areas[i - 1].name : "오늘") + "' 다음")));
-  pos.value = String(Math.min(A.posSet ? A.pos : config.areas.length, config.areas.length)); pos.onchange = () => save({ pos:Number(pos.value), posSet:true });
+  const nm = el("input",{type:"text",className:"field",value:attName(),maxLength:12,"aria-label":"탭 이름"}); nm.onchange = () => save({ name:nm.value.trim() || "학급 출결" });
+  // 탭 순서: 오늘 다음부터 영역들과 학급 출결을 ↑↓ 로 (설정은 맨 끝)
+  const order = el("div",{className:"taborder"});
+  const drawOrder = () => { const cur = attCfg(), p = Math.min(cur.posSet ? cur.pos : config.areas.length, config.areas.length), list = config.areas.map(a => ({ id:a.id, name:a.name }));
+    list.splice(p, 0, { id:"attend", name:attName() });
+    order.replaceChildren(...list.map((x, i) => el("div",{className:"attrow"}, el("b",{}, (i + 1) + ". " + x.name + (x.id === "attend" ? " (출결)" : "")), el("span",{className:"spacer"}),
+      navBtn("↑", () => moveTab(list, i, -1), x.name + " 앞으로", !i || !canWrite()), navBtn("↓", () => moveTab(list, i, 1), x.name + " 뒤로", i === list.length - 1 || !canWrite())))); };
+  const moveTab = async (list, i, d) => { const j = i + d; [list[i], list[j]] = [list[j], list[i]];
+    const areas = list.filter(x => x.id !== "attend").map(x => config.areas.find(a => a.id === x.id)), posN = list.findIndex(x => x.id === "attend");
+    try{ await store.saveConfigPatch({ areas, attend:{ ...attCfg(), pos:posN, posSet:true } }); draft = null; say("탭 순서를 바꿨어요."); render(); }catch(e){ say(e?.message || "바꾸지 못했어요."); } };
+  drawOrder();
   const box = el("section",{className:"set-area noticebox"}, el("h3",{className:"nt-title"}, "학급 출결"),
     el("p",{className:"hint"}, "'학급 올인원 워크스페이스' 출결 시트를 이어서 그 앱과 함께 써요. 학생 명단, 학사일정의 쉬는 날, 요일별 교시 수는 교무수첩 것으로 맞춰져요." + (homeroom() ? "" : " 지금은 담임 모드가 꺼져 있어서 탭이 보이지 않아요.")),
     el("div",{className:"actions"}, url, navBtn("잇기", () => { const v = url.value.trim(); if(v && !/^https:\/\/docs\.google\.com\/spreadsheets\//.test(v)) return say("구글 시트 주소를 넣어 주세요."); save({ url:v }); }, "출결 시트 잇기", !canWrite()),
       A.url ? el("a",{className:"btn ghost small",href:A.url,target:"_blank",rel:"noopener noreferrer"}, "시트 열기") : ""),
-    el("div",{className:"actions"}, el("label",{className:"inline"}, on, " 탭 보이기"), el("label",{className:"inline"}, "위치 ", pos),
+    el("div",{className:"actions"}, el("label",{className:"inline"}, on, " 탭 보이기"), el("label",{className:"inline"}, "탭 이름 ", nm),
       A.url && window.fbCall ? navBtn("지금 교무수첩과 맞추기", async () => { try{ await attSyncNow(); }catch(e){ say(e?.message || "맞추지 못했어요."); } }, "출결 시트 맞추기", !canWrite()) : ""));
+  box.append(el("h3",{className:"nt-title"}, "탭 순서"), el("p",{className:"hint"}, "교과·학급·행정 같은 영역과 학급 출결 탭의 순서예요. '오늘'은 맨 앞, '설정'은 맨 뒤에 있어요."), order);
   box.style.setProperty("--c", "var(--green)");
   return box;
 }
 function setCover(){ const a = areaOf(tab); $("book").style.setProperty("--cover", a ? cloth(a.color) : "var(--slate)"); }
 function renderTabs(){
   const tabs = [["home","오늘"], ...config.areas.map(a => [a.id, a.name])], A = attCfg();
-  if(attOn()) tabs.splice(1 + Math.min(A.posSet ? A.pos : config.areas.length, config.areas.length), 0, ["attend","학급 출결"]);
+  if(attOn()) tabs.splice(1 + Math.min(A.posSet ? A.pos : config.areas.length, config.areas.length), 0, ["attend", attName()]);
   tabs.push(...EXT_TABS.filter(x => x.embed).map(x => [x.id, x.name]), ["settings","설정"]);
   $("tabs").replaceChildren(...tabs.map(([k,n]) => {
     const b = el("button",{type:"button",role:"tab",className:k==="settings"?"gear":""}, n);
@@ -1524,7 +1580,7 @@ function go(k, isBack){
   tab = k; cat = null; query = ""; $("q").value = ""; draft = null; viewTerm = null;
   render(); window.scrollTo(0, 0);
 }
-const tabName = k => k === "home" ? "오늘" : k === "settings" ? "설정" : k === "attend" ? (attOn() ? "학급 출결" : "") : areaOf(k)?.name || extOf(k)?.name || "";
+const tabName = k => k === "home" ? "오늘" : k === "settings" ? "설정" : k === "attend" ? (attOn() ? attName() : "") : areaOf(k)?.name || extOf(k)?.name || "";
 function addTabBack(){
   while(tabHist.length && !tabName(tabHist[tabHist.length - 1])) tabHist.pop(); // 지운 영역은 건너뜀
   // 머리띠의 탭 줄 오른쪽 끝에 (본문을 밀어내지 않게)
@@ -2424,7 +2480,7 @@ async function openStudentPw(info){
     el("div",{className:"actions"}, el("span",{className:"spacer"}), save));
 }
 // 개별 알림: 고른 학생에게만 알림 앱에서 보임 ('안 낸 학생' 고르기는 걷고 있는 제출물에서)
-function openStudentMsg(sent){
+function openStudentMsg(sent, pre){
   if(!students.length) return say("우리 반 학생 명단을 먼저 넣어 주세요.");
   const boxes = students.map(s => ({ s, cb:el("input",{type:"checkbox",value:s.no}) }));
   const pickNos = nos => boxes.forEach(b => { b.cb.checked = nos.includes(b.s.no); });
@@ -2432,6 +2488,7 @@ function openStudentMsg(sent){
   const sel = el("select",{className:"field","aria-label":"제출물에서 안 낸 학생 고르기"}, el("option",{value:""}, "안 낸 학생 고르기…"), ...open.map(c => el("option",{value:c.id}, c.title)));
   sel.onchange = () => { const c = open.find(x => x.id === sel.value); if(c) pickNos(students.map(s => s.no).filter(n => !c.done.includes(n))); };
   const ta = el("textarea",{className:"field",rows:3,maxLength:1000,placeholder:"보낼 말 (예: 내일까지 체험학습 보고서를 내 주세요.)","aria-label":"보낼 말"});
+  if(pre){ pickNos(pre.nos || []); ta.value = pre.text || ""; }
   const list = el("div",{className:"pmsglist"}, el("p",{className:"hint"}, "보낸 알림을 불러오는 중…"));
   const nameList = nos => nos.map(n => n + "번" + (nameOf(n) ? " " + nameOf(n) : "")).join(", ");
   const drawSent = arr => list.replaceChildren(...(arr.length ? arr.map(m => { const x = navBtn("지우기", async () => { if(!confirm("이 알림을 지울까요? 학생 앱에서도 사라져요.")) return; try{ drawSent(await call("deleteStudentMessage", m.id)); }catch(e){ say(e?.message || "지우지 못했어요."); } }, "보낸 알림 지우기");
