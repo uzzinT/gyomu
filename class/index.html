@@ -6,20 +6,21 @@
 <meta name="robots" content="noindex">
 <title>우리 반 알림</title>
 <meta name="description" content="조·종례 공지, 학사일정, 제출물 마감, 우리 반 시간표">
-<meta name="theme-color" content="#3f5c9e">
+<meta name="theme-color" content="#26402e">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="우리 반">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gaegu:wght@700&family=IBM+Plex+Sans+KR:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <style>
 /* 교무수첩과 같은 공책 느낌. 휴대폰 한 손으로 보기 좋게: 위 제목, 아래 탭 */
-:root{--paper:#fffdf9;--paper2:#f5f2ec;--ink:#2a2a2c;--muted:#6c6862;--line:#e5e0d7;--dot:#e4ded3;--navy:#3f5c9e;--sun:#c8453b;--green:#5f9a7c;--ochre:#d09a3e;
-  --display:"Gaegu","Nanum Pen Script",cursive;--body:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--paper:#1c1d1f;--paper2:#26272a;--ink:#ebe7e0;--muted:#a39f98;--line:#34363a;--dot:#2c2e31;--navy:#8aa2dc;--sun:#e77b70;--green:#7fb898;--ochre:#e0b060}}
-:root[data-theme="dark"]{--paper:#1c1d1f;--paper2:#26272a;--ink:#ebe7e0;--muted:#a39f98;--line:#34363a;--dot:#2c2e31;--navy:#8aa2dc;--sun:#e77b70;--green:#7fb898;--ochre:#e0b060}
+/* 교무수첩과 같은 모양: 짙은 숲색 머리띠, 연두 강조, 흰 카드 */
+:root{--paper:#ffffff;--paper2:#f4f7ef;--ink:#1b2e21;--muted:#5f6f63;--line:#e2e7db;--dot:transparent;--navy:#26402e;--sun:#e0533d;--green:#3c9a5f;--ochre:#d99a2b;--lime:#7ee35f;--mint:#e6f8db;--desk:#eef1e8;
+  --display:"Pretendard Variable",Pretendard,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;--body:var(--display)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--paper:#152219;--paper2:#1a2a1f;--ink:#e8f1e7;--muted:#9db0a2;--line:#27392d;--navy:#0f1d14;--sun:#ff7a66;--green:#6fcf8f;--ochre:#f0b54f;--mint:#1f3626;--desk:#0d1610}}
+:root[data-theme="dark"]{--paper:#152219;--paper2:#1a2a1f;--ink:#e8f1e7;--muted:#9db0a2;--line:#27392d;--navy:#0f1d14;--sun:#ff7a66;--green:#6fcf8f;--ochre:#f0b54f;--mint:#1f3626;--desk:#0d1610}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html,body{margin:0}
@@ -102,6 +103,21 @@ nav{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:1fr}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
 .chip{font-size:.78rem;font-weight:600;padding:4px 10px;border-radius:999px;background:var(--paper2);border:1px solid var(--line)}
 .att .ev .d{width:auto;min-width:6.2em}.att .days{flex:none;font-weight:700;color:var(--sun);font-size:.84rem}
+body{background:var(--desk)!important;letter-spacing:-.01em}
+header{background:var(--navy);background-image:radial-gradient(420px 160px at 100% 0,color-mix(in srgb,var(--lime) 22%,transparent),transparent 70%)}
+header h1{font-weight:900;letter-spacing:-.03em;font-size:1.45rem}
+h2{font-weight:800;letter-spacing:-.02em;font-size:1.12rem}
+.card{border-radius:16px;border-color:var(--line)}.card.today{border-color:var(--green);box-shadow:inset 4px 0 0 var(--lime)}
+.btn{border-radius:999px;background:var(--lime);color:#16301f;font-weight:700}
+.login .alt .btn{border-radius:999px}
+.hbtn{border-radius:999px}
+nav button[aria-selected="true"]{color:var(--navy)}nav button[aria-selected="true"]::after{background:var(--lime);height:4px}
+@media (prefers-color-scheme:dark){nav button[aria-selected="true"]{color:var(--lime)}}
+.tag{border-radius:999px}.field{border-radius:12px}
+.tt th{background:var(--paper2)}.tt .on{background:var(--mint)}.tt td.now{outline-color:var(--lime)}
+.login h1{font-weight:900;letter-spacing:-.03em}
+.setrow{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px dashed var(--line)}.setrow:first-of-type{border-top:0}
+.setrow b{flex:1}.setrow .small-btn{min-width:2.4em}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
@@ -126,6 +142,7 @@ nav{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:1fr}
 <div id="appView" hidden>
   <header>
     <h1 id="title">우리 반<small id="sub"></small></h1>
+    <button class="hbtn" id="setBtn" type="button" aria-label="알림 앱 설정" hidden>⚙</button>
     <button class="hbtn" id="refresh" type="button" aria-label="새로 고침">↻</button>
     <button class="hbtn" id="logout" type="button">나가기</button>
   </header>
@@ -153,6 +170,10 @@ const el = (tag, props = {}, ...kids) => { const e = document.createElement(tag)
 const store = { get(k){ try{ return localStorage.getItem(k) ?? sessionStorage.getItem(k); }catch{ return null; } },
   set(k, v, keep){ try{ (keep ? localStorage : sessionStorage).setItem(k, v); }catch{} }, del(k){ try{ localStorage.removeItem(k); sessionStorage.removeItem(k); }catch{} } };
 let data = null, view = store.get("classView") || "notes", lastFetch = 0, tid = null;
+// 탭 순서·보이기: 선생님이 이 앱(구글 로그인)에서 정함 → notice 문서의 ui
+const TABS = { notes:"공지", events:"일정", checks:"제출물", tt:"시간표", att:"출결" };
+const uiOf = () => { const u = data?.ui || {}, order = (u.order || []).filter(k => TABS[k]); Object.keys(TABS).forEach(k => { if(!order.includes(k)) order.push(k); }); return { order, hide:new Set(u.hide || []) }; };
+const isTeacher = () => !!auth.currentUser && auth.currentUser.uid === tid;
 const WD = ["일","월","화","수","목","금","토"], DAYS = ["월","화","수","목","금"];
 const parse = k => { const [y, m, d] = k.split("-").map(Number); return new Date(y, m - 1, d); };
 const ymd = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
@@ -189,14 +210,36 @@ $("teacherBtn").onclick = async () => { try{ await auth.signInWithPopup(new fire
 $("logout").onclick = async () => { if(!confirm("이 기기에서 나갈까요? 다시 보려면 비밀번호를 넣어야 해요.")) return; store.del("classData"); store.del("msgSeen"); data = null; await auth.signOut(); showLogin(); };
 $("refresh").onclick = () => load(true);
 document.querySelectorAll("nav button").forEach(b => b.onclick = () => { view = b.dataset.v; store.set("classView", view, true); draw(); window.scrollTo(0, 0); });
+// 처음 열 때(기억해 둔 내용) 탭 정리는 got() 이 함
 document.addEventListener("visibilitychange", () => { if(!document.hidden && Date.now() - lastFetch > 5 * 60e3 && auth.currentUser) load(); });
 
+// 정한 순서대로 아래 탭을 놓고, 숨긴 탭은 뺌 (출결은 학생·학부모만)
+function applyTabs(){
+  const nav = document.querySelector("nav"), U = uiOf();
+  U.order.forEach(k => { const b = nav.querySelector('button[data-v="' + k + '"]'); if(b){ nav.append(b); b.hidden = U.hide.has(k) || (k === "att" && !data.my); } });
+  const vis = U.order.filter(k => !U.hide.has(k) && !(k === "att" && !data.my));
+  if(view !== "set" && !vis.includes(view)) view = vis[0] || "notes";
+  $("setBtn").hidden = !isTeacher();
+}
+// 선생님 설정: 탭 순서 바꾸기·보이기
+function drawSet(){
+  const U = uiOf(), save = async order => { const ui = { order, hide:[...U.hide] }; data.ui = ui; applyTabs(); draw();
+    try{ await db.collection("notice").doc(tid).set({ ui:ui }, { merge:true }); }catch(x){ alert("저장하지 못했어요: " + (x.message || x.code)); } };
+  return el("section",{}, el("h2",{}, "알림 앱 설정", el("small",{textContent:"선생님만 보여요"})),
+    el("div",{className:"card"}, el("p",{className:"hint",textContent:"아래 탭의 순서와 보이기를 정해요. 학생·학부모 앱에도 그대로 적용돼요."}),
+      ...U.order.map((k, i) => { const cb = el("input",{type:"checkbox",checked:!U.hide.has(k),"aria-label":TABS[k] + " 보이기"});
+        cb.onchange = () => { cb.checked ? U.hide.delete(k) : U.hide.add(k); save(U.order); };
+        const up = el("button",{className:"small-btn",type:"button",textContent:"↑",disabled:!i,"aria-label":TABS[k] + " 앞으로"}), dn = el("button",{className:"small-btn",type:"button",textContent:"↓",disabled:i === U.order.length - 1,"aria-label":TABS[k] + " 뒤로"});
+        up.onclick = () => { const o = U.order.slice(); [o[i - 1], o[i]] = [o[i], o[i - 1]]; save(o); }; dn.onclick = () => { const o = U.order.slice(); [o[i + 1], o[i]] = [o[i], o[i + 1]]; save(o); };
+        return el("div",{className:"setrow"}, el("label",{className:"inline"}, cb), el("b",{textContent:TABS[k] + (k === "att" ? " (학생·학부모만)" : "")}), up, dn); })),
+    el("p",{className:"hint",textContent:"공지·일정·제출물·시간표 내용은 교무수첩에서 고쳐요."}));
+}
+$("setBtn").onclick = () => { view = view === "set" ? (uiOf().order.find(k => !uiOf().hide.has(k)) || "notes") : "set"; draw(); window.scrollTo(0, 0); };
 function got(d){
   data = d; lastFetch = Date.now();
   store.set("classData", JSON.stringify({ d, at:Date.now() }), true);
   $("loginView").hidden = true; $("appView").hidden = false;
-  document.querySelector('nav button[data-v="att"]').hidden = !d.my; // 출결은 학생·학부모만
-  if(view === "att" && !d.my) view = "notes";
+  applyTabs();
   draw();
 }
 async function load(manual){
@@ -204,7 +247,7 @@ async function load(manual){
   if(manual) $("refresh").textContent = "…";
   try{
     if(!tid){ const c = await db.collection("classes").doc("main").get(); tid = c.exists ? c.data().tid : null; if(!tid) throw new Error("선생님이 아직 알림 앱을 열지 않았어요."); }
-    const shared = readJ(await db.collection("notice").doc(tid).get());
+    const nd = await db.collection("notice").doc(tid).get(), shared = readJ(nd); if(shared) shared.ui = readJ(nd, "ui") || (nd.exists && typeof nd.data().ui === "object" ? nd.data().ui : null);
     if(!shared) throw new Error(isStudent(u) || u.uid === tid ? "아직 받은 내용이 없어요." : "이 계정은 우리 반 알림을 볼 수 없어요.");
     let my = null;
     if(isStudent(u)){ const hb = u.email.split("@")[0], sd = await db.collection("notice").doc(tid).collection("students").doc(hb).get(); my = readJ(sd) || { no:Number(hb.slice(3)), name:"" }; my.att = readJ(sd, "att") || []; }
@@ -238,7 +281,7 @@ function draw(){
   document.querySelectorAll("nav button").forEach(b => { b.setAttribute("aria-selected", String(b.dataset.v === view)); b.querySelector(".badge")?.remove(); });
   const unseen = view === "notes" ? 0 : newMsgs().length;
   if(unseen) document.querySelector('nav button[data-v="notes"]').append(el("span",{className:"badge",textContent:unseen,"aria-label":"새 알림 " + unseen + "개"}));
-  const parts = [installTip(), pushTip(), ({ notes:drawNotes, events:drawEvents, checks:drawChecks, tt:drawTT, att:drawAtt })[view]?.() || drawNotes(),
+  const parts = [installTip(), pushTip(), ({ notes:drawNotes, events:drawEvents, checks:drawChecks, tt:drawTT, att:drawAtt, set:drawSet })[view]?.() || drawNotes(),
     el("p",{className:"stale",textContent: "받은 시각 " + new Date(lastFetch).toLocaleTimeString("ko-KR", { hour:"2-digit", minute:"2-digit" })})];
   $("view").replaceChildren(...parts.filter(Boolean));
 }
@@ -336,7 +379,7 @@ function installTip(){
 }
 
 // 시작: 기억해 둔 내용을 먼저 보여 주고, 바로 새로 받음
-try{ const c = JSON.parse(store.get("classData") || "null"); if(c){ data = c.d; lastFetch = c.at; $("appView").hidden = false; draw(); } }catch{}
+try{ const c = JSON.parse(store.get("classData") || "null"); if(c){ data = c.d; lastFetch = c.at; $("appView").hidden = false; applyTabs(); draw(); } }catch{}
 setInterval(() => { if(data && view === "tt") draw(); }, 60e3);
 if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 </script>

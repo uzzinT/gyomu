@@ -174,7 +174,7 @@
       if (!cfg || !Array.isArray(cfg.areas) || cfg.areas.length < 1 || cfg.areas.length > 8) fail("영역은 1~8개여야 해요.");
       const seen = {}, carry = {};
       Object.keys(cfg.carry || {}).forEach(k => { if (TERM_RE.test(k) && Array.isArray(cfg.carry[k])) carry[k] = cfg.carry[k].filter(x => AREA_IDS.indexOf(x) >= 0); });
-      const clean = { term: termOf(cfg.term), carry, homeroom: cfg.homeroom !== false, homeroomClass: S(cfg.homeroomClass, 10).trim(), sources: cleanSources(cfg.sources), attend: cfg.attend && typeof cfg.attend === "object" ? { url: SHEET_URL_RE.test(String(cfg.attend.url || "")) ? String(cfg.attend.url) : "", pos: Math.max(0, Math.min(9, Math.floor(Number(cfg.attend.pos)) || 0)), on: cfg.attend.on !== false, posSet: cfg.attend.posSet === true, name: S(cfg.attend.name, 12).trim() } : undefined,
+      const clean = { term: termOf(cfg.term), carry, homeroom: cfg.homeroom !== false, homeroomClass: S(cfg.homeroomClass, 10).trim(), sources: cleanSources(cfg.sources), attend: cfg.attend && typeof cfg.attend === "object" ? { url: SHEET_URL_RE.test(String(cfg.attend.url || "")) ? String(cfg.attend.url) : "", pos: Math.max(0, Math.min(9, Math.floor(Number(cfg.attend.pos)) || 0)), on: cfg.attend.on !== false, posSet: cfg.attend.posSet === true, name: S(cfg.attend.name, 12).trim(), msg_today: S(cfg.attend.msg_today, 300), msg_alert: S(cfg.attend.msg_alert, 300) } : undefined,
         evCats: cleanEvCats(cfg.evCats), bells: cleanBells(cfg.bells), offWork: T.test(String(cfg.offWork)) ? cfg.offWork : undefined, onWork: T.test(String(cfg.onWork)) ? cfg.onWork : undefined,
         planRange: cfg.planRange && DATE_RE.test(String(cfg.planRange.s)) && DATE_RE.test(String(cfg.planRange.e)) ? { s: cfg.planRange.s, e: cfg.planRange.e } : undefined,
         planDays: cleanPlanDays(cfg.planDays),
@@ -826,7 +826,7 @@
     const checks = chk.map(x => ({ id: x.id, title: x.title, due: x.due || "", closed: !!x.closed, memo: x.memo && x.memoShare !== false ? x.memo : "" }))
       .sort((a, b) => a.closed !== b.closed ? (a.closed ? 1 : -1) : a.closed ? (recent(chk.find(x => x.id === b.id)) > recent(chk.find(x => x.id === a.id)) ? 1 : -1) : (a.due || "9999") < (b.due || "9999") ? -1 : 1);
     const tt = cfgGet("classTT"), bells = Array.isArray(c.bells) ? c.bells.map(b => ({ s: String(b && b.s || ""), e: String(b && b.e || "") })) : [];
-    await noticeDoc().set({ v: JSON.stringify({ cls: c.homeroomClass || "", notes, events, checks, tt: tt && Array.isArray(tt.cells) ? { periods: Number(tt.periods) || tt.cells.length, cells: tt.cells } : null, bells }), at: Date.now() });
+    await noticeDoc().set({ v: JSON.stringify({ cls: c.homeroomClass || "", notes, events, checks, tt: tt && Array.isArray(tt.cells) ? { periods: Number(tt.periods) || tt.cells.length, cells: tt.cells } : null, bells }), at: Date.now() }, { merge: true }); // 학생 앱 화면 설정(ui)은 그대로
     await fs.collection("classes").doc("main").set({ tid: uid, cls: c.homeroomClass || "", at: Date.now() });
     // 학생 한 명 몫: 이름 · 개인 시간표 · 개별 알림 · 낸 제출물
     const acct = cfgGet("stuAcct") || {}, stt = cfgGet("studentTT") || {}, kids = cfgGet("students") || [], old = Date.now() - 90 * 864e5;

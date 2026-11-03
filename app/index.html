@@ -739,6 +739,11 @@ button.dcard{cursor:pointer}
 .attline.click{cursor:pointer;border-radius:8px}
 /* 기록 줄: 한 줄에 이름·종류·사유, 서류는 늘 아래 줄 (모든 줄이 같은 모양) */
 .attline>.docs{flex-basis:100%;padding-left:17px}
+.doctable{table-layout:fixed;width:100%;min-width:640px}
+.doctable th{background:var(--paper2);font-size:.8rem;white-space:nowrap}.doctable th.sortable{cursor:pointer;user-select:none}.doctable th.sortable:hover{color:var(--accent)}
+.doctable .sorti{color:var(--accent);font-size:.72rem}
+.doctable td{vertical-align:middle;font-size:.86rem;border-left:0;border-right:0}.doctable tr.click{cursor:pointer}.doctable tr.click:hover td{background:var(--mint)}
+.doctable .ty{color:var(--c)}.doctable .per{color:var(--danger);font-size:.74rem}.doctable .rsn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .attline>b{flex:none;min-width:5.6em}.attline .ty{flex:none}
 .kbtn.kid{display:grid;justify-items:center;gap:0;padding:4px 2px;line-height:1.2;white-space:nowrap;overflow:visible}
 .kbtn.kid small{font-size:.66rem;opacity:.7}.kbtn.kid span{font-size:.8rem;font-weight:600;letter-spacing:-.02em}.attline.click:hover{background:var(--paper2)}
@@ -903,7 +908,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="backend.js?v=4de55609"></script>
+<script src="backend.js?v=ad00b55c"></script>
 <style>
 #fbGate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--desk)}
 #fbGate .fbbox{background:var(--paper);border-radius:22px;padding:36px 32px;text-align:center;box-shadow:0 18px 40px -24px rgba(20,40,25,.35);max-width:340px}
@@ -1108,6 +1113,9 @@ const ATT_DEFAULT = "https:" + "/" + "/docs.google.com/spreadsheets/d/1ZyTxkGizt
 const attCfg = () => ({ on:true, url:ATT_DEFAULT, pos:0, posSet:false, ...(config.attend || {}) });
 const attOn = () => homeroom() && attCfg().on !== false; // 담임 모드를 끄면 학급 출결 탭도 숨김
 const attName = () => String(attCfg().name || "").trim() || "학급 출결";
+// 학생에게 보내는 알림 문구: {날짜} {규칙} 자리에 알맞은 말이 들어감
+const ATT_MSG = { today:"{날짜} 출결이 기록되었어요. 확인해 주세요.", alert:"[{규칙}] 출결을 확인해 주세요. 궁금한 점은 담임 선생님께 연락해 주세요." };
+const attMsg = (k, vars) => Object.entries(vars || {}).reduce((t, [a, b]) => t.split("{" + a + "}").join(b), String(attCfg()["msg_" + k] || "").trim() || ATT_MSG[k]);
 const ATT_VIEWS = [["input","출결 입력"],["docs","서류 관리"],["cal","주간/월간 캘린더"],["stats","누적 통계 & 알림"],["holi","학사일정"],["set","설정"]];
 let att = { data:null, loading:false, err:"", view:"input", synced:false, f:null, week:0, month:0, docQ:"", docS:"", docE:"", docStu:"", docHide:true, statS:"", statE:"", qS:"", qE:"", qStu:"", qTypes:new Set(), result:null, calStu:"" };
 const normD = v => { const m = String(v || "").match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m ? m[1] + "-" + m[2].padStart(2, "0") + "-" + m[3].padStart(2, "0") : ""; };
@@ -1308,7 +1316,7 @@ function attInput(){
       el("div",{className:"actions"}, sms, el("span",{className:"spacer"}), save)),
     el("div",{className:"attside"},
     el("section",{className:"notes"}, el("div",{className:"panel-head"}, el("h3",{className:"nt-title"}, "오늘 학생 현황"), el("span",{className:"hint"}, dayLabel(new Date()))), stuGrid),
-    el("section",{className:"notes"}, el("div",{className:"panel-head"}, el("h3",{className:"nt-title"}, "오늘 출결 기록"), todays.length ? navBtn("이 학생들에게 알림", () => attNotify(todays.map(r => r.num), "오늘 출결이 " + "기록되었어요. 확인해 주세요."), "오늘 출결 학생에게 개별 알림") : ""),
+    el("section",{className:"notes"}, el("div",{className:"panel-head"}, el("h3",{className:"nt-title"}, "오늘 출결 기록"), todays.length ? navBtn("이 학생들에게 알림", () => attNotify(todays.map(r => r.num), attMsg("today", { 날짜:dayLabel(new Date()) })), "오늘 출결 학생에게 개별 알림") : ""),
       recTable(todays.sort((a, b) => (parseInt(a.num) || 0) - (parseInt(b.num) || 0)), { noDate:true, empty:"오늘 출결 처리된 기록이 없어요. 전원 정상 출석!" }))));
 }
 // 기록 표 (누르면 고치기 창). 서류 단추는 눌러서 냄/안 냄
@@ -1383,10 +1391,25 @@ function attDocs(){
   const stu = el("select",{className:"field","aria-label":"학생"}, el("option",{value:""}, "모든 학생"), ...attKids().map(k => el("option",{value:k.name}, stuLabel(k.num, k.name)))); stu.value = att.docStu;
   const hide = el("input",{type:"checkbox",checked:att.docHide});
   const list = el("div",{});
+  const sorts = att.docSort ||= [{ k:"date", d:1 }, { k:"num", d:1 }];
+  const key = { date:r => r.startDate, num:r => parseInt(r.num) || 0, type:r => r.type };
+  const cmp = (a, b) => { for(const x of sorts){ const va = key[x.k](a), vb = key[x.k](b); if(va < vb) return -x.d; if(va > vb) return x.d; } return 0; };
+  const th = (k, label, w) => { const o = sorts.find(x => x.k === k), h = el("th",{className:k ? "sortable" : "",style:w ? "width:" + w : ""}, label, o ? el("span",{className:"sorti"}, o.d > 0 ? " ▲" : " ▼") : "");
+    if(k) h.onclick = () => { const i = sorts.findIndex(x => x.k === k); if(i === 0) sorts[0].d *= -1; else { if(i > 0) sorts.splice(i, 1); sorts.unshift({ k, d:1 }); sorts.length = Math.min(sorts.length, 3); } draw(); }; return h; };
   const draw = () => { const t = q.value.trim().toLowerCase();
     const rows = D.recs.filter(r => (!stu.value || r.name === stu.value) && (!t || (r.name + " " + r.type + " " + r.reason + " " + r.num).toLowerCase().includes(t))
-      && (!s.value || !e.value || (r.startDate >= s.value && r.startDate <= e.value)) && (!hide.checked || pendingOf(r).length)).sort((a, b) => a.startDate.localeCompare(b.startDate) || (parseInt(a.num) || 0) - (parseInt(b.num) || 0));
-    list.replaceChildren(recTable(rows, { empty:hide.checked ? "안 낸 서류가 없어요." : "조건에 맞는 기록이 없어요." })); };
+      && (!s.value || !e.value || (r.startDate >= s.value && r.startDate <= e.value)) && (!hide.checked || pendingOf(r).length)).sort(cmp);
+    if(!rows.length) return list.replaceChildren(el("p",{className:"hint"}, hide.checked ? "안 낸 서류가 없어요." : "조건에 맞는 기록이 없어요."));
+    list.replaceChildren(el("div",{className:"tt-wrap"}, el("table",{className:"plan doctable"},
+      el("thead",{}, el("tr",{}, th("date", "날짜/기간", "16%"), th("num", "이름", "13%"), th("type", "출결(교시)", "24%"), th("", "사유", "19%"), th("", "서류 상태 (클릭)"))),
+      el("tbody",{}, ...rows.map(r => { const tr = el("tr",{className:"click"},
+        el("td",{}, dayLabel(parseYmd(r.startDate)) + (r.endDate && r.endDate !== r.startDate ? " ~ " + dayLabel(parseYmd(r.endDate)) : "")),
+        el("td",{}, el("b",{}, stuLabel(r.num, r.name))),
+        el("td",{}, el("b",{className:"ty"}, r.type || "-"), el("small",{className:"per"}, " (" + (r.period || "-") + ")")),
+        el("td",{className:"rsn"}, r.reason || ""),
+        el("td",{}, el("div",{className:"docrow"}, ...splitDocs(r.doc).map(d => { const b = el("button",{type:"button",className:"docbtn" + (r.docStatus[d] === true ? " done" : ""),disabled:!canWrite()}, d);
+          b.onclick = ev => { ev.stopPropagation(); attDo("attDoc", [r.id, { ...r.docStatus, [d]:r.docStatus[d] !== true }]).catch(() => {}); }; return b; }))));
+        tr.style.setProperty("--c", typeColor(r.type)); tr.onclick = () => attEdit(r); return tr; }))))); };
   q.oninput = () => { att.docQ = q.value; draw(); }; [s, e, stu].forEach(x => { x.onchange = () => { att.docS = s.value; att.docE = e.value; att.docStu = stu.value; draw(); }; }); hide.onchange = () => { att.docHide = hide.checked; draw(); };
   draw();
   const trash = el("details",{className:"notes trash"}, el("summary",{}, "휴지통 ", el("small",{className:"hint"}, D.trash.length + "개")),
@@ -1454,7 +1477,7 @@ function attStats(){
   return el("div",{className:"attgrid"},
     el("details",{className:"notes alertbox",open:att.alertOpen !== false,ontoggle:function(){ att.alertOpen = this.open; }}, el("summary",{className:"nt-title"}, "누적 통계 알림 " + (al.length ? al.length + "건" : "")),
       al.length ? Object.entries(by).map(([rule, list]) => el("div",{className:"alertrule"}, el("div",{className:"attrow"}, el("b",{}, rule + " · " + list.length + "명"), el("span",{className:"spacer"}),
-          navBtn("이 학생들에게 알림", () => attNotify(list.map(a => a.num), "[" + rule + "] 출결을 확인해 주세요. 궁금한 점은 담임 선생님께 연락해 주세요."), rule + " 학생에게 개별 알림")),
+          navBtn("이 학생들에게 알림", () => attNotify(list.map(a => a.num), attMsg("alert", { 규칙:rule, 날짜:dayLabel(new Date()) })), rule + " 학생에게 개별 알림")),
         el("div",{className:"stuchips"}, ...list.map(a => { const b = el("button",{type:"button",className:"kbtn alert"}, stuLabel(a.num, a.name) + " " + (a.how === "consecutive" ? "연속 " : "누적 ") + a.n + "일"); b.onclick = () => attStudent(a.name); return b; }))))
         : el("p",{className:"hint"}, "지금 알림 조건에 걸린 학생이 없어요."), el("p",{className:"hint"}, "규칙은 학급 출결 → 설정에서 고쳐요.")),
     el("section",{className:"notes attform"}, el("h3",{className:"nt-title"}, "출결 맞춤 검색 (주말·쉬는 날 빼고)"),
@@ -1543,6 +1566,14 @@ function attSettings(){
       el("p",{className:"hint"}, "하루에 기록이 여러 개면: ① 결석이 있으면 결석 ② 사유 순서가 앞선 것 ③ 빠진 교시가 많은 것 ④ 종류 순서가 앞선 것 하나만 세요."),
       el("div",{className:"attcols"}, el("div",{}, el("b",{}, "사유 순서"), orderList(ro, "r")), el("div",{}, el("b",{}, "종류 순서 (교시 수가 같을 때)"), orderList(to, "t"))),
       el("div",{className:"actions"}, navBtn("기본값으로", () => attDo("attSaveUi", [{ statRules:{ reasonOrder:DEF_REASON, tieOrder:DEF_TIE } }], "기본값으로 되돌렸어요.").catch(() => {}), "기본값으로", !canWrite()))),
+    (() => { // 학생에게 보낼 알림 문구
+      const box = (k, label) => { const t = el("textarea",{className:"field",rows:2,maxLength:300,value:attCfg()["msg_" + k] || ATT_MSG[k],"aria-label":label + " 문구"}); return [el("b",{}, label), t]; };
+      const [l1, t1] = box("today", "오늘 출결 알림"), [l2, t2] = box("alert", "누적 통계 알림");
+      const save = el("button",{type:"button",className:"btn",disabled:!canWrite()}, "문구 저장");
+      save.onclick = () => store.saveConfigPatch({ attend:{ ...attCfg(), msg_today:t1.value.trim(), msg_alert:t2.value.trim() } }).then(() => say("알림 문구를 저장했어요.")).catch(e => say(e?.message || "저장하지 못했어요."));
+      return el("section",{className:"notes attform"}, el("h3",{className:"nt-title"}, "학생에게 보내는 알림 문구"),
+        el("p",{className:"hint"}, "{날짜}는 오늘 날짜, {규칙}은 알림 규칙 이름으로 바뀌어요. 보내기 전 창에서 한 번 더 고칠 수 있어요."), l1, t1, l2, t2,
+        el("div",{className:"actions"}, navBtn("기본 문구로", () => { t1.value = ATT_MSG.today; t2.value = ATT_MSG.alert; }, "기본 문구로"), el("span",{className:"spacer"}), save)); })(),
     el("section",{className:"notes"}, el("h3",{className:"nt-title"}, "요일별 교시 수"), el("p",{className:"hint"}, [1, 2, 3, 4, 5].map(d => "월화수목금"[d - 1] + " " + D.per[d] + "교시").join(" · ") + " — 교무수첩의 우리 반 시간표에 맞춰 알아서 바뀌어요.")));
 }
 // 설정 탭: 출결 시트 잇기 · 시트 열기 · 탭 위치 · 보이기 (담임 모드일 때만 탭이 보임)
