@@ -5,7 +5,8 @@
   const FB = { apiKey: "AIzaSyCO4Mc-lGPDZWddX1E5WwAVFBh5ofc2cvc", authDomain: "gyomu-7e9e1.firebaseapp.com", projectId: "gyomu-7e9e1",
     storageBucket: "gyomu-7e9e1.firebasestorage.app", messagingSenderId: "778560026907", appId: "1:778560026907:web:82f4dab5fcbe9fcc86fbbe" };
   const OLD_SHEET = "18QiESGXlKZLdsTKEuegCWCwJagI-H6OGbnQyMbMztjs"; // 지금까지 쓰던 교무수첩 구글 시트 (가져오기용)
-  const SCOPES = ["https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/spreadsheets"];
+  // 드라이브·시트, 그리고 휴대폰 알림(FCM) 보내기
+  const SCOPES = ["https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/firebase.messaging"];
   firebase.initializeApp(FB);
   const auth = firebase.auth(), fs = firebase.firestore();
   fs.enablePersistence({ synchronizeTabs: true }).catch(() => {}); // 이 기기에 남겨 두어 다음에 바로 열림
@@ -716,10 +717,10 @@
       if (Array.isArray(p.students) && p.students.length) {
         const old = (await batchGet(id, ["'학생명부'!A2:H200"], "FORMATTED_VALUE"))[0], byNo = {}; old.forEach(r => { byNo[String(Number(r[0]) || r[0])] = r; });
         const batchim = n => { const c = String(n).charCodeAt(String(n).length - 1); return c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 !== 0; };
-        const rows = p.students.slice(0, 60).map(s => { const o = byNo[String(s.no)] || [], rel = S(s.rel || o[4] || "", 10), name = S(s.name, 20);
-          // 미등교 안내 문자: 비어 있거나 이름이 빠진 양식이면 이름을 넣어 새로 씀
-          const msg = o[6] && o[6].includes(name) ? o[6] : "안녕하세요, " + (rel || "보호자님") + ".\n아직 " + name + (batchim(name) ? "이가" : "가") + " 등교하지 않았습니다.\n확인 후 지도 부탁드립니다.";
-          return [String(s.no), name, name, S(s.phone, 20) || o[3] || "", rel, S(s.parentPhone, 20) || o[5] || "", msg, o[7] || ""]; });
+        // C열(학생 이름: 문자에 쓰는 친근한 이름)과 메시지는 선생님이 시트에서 고친 그대로 둠. 메시지가 비어 있을 때만 새로 씀
+        const rows = p.students.slice(0, 60).map(s => { const o = byNo[String(s.no)] || [], rel = S(s.rel || o[4] || "", 10), name = S(s.name, 20), friendly = o[2] || "";
+          const call = friendly || name, msg = o[6] || ("안녕하세요, " + (rel || "보호자님") + ".\n아직 " + call + (batchim(call) ? "이가" : "가") + " 등교하지 않았습니다.\n확인 후 지도 부탁드립니다.");
+          return [String(s.no), name, friendly, S(s.phone, 20) || o[3] || "", rel, S(s.parentPhone, 20) || o[5] || "", msg, o[7] || ""]; });
         await clearRange(id, "'학생명부'!A2:H200"); await putRange(id, "'학생명부'!A2", rows); done.push("학생 " + rows.length + "명");
       }
       if (Array.isArray(p.holidays) && p.holidays.length) { const r = await API.attHolidayAdd(p.holidays); if (r.added) done.push("쉬는 날 " + r.added + "개 더함"); }
@@ -779,11 +780,113 @@
     return out;
   }
 
+  // ---------- 우리 반 알림 앱(학생·학부모)으로 내보내기: Firestore notice/{선생님 uid} ----------
+  // 학생 계정: 학번@s.gyomu-7e9e1.app (비밀번호 = 선생님이 정한 것 + 붙임말, Firebase 는 6자 이상이어야 해서)
+  const STU_DOMAIN = "@s.gyomu-7e9e1.app", PW_SUFFIX = "#gyomu", PWA_URL = "https://uzzint.github.io/gyomu/class/";
+  const HOLI_RE = /(공휴일|대체공휴일|휴업|방학|추석|설날|한글날|개천절|성탄절|어린이날|현충일|광복절|삼일절|신정|부처님)/;
+  const hakbunOf = no => { const m = String((cfgGet("config") || {}).homeroomClass || "").match(/^(\d)\s*-\s*(\d+)$/); return m ? m[1] + m[2].padStart(2, "0") + String(no).padStart(2, "0") : ""; };
+  const noticeDoc = () => fs.collection("notice").doc(uid);
+  let auth2 = null;
+  const prov = () => auth2 || (auth2 = firebase.initializeApp(FB, "prov").auth());
+  // 정한 비밀번호대로 학생 계정을 만들고·바꾸고·지움 (선생님 화면 뒤에서, 선생님 로그인은 그대로)
+  async function provisionAccounts() {
+    const pw = cfgGet("stuPw") || {}, acct = { ...(cfgGet("stuAcct") || {}) }, a2 = prov(), problems = [];
+    await a2.setPersistence(firebase.auth.Auth.Persistence.NONE).catch(() => {});
+    let changed = false;
+    for (const no of new Set([...Object.keys(pw), ...Object.keys(acct)])) {
+      const hb = hakbunOf(no), want = pw[no], cur = acct[no]; if (!hb) continue;
+      try {
+        if (want && (!cur || cur.pw !== want || cur.hb !== hb)) {
+          let u;
+          if (cur && cur.hb === hb) { u = (await a2.signInWithEmailAndPassword(hb + STU_DOMAIN, cur.pw + PW_SUFFIX)).user; await u.updatePassword(want + PW_SUFFIX); }
+          else { try { u = (await a2.createUserWithEmailAndPassword(hb + STU_DOMAIN, want + PW_SUFFIX)).user; } catch (e) { if (e.code !== "auth/email-already-in-use") throw e; u = (await a2.signInWithEmailAndPassword(hb + STU_DOMAIN, want + PW_SUFFIX)).user; } }
+          await noticeDoc().collection("members").doc(u.uid).set({ hakbun: hb, no: Number(no) });
+          acct[no] = { uid: u.uid, pw: want, hb }; changed = true;
+        } else if (!want && cur) {
+          try { const u = (await a2.signInWithEmailAndPassword(cur.hb + STU_DOMAIN, cur.pw + PW_SUFFIX)).user; await u.delete(); } catch (e) { /* 이미 없음 */ }
+          await noticeDoc().collection("members").doc(cur.uid).delete().catch(() => {});
+          delete acct[no]; changed = true;
+        }
+      } catch (e) { problems.push(no + "번(" + (e.code || e.message) + ")"); }
+      await a2.signOut().catch(() => {});
+    }
+    if (changed) await cfgPut({ stuAcct: acct });
+    return problems;
+  }
+  async function publishNotice() {
+    if (!uid || !DB) return;
+    const c = cfgGet("config") || {}, ad = n => ymd(new Date(Date.now() + n * 864e5)), since = Date.now() - 60 * 864e5;
+    const problems = await provisionAccounts();
+    const classCats = (Array.isArray(c.evCats) ? c.evCats : [{ id: "class", name: "학급" }]).filter(x => x.id === "class" || x.name === "학급").map(x => x.id);
+    const notes = get("notes").filter(n => n.share !== false && n.text && n.date >= ad(-21) && n.date <= ad(14))
+      .sort((a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : (a.createdAt || 0) - (b.createdAt || 0)).slice(0, 120).map(n => ({ date: n.date, type: n.type || "", text: n.text, detail: n.detail || "" }));
+    const events = get("events").filter(e => (!e.cat || classCats.includes(e.cat)) && e.date >= ad(-7) && e.date <= ad(120)).map(e => ({ date: e.date, title: e.title, mine: !!e.cat })).sort((a, b) => a.date < b.date ? -1 : 1).slice(0, 200);
+    const recent = x => x.due || (x.createdAt ? ymd(new Date(x.createdAt)) : "");
+    const chk = get("checks").filter(x => x.title && (!x.closed || (x.createdAt || 0) > since || (x.due && x.due >= ad(-60))));
+    const checks = chk.map(x => ({ id: x.id, title: x.title, due: x.due || "", closed: !!x.closed, memo: x.memo && x.memoShare !== false ? x.memo : "" }))
+      .sort((a, b) => a.closed !== b.closed ? (a.closed ? 1 : -1) : a.closed ? (recent(chk.find(x => x.id === b.id)) > recent(chk.find(x => x.id === a.id)) ? 1 : -1) : (a.due || "9999") < (b.due || "9999") ? -1 : 1);
+    const tt = cfgGet("classTT"), bells = Array.isArray(c.bells) ? c.bells.map(b => ({ s: String(b && b.s || ""), e: String(b && b.e || "") })) : [];
+    await noticeDoc().set({ v: JSON.stringify({ cls: c.homeroomClass || "", notes, events, checks, tt: tt && Array.isArray(tt.cells) ? { periods: Number(tt.periods) || tt.cells.length, cells: tt.cells } : null, bells }), at: Date.now() });
+    await fs.collection("classes").doc("main").set({ tid: uid, cls: c.homeroomClass || "", at: Date.now() });
+    // 학생 한 명 몫: 이름 · 개인 시간표 · 개별 알림 · 낸 제출물
+    const acct = cfgGet("stuAcct") || {}, stt = cfgGet("studentTT") || {}, kids = cfgGet("students") || [], old = Date.now() - 90 * 864e5;
+    for (const no of Object.keys(acct)) {
+      const a = acct[no], n = Number(no), s = kids.find(k => k.no === n);
+      const my = { no: n, name: (s && s.name) || (stt[no] && stt[no].name) || "", cells: stt[no] && Array.isArray(stt[no].cells) ? stt[no].cells : null,
+        msgs: get("pmsg").filter(m => m.no === n && m.at > old).sort((x, y) => y.at - x.at).slice(0, 50).map(m => ({ text: m.text, at: m.at })),
+        done: chk.filter(x => (x.done || []).includes(n)).map(x => x.id) };
+      await noticeDoc().collection("students").doc(a.hb).set({ v: JSON.stringify(my), at: Date.now() }, { merge: true });
+    }
+    if (problems.length) console.warn("학생 계정을 만들지 못한 번호:", problems.join(", "));
+    return problems;
+  }
+  let pubTimer = null;
+  const schedulePublish = () => { clearTimeout(pubTimer); pubTimer = setTimeout(() => publishNotice().catch(e => console.warn("알림 앱 내보내기", e)), 2500); };
+  // 학급 출결 → 학생 몫에 출결 기록 (사유 빼고: 날짜·종류·교시·수업일 수)
+  let attPubKey = "";
+  async function publishAtt(tabs) {
+    const acct = cfgGet("stuAcct") || {}; if (!Object.keys(acct).length) return;
+    const recs = (tabs["출결기록"] || []).slice(1).filter(r => r[0] && r[3]), key = JSON.stringify(recs.map(r => r.slice(0, 6))) + JSON.stringify(tabs["학사일정"] || []);
+    if (key === attPubKey) return; attPubKey = key;
+    const holi = (tabs["학사일정"] || []).slice(1).filter(r => r[0]).map(r => ({ s: normD(r[1]), e: normD(r[2]) || normD(r[1]) }));
+    const bookHoli = new Set(get("events").filter(e => !e.cat && HOLI_RE.test(String(e.title).replace(/\([^)]*\)/g, ""))).map(e => e.date));
+    const school = k => { const w = new Date(k + "T12:00:00").getDay(); return w > 0 && w < 6 && !bookHoli.has(k) && !holi.some(h => k >= h.s && k <= h.e); };
+    const days = (s, e) => { let n = 0; for (let d = new Date(s + "T12:00:00"); ymd(d) <= e && n < 400; d.setDate(d.getDate() + 1)) if (school(ymd(d))) n++; return n || 1; };
+    for (const no of Object.keys(acct)) {
+      const list = recs.filter(r => Number(r[2]) === Number(no)).map(r => { const s = normD(r[0]), e = normD(r[1]) || s; return { s, e, type: r[4] || "", period: r[5] || "", days: days(s, e) }; }).sort((a, b) => b.s.localeCompare(a.s));
+      await noticeDoc().collection("students").doc(acct[no].hb).set({ att: JSON.stringify(list), attAt: Date.now() }, { merge: true });
+    }
+  }
+  // 휴대폰 알림 (FCM): 그 학생들 기기로. 선생님 구글 로그인 열쇠로 바로 보냄
+  async function pushTo(nos, title, body) {
+    const acct = cfgGet("stuAcct") || {}, hbs = new Set(nos.map(n => (acct[n] || {}).hb).filter(Boolean)); if (!hbs.size) return 0;
+    const snap = await noticeDoc().collection("push").get(), targets = []; snap.forEach(d => { const x = d.data(); if (x.token && hbs.has(x.hakbun)) targets.push({ id: d.id, token: x.token }); });
+    let sent = 0;
+    for (const t of targets) {
+      const r = await fetch("https://fcm.googleapis.com/v1/projects/" + FB.projectId + "/messages:send", { method: "POST", headers: { Authorization: "Bearer " + await gtoken(), "Content-Type": "application/json" },
+        body: JSON.stringify({ message: { token: t.token, notification: { title, body: body.slice(0, 180) }, webpush: { fcm_options: { link: PWA_URL } } } }) });
+      if (r.ok) sent++;
+      else if (r.status === 404 || r.status === 400) await noticeDoc().collection("push").doc(t.id).delete().catch(() => {}); // 지운 기기
+      else if (r.status === 401 || r.status === 403) { token = null; throw new Error("휴대폰 알림을 보내려면 구글 확인을 한 번 더 받아야 해요. 다시 보내기를 눌러 주세요."); }
+    }
+    return sent;
+  }
+  const PUB_FNS = new Set(["addNote", "updateNote", "deleteNote", "saveEvents", "addCheck", "updateCheck", "deleteCheck", "saveConfig", "saveClassTT", "saveStudentTT", "setStudentPasswords", "sendStudentMessages", "deleteStudentMessage", "saveStudents", "importFromSheet", "importFromArchive", "restoreArchive", "archiveBefore"]);
+  const sendMsg = API.sendStudentMessages;
+  API.sendStudentMessages = async (nos, text) => { const r = await sendMsg(nos, text); try { await publishNotice(); const n = await pushTo((Array.isArray(nos) ? nos : []).map(Number), "담임 선생님 알림", String(text || "")); if (n) r.pushed = n; } catch (e) { r.pushError = e.message; } return r; };
+  API.publishNow = async () => ({ problems: await publishNotice() });
+  const attLoad0 = API.attLoad;
+  API.attLoad = async () => { const r = await attLoad0(); publishAtt(r.tabs).catch(e => console.warn("출결 내보내기", e)); return r; };
+
   // 화면 코드가 부르는 곳: 로그인·자료 준비가 끝날 때까지 기다렸다가 같은 이름의 함수를 부름
+  let firstPub = false;
   window.fbCall = async (fn, ...args) => {
     await ready;
     if (!API[fn]) throw new Error("없는 기능이에요: " + fn);
-    return API[fn](...args);
+    if (!firstPub) { firstPub = true; setTimeout(schedulePublish, 3000); } // 열 때 한 번 (학생 앱을 최신으로)
+    const r = await API[fn](...args);
+    if (PUB_FNS.has(fn) && fn !== "sendStudentMessages") schedulePublish();
+    return r;
   };
   window.fbSignOut = () => auth.signOut().then(() => location.reload());
   window.fbUser = () => auth.currentUser;

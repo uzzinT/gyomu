@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>나의 교무수첩</title>
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<meta name="theme-color" content="#26402e">
 <base target="_blank">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <style>
@@ -734,7 +736,12 @@ button.dcard{cursor:pointer}
 .docbtn{font:inherit;font-size:.76rem;font-weight:700;padding:3px 10px;border-radius:999px;border:1px solid #ec4899;background:#fdf2f8;color:#be185d;cursor:pointer}
 .docbtn.done{border-color:var(--line);background:var(--paper2);color:var(--muted);text-decoration:line-through}
 .docbtn:disabled{cursor:default}
-.attline.click{cursor:pointer;border-radius:8px}.attline.click:hover{background:var(--paper2)}
+.attline.click{cursor:pointer;border-radius:8px}
+/* 기록 줄: 한 줄에 이름·종류·사유, 서류는 늘 아래 줄 (모든 줄이 같은 모양) */
+.attline>.docs{flex-basis:100%;padding-left:17px}
+.attline>b{flex:none;min-width:5.6em}.attline .ty{flex:none}
+.kbtn.kid{display:grid;justify-items:center;gap:0;padding:4px 2px;line-height:1.2;white-space:nowrap;overflow:visible}
+.kbtn.kid small{font-size:.66rem;opacity:.7}.kbtn.kid span{font-size:.8rem;font-weight:600;letter-spacing:-.02em}.attline.click:hover{background:var(--paper2)}
 .attline .dot{flex:none;width:9px;height:9px;border-radius:50%;background:var(--c)}
 .attline .ty{font-weight:700;color:var(--c,var(--ink))}.attline .ty small{color:var(--danger);font-weight:500}
 .attline .days{color:var(--danger)}
@@ -779,7 +786,10 @@ button.dcard{cursor:pointer}
 .smsmsg{margin:0;padding:10px 12px;border-radius:10px;background:var(--paper2);font-size:.86rem;white-space:pre-wrap;color:var(--ink)}
 .smsrow{display:flex;align-items:center;gap:8px;padding-top:6px;border-top:1px dashed var(--line)}
 .smswho{flex:none;min-width:4.5em;font-weight:700;font-size:.86rem}.smsnum{font-variant-numeric:tabular-nums;color:var(--muted);font-size:.84rem}
-.smsrow .btn{min-width:4.2em;text-align:center}
+.smsrow .btn,.smshead .btn{display:inline-flex;align-items:center;justify-content:center;min-width:4.6em;text-align:center}
+.smshead .spacer,.smsrow .spacer{flex:1}
+.smsrow{display:grid;grid-template-columns:4.5em 1fr auto auto;align-items:center}
+.smsrow .spacer{display:none}
 .taborder{display:grid;gap:4px}
 /* 따로 쓰는 앱 탭: 남은 화면 높이만큼 */
 .extwrap{display:grid;gap:8px}
@@ -893,7 +903,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="backend.js?v=f65a481c"></script>
+<script src="backend.js?v=4de55609"></script>
 <style>
 #fbGate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--desk)}
 #fbGate .fbbox{background:var(--paper);border-radius:22px;padding:36px 32px;text-align:center;box-shadow:0 18px 40px -24px rgba(20,40,25,.35);max-width:340px}
@@ -1103,6 +1113,8 @@ let att = { data:null, loading:false, err:"", view:"input", synced:false, f:null
 const normD = v => { const m = String(v || "").match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m ? m[1] + "-" + m[2].padStart(2, "0") + "-" + m[3].padStart(2, "0") : ""; };
 const pad2a = n => String(n).padStart(2, "0");
 const stuLabel = (num, name) => (isNaN(parseInt(num)) ? "?" : pad2a(parseInt(num))) + ". " + name;
+// 학생 단추: 번호는 위에 작게, 이름은 아래에 (이름이 잘리지 않게)
+const kidLabel = k => [el("small",{}, isNaN(parseInt(k.num)) ? "?" : pad2a(parseInt(k.num))), el("span",{}, k.name)];
 const splitDocs = s => String(s || "").split(",").map(x => x.trim()).filter(Boolean);
 const attSY = () => { const d = new Date(); return d.getMonth() < 2 ? d.getFullYear() - 1 : d.getFullYear(); };
 function attParse(t){
@@ -1255,7 +1267,7 @@ function attInput(){
   const attTypeDoc = n => D.types.find(t => t.name === n)?.doc || "";
   const drawKids = () => { const kids = attKids(), max = Math.max(0, ...kids.map(k => parseInt(k.num) || 0));
     kidBox.replaceChildren(...range1(1, max).map(i => { const k = kids.find(x => parseInt(x.num) === i); if(!k) return el("span",{});
-      const b = el("button",{type:"button",className:"kbtn","aria-pressed":String(f.kids.has(String(k.num)))}, stuLabel(k.num, k.name)); b.onclick = () => { const id = String(k.num); f.kids.has(id) ? f.kids.delete(id) : f.kids.add(id); drawKids(); }; return b; })); };
+      const b = el("button",{type:"button",className:"kbtn kid","aria-pressed":String(f.kids.has(String(k.num))),title:stuLabel(k.num, k.name)}, kidLabel(k)); b.onclick = () => { const id = String(k.num); f.kids.has(id) ? f.kids.delete(id) : f.kids.add(id); drawKids(); }; return b; })); };
   const drawPer = () => { const ab = /결석/.test(f.type);
     perHint.textContent = ab ? "종일 처리돼요." : /지각/.test(f.type) ? "도착한 교시를 눌러요" : /조퇴/.test(f.type) ? "나간 교시를 눌러요" : /결과/.test(f.type) ? "여러 교시를 고를 수 있어요" : f.type ? "" : "출결 종류를 먼저 골라요";
     perBox.replaceChildren(...[0, ...range1(1, f.maxP), 99].map(p => { const b = el("button",{type:"button",className:"kbtn pbtn","aria-pressed":String(f.ps.includes(p)),disabled:!f.type || ab}, PN(p));
@@ -1282,7 +1294,7 @@ function attInput(){
   const kids = attKids(), max = Math.max(0, ...kids.map(k => parseInt(k.num) || 0));
   const stuGrid = el("div",{className:"kidgrid"}, ...range1(1, max).map(i => { const k = kids.find(x => parseInt(x.num) === i); if(!k) return el("span",{});
     const r = todays.find(x => x.name === k.name), pn = D.recs.filter(x => x.name === k.name).reduce((n, x) => n + pendingOf(x).length, 0);
-    const b = el("button",{type:"button",className:"kbtn" + (r ? " filled" : "")}, stuLabel(k.num, k.name), pn ? el("span",{className:"kbadge"}, String(pn)) : ""); if(r) b.style.setProperty("--c", typeColor(r.type)); b.onclick = () => attStudent(k.name); return b; }));
+    const b = el("button",{type:"button",className:"kbtn kid" + (r ? " filled" : ""),title:stuLabel(k.num, k.name)}, kidLabel(k), pn ? el("span",{className:"kbadge"}, String(pn)) : ""); if(r) b.style.setProperty("--c", typeColor(r.type)); b.onclick = () => attStudent(k.name); return b; }));
   return el("div",{className:"attgrid attinput"},
     el("div",{className:"dcards"}, card(kids.length, "전체 학생", "#3b82f6"), card(new Set(todays.map(r => r.name)).size, "오늘 출결 학생", "#f59e0b"), card(todays.length, "오늘 처리 건수", "#ef4444"),
       card(pend, "미제출 서류 →", pend ? "#f59e0b" : "#94a3b8", () => { att.view = "docs"; renderAttend(); })),
@@ -1305,8 +1317,8 @@ function recTable(list, o = {}){
   return el("div",{className:"attlist"}, ...list.map(r => { const row = el("div",{className:"attline click",tabIndex:0,role:"button"},
     el("span",{className:"dot"}), o.noDate ? "" : el("span",{className:"d"}, dayLabel(parseYmd(r.startDate)) + (r.endDate && r.endDate !== r.startDate ? " ~ " + dayLabel(parseYmd(r.endDate)) : "")),
     el("b",{}, stuLabel(r.num, r.name)), el("span",{className:"ty"}, r.type || "-", el("small",{}, " (" + (r.period || "-") + ")")), el("span",{className:"t"}, r.reason || ""),
-    el("span",{className:"docs"}, ...splitDocs(r.doc).map(d => { const b = el("button",{type:"button",className:"docbtn" + (r.docStatus[d] === true ? " done" : ""),disabled:!canWrite()}, d);
-      b.onclick = ev => { ev.stopPropagation(); attDo("attDoc", [r.id, { ...r.docStatus, [d]:r.docStatus[d] !== true }]).catch(() => {}); }; return b; })));
+    splitDocs(r.doc).length ? el("span",{className:"docs"}, ...splitDocs(r.doc).map(d => { const b = el("button",{type:"button",className:"docbtn" + (r.docStatus[d] === true ? " done" : ""),disabled:!canWrite()}, d);
+      b.onclick = ev => { ev.stopPropagation(); attDo("attDoc", [r.id, { ...r.docStatus, [d]:r.docStatus[d] !== true }]).catch(() => {}); }; return b; })) : "");
     row.style.setProperty("--c", typeColor(r.type)); row.onclick = () => attEdit(r); row.onkeydown = ev => { if(ev.key === "Enter") attEdit(r); }; return row; }));
 }
 // 기록 고치기 · 복제 · 지우기
