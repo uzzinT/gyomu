@@ -480,11 +480,7 @@
   const readTab = async key => (await batchGet(await inputBookFor(key), ["'" + INPUT_TABS[key].name + "'!A1:CB400"], "FORMATTED_VALUE"))[0].map(r => r.map(v => String(v ?? "")));
   const hash = rows => { const s = JSON.stringify(rows.map(r => { const c = r.slice(); while (c.length && c[c.length - 1] === "") c.pop(); return c; }).filter(r => r.length)); let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return s.length + ":" + h; };
   const keepHash = p => cfgPut({ inputHash: { ...(cfgGet("inputHash") || {}), ...p } });
-  // 구글 열쇠가 살아 있을 때만 (창을 띄우지 않음). 처음엔 지금 모양만 기억하고, 그 뒤 바뀐 탭만 다시 넣음
-  async function autoSync() {
-    if (!token || Date.now() - tokenAt > 50 * 60e3 || typeof window.importRows !== "function") return;
-    try {
-      // 설정 맨 아래 바로 열기: 영역 폴더 · 학기 초 입력 시트 · 처음 쓰던 교무수첩 시트
+  // 설정 맨 아래 바로 열기: 영역 폴더 · 학기 초 입력 시트 · 처음 쓰던 교무수첩 시트
   function driveLinks() {
     const y = curYear(), d = cfgGet("drive") || {}, books = cfgGet("inputBooks") || {}, ids = ((cfgGet("config") || {}).areas || []).map(a => a.id);
     const folder = id => "https://drive.google.com/drive/folders/" + id, sheet = id => "https://docs.google.com/spreadsheets/d/" + id + "/edit";
@@ -501,7 +497,11 @@
     try { await yearFolder(); for (const a of ((cfgGet("config") || {}).areas || [])) await areaFolder(a.id); } catch (e) { return; }
     if (JSON.stringify(cfgGet("drive") || {}) !== before && window.apply) window.apply(getAll());
   }
-  // 이미 만든 영역 입력 시트만 읽음 (없는 시트를 새로 만들지 않음)
+  // 구글 열쇠가 살아 있을 때만 (창을 띄우지 않음). 처음엔 지금 모양만 기억하고, 그 뒤 바뀐 탭만 다시 넣음
+  async function autoSync() {
+    if (!token || Date.now() - tokenAt > 50 * 60e3 || typeof window.importRows !== "function") return;
+    try {
+      // 이미 만든 영역 입력 시트만 읽음 (없는 시트를 새로 만들지 않음)
       const books = cfgGet("inputBooks") || {}, keys = Object.keys(INPUT_TABS).filter(k => books[AREA_OF_KEY[k]]);
       if (!keys.length) return;
       const seen = cfgGet("inputHash") || {}, next = {}, done = [], got = {};
