@@ -712,7 +712,9 @@ dialog::backdrop{background:rgba(16,32,21,.45);backdrop-filter:blur(2px)}
 /* 학급 출결 (학급 올인원 워크스페이스와 같은 기능, 교무수첩 모양) */
 .atthead{flex-wrap:wrap}
 .attseg{flex-wrap:wrap;border-radius:14px;width:max-content;max-width:100%}
-.attseg button{display:inline-flex;align-items:center;gap:5px}
+.attseg button{display:inline-flex;align-items:center;gap:5px;padding:9px 16px}
+/* 행정 영역 학사일정: 달력 넓게, 이번 주 일정 좁게 */
+@media (min-width:900px){.feat:has(> .panel.week){grid-template-columns:minmax(0,1.8fr) minmax(280px,1fr)}}
 .tbadge{min-width:17px;height:17px;padding:0 5px;border-radius:9px;background:var(--sun);color:#fff;font-size:.66rem;line-height:17px;text-align:center}
 .attgrid{display:grid;gap:14px}
 .dcards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
@@ -789,7 +791,7 @@ button.dcard{cursor:pointer}
 .kbtn.alert{padding:8px 16px;min-width:9em}
 .stuchips{gap:6px}
 .kbtn.kid span{font-size:.9rem}.kbtn.kid small{font-size:.68rem}.kbtn.kid{padding:6px 2px}
-body.onhome .tt th,body.onhome .tt td{height:36px!important}
+body.onhome .tt th,body.onhome .tt td{height:46px!important;padding:4px 3px!important}
 /* 학급 출결 2차 */
 .kidgrid{grid-template-columns:repeat(10,minmax(0,1fr))}
 @media (max-width:1100px){.kidgrid{grid-template-columns:repeat(5,minmax(0,1fr))}}
