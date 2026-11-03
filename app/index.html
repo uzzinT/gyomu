@@ -681,6 +681,10 @@ dialog::backdrop{background:rgba(16,32,21,.45);backdrop-filter:blur(2px)}
 .panel.now{border-left:0;padding:16px 18px;border-radius:18px;background:var(--paper2)}
 .pinlink{border:0!important;border-radius:14px!important;background:color-mix(in srgb,var(--c,var(--green)) 13%,var(--paper))!important}
 .panel-head h2{letter-spacing:.08em;font-weight:800;color:var(--accent)}
+/* 따로 쓰는 앱 탭 (학급 출결): 남은 화면 높이만큼 */
+.extwrap{display:grid;gap:8px}
+.extcard{display:grid;gap:10px;justify-items:start;padding:28px;border-radius:18px;background:var(--paper2);max-width:560px}
+.extframe{width:100%;height:calc(100dvh - 300px);min-height:520px;border:1px solid var(--line);border-radius:16px;background:var(--paper)}
 /* 탭을 바꿔도 위치가 그대로: 모든 탭이 같은 위 여백, 스크롤 막대 자리도 늘 비워 둠 */
 html{scrollbar-gutter:stable}
 .desk{padding-top:18px}
@@ -709,9 +713,16 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
   body.onhome .home4 .col{gap:12px}
   body.onhome .datebox .md{font-size:2.6rem}
   body.onhome .notes{padding:10px 14px}
-  body.onhome .tt th,body.onhome .tt td{height:26px;padding:2px;font-size:.76rem;line-height:1.25}
+  body.onhome .tt th,body.onhome .tt td{height:clamp(26px,calc((100dvh - 500px) / 8),46px);padding:2px;font-size:.76rem;line-height:1.25}
   body.onhome .panel.now{padding:12px 14px}
-  body.onhome .bigcal .grid>*{min-height:46px}
+  /* 각 줄의 마지막 칸은 아래 끝까지 늘림 (시간표는 교시 줄이 고르게 커짐) */
+  body.onhome .home4 .col{display:flex;flex-direction:column}
+  body.onhome .home4 .col>:last-child{flex:1 0 auto}
+  body.onhome .home4 .col>.tt:last-child{display:flex;flex-direction:column}
+  body.onhome .home4 .col>.tt:last-child .tt-wrap{flex:1;display:flex}
+  body.onhome .home4 .col>.tt:last-child table{height:100%}
+  /* 화면이 크면 시간표·달력 칸을 조금씩 키워 아래가 비지 않게 */
+  body.onhome .bigcal .grid>*{min-height:clamp(46px,calc((100dvh - 470px) / 6),84px)}
   body.onhome .desk{padding-bottom:14px;height:100dvh}
   body.onhome .book{height:100%;display:flex;flex-direction:column}
   body.onhome .inner{flex:1;min-height:0;display:flex;flex-direction:column;padding-bottom:16px}
@@ -783,7 +794,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="backend.js?v=e266c04b"></script>
+<script src="backend.js?v=dd6667e6"></script>
 <style>
 #fbGate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--desk)}
 #fbGate .fbbox{background:var(--paper);border-radius:22px;padding:36px 32px;text-align:center;box-shadow:0 18px 40px -24px rgba(20,40,25,.35);max-width:340px}
@@ -808,7 +819,7 @@ const DEFAULT_CONFIG = { areas: [
 const MAX_BYTES = 20 * 1024 * 1024;
 
 let config = DEFAULT_CONFIG, items = [], tab = "home", cat = null, query = "";
-let archives = [], yearFolder = null, ready = false, editing = null, kind = "link", draft = null;
+let archives = [], driveLinks = [], yearFolder = null, ready = false, editing = null, kind = "link", draft = null;
 const $ = id => document.getElementById(id);
 // '-' 가 든 이름(aria-pressed, aria-label 등)은 속성으로, 나머지는 속성값(property)으로
 const el = (tag, props = {}, ...kids) => {
@@ -858,6 +869,7 @@ const NEW_YEAR_NOTE = "새 학년도는 영역·분류 설정만 남기고 모�
 const extraTermInfo = () => [
   ...(sheetInfo ? [el("p",{className:"note"}, "교무수첩 시트: ", el("a",{href:sheetInfo.url,target:"_blank",rel:"noopener noreferrer"}, "교무수첩 데이터 열기"), " (올해 자료가 들어 있어요. 지난 학년도 자료는 보관 시트에 있어요.)")] : []),
   ...(yearFolder ? [el("p",{className:"note"}, "올해 폴더: ", el("a",{href:yearFolder.url,target:"_blank",rel:"noopener noreferrer"}, "교무수첩 › " + yearFolder.year + "학년도"))] : []),
+  ...driveLinks.map(g => el("p",{className:"note"}, g.label + ": ", ...g.links.flatMap((l, i) => [i ? " · " : "", el("a",{href:l.url,target:"_blank",rel:"noopener noreferrer"}, l.name)]))),
   ...(archives.length ? [renderImportBox()] : []),
 ];
 // 지난 학년도에서 고른 것만 불러오기
@@ -960,6 +972,7 @@ function apply(data){
   allTT = data?.allTT && Array.isArray(data.allTT.teachers) && data.allTT.teachers.length ? data.allTT : null;
   if(allTT) allTT.teachers.forEach(t => { t.homeroom = normCode(t.homeroom); }); // 예전에 날짜 글자로 저장된 담임 반 고침
   archives = Array.isArray(data?.archives) ? data.archives.filter(a => safeUrl(a.url)) : [];
+  driveLinks = Array.isArray(data?.links) ? data.links.map(g => ({ label:String(g.label || ""), links:(g.links || []).filter(l => safeUrl(l.url)) })).filter(g => g.links.length) : [];
   yearFolder = data?.folder && safeUrl(data.folder.url) ? data.folder : null;
   items = (data?.items || []).filter(i => i.title && (safeUrl(i.url) || i.kind === "memo"));
   ready = true;
@@ -969,9 +982,20 @@ function apply(data){
 }
 
 // ---------- 화면 ----------
+// 따로 쓰는 앱을 교무수첩 탭으로 (영역과 나란히). 화면 안에 띄우고, 안 뜨면 새 창으로
+// embed: 그 앱의 doGet 에 setXFrameOptionsMode(ALLOWALL) 이 있어야 화면 안에 보임 (없으면 열기 카드)
+const EXT_TABS = [{ id:"attend", name:"학급 출결", embed:false, note:"출결 관련 (2026) 앱", url:"https:" + "/" + "/script.google.com/macros/s/AKfycbyhKlnzpX9tput2GOKrYcw7ODdnWmBlqssTM_waEWJPPdyr7eKjIT7P6O05Eou2F9lK/exec" }];
+const extOf = k => EXT_TABS.find(x => x.id === k);
+function renderExt(x){
+  const open = el("a",{className:"btn",href:x.url,target:"_blank",rel:"noopener noreferrer"}, x.name + " 열기");
+  $("view").replaceChildren(el("section",{className:"extwrap"},
+    el("div",{className:"panel-head"}, el("h2",{}, x.name), el("div",{className:"tt-tools"}, el("a",{className:"btn ghost small",href:x.url,target:"_blank",rel:"noopener noreferrer"}, "새 창에서 열기"))),
+    x.embed ? el("iframe",{className:"extframe",src:x.url,title:x.name,allow:"clipboard-write"})
+      : el("div",{className:"extcard"}, el("b",{}, x.note || x.name), el("p",{className:"hint"}, "이 앱은 다른 화면 안에 넣는 것을 막아 두어서 새 창으로 열려요. 교무수첩 탭은 그대로 남아 있어요."), open)));
+}
 function setCover(){ const a = areaOf(tab); $("book").style.setProperty("--cover", a ? cloth(a.color) : "var(--slate)"); }
 function renderTabs(){
-  const tabs = [["home","오늘"], ...config.areas.map(a => [a.id, a.name]), ["settings","설정"]];
+  const tabs = [["home","오늘"], ...config.areas.map(a => [a.id, a.name]), ...EXT_TABS.map(x => [x.id, x.name]), ["settings","설정"]];
   $("tabs").replaceChildren(...tabs.map(([k,n]) => {
     const b = el("button",{type:"button",role:"tab",className:k==="settings"?"gear":""}, n);
     b.setAttribute("aria-selected", k === tab);
@@ -988,7 +1012,7 @@ function go(k, isBack){
   tab = k; cat = null; query = ""; $("q").value = ""; draft = null; viewTerm = null;
   render(); window.scrollTo(0, 0);
 }
-const tabName = k => k === "home" ? "오늘" : k === "settings" ? "설정" : areaOf(k)?.name || "";
+const tabName = k => k === "home" ? "오늘" : k === "settings" ? "설정" : areaOf(k)?.name || extOf(k)?.name || "";
 function addTabBack(){
   while(tabHist.length && !tabName(tabHist[tabHist.length - 1])) tabHist.pop(); // 지운 영역은 건너뜀
   // 머리띠의 탭 줄 오른쪽 끝에 (본문을 밀어내지 않게)
@@ -1861,6 +1885,7 @@ async function uploadStudentTT(file){
   const n = Object.keys(map).length;
   if(!n) throw new Error(hr ? hr + "반 학생 시간표를 찾지 못했어요. 나이스 '학생별 시간표' 엑셀인지 확인해 주세요." : "학생 시간표를 찾지 못했어요. 나이스 '학생별 시간표' 엑셀인지 확인해 주세요.");
   const r = await call("saveStudentTT", Object.fromEntries(Object.entries(map).map(([k, v]) => [k, { name:v.name, cells:v.cells }])));
+  keepOriginal(file, "class");
   say(n + "명 시간표를 올렸어요.");
   return r;
 }
@@ -2553,7 +2578,7 @@ async function uploadKidPhotos(files, only){
     for(const [k, f] of files.entries()){
       const s = only || kidOfFile(f.name);
       if(!s){ miss.push(f.name); continue; }
-      const r = await call("uploadNoteFile", { name: hakbun(s) + " " + s.name + ".jpg", type:"image/jpeg", data: await shrinkImage(f) });
+      const r = await call("uploadNoteFile", { name: hakbun(s) + " " + s.name + ".jpg", type:"image/jpeg", data: await shrinkImage(f), area:"class" });
       done[s.no] = r.fileId; say("사진 올리는 중… (" + (k + 1) + "/" + files.length + ")");
     }
     const n = Object.keys(done).length;
@@ -3053,7 +3078,7 @@ function openAttendSummary(code, recs){
       const name = no => c.students.find(s => s.no === no)?.name || "";
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["날짜", "번호", "성명", "출결", "특이사항"], ...dated.map(x => [x.date, x.no, name(x.no), x.status, x.note])]), "날짜별 기록");
       const data = XLSX.write(wb, { bookType:"xlsx", type:"base64" });
-      const r = await call("uploadNoteFile", { name: title + " 출결·특이사항 " + ymd(new Date()) + ".xlsx", type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data });
+      const r = await call("uploadNoteFile", { name: title + " 출결·특이사항 " + ymd(new Date()) + ".xlsx", type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data, area:"subject" });
       msg.replaceChildren("만들었어요: ", el("a",{href:"https://drive.google.com/uc?export=download&id=" + encodeURIComponent(r.fileId),target:"_blank",rel:"noopener noreferrer"}, "내려받기"), " · ", el("a",{href:r.url,target:"_blank",rel:"noopener noreferrer"}, "드라이브에서 열기"));
     }catch(e){ msg.textContent = e?.message && !e.code ? e.message : "엑셀을 만들지 못했어요. 잠시 뒤 다시 시도해 주세요."; }
   }, "학생별 출결·특이사항 엑셀로 받기");
@@ -3125,13 +3150,19 @@ function setupButtons(s, done){
     const file = el("input",{type:"file",accept:neis ? ".xlsx,.xls,.csv,.pdf,image/*" : ".xlsx,.xls,.csv",hidden:true,multiple:!!s.multi});
     const run = async get => {
       say(s.label + " 불러오는 중…");
-      try{ say((await importRows(s.key, await get())) + "을(를) 넣었어요."); render(); if(done) done(); }
-      catch(e){ say(e?.message && !e.code ? e.message : "불러오지 못했어요. 잠시 뒤 다시 시도해 주세요."); }
+      try{ say((await importRows(s.key, await get())) + "을(를) 넣었어요."); render(); if(done) done(); return true; }
+      catch(e){ say(e?.message && !e.code ? e.message : "불러오지 못했어요. 잠시 뒤 다시 시도해 주세요."); return false; }
     };
     file.onchange = async () => {
       const fs = [...file.files]; file.value = ""; if(!fs.length) return;
       const xl = fs.filter(isXl), ph = neis ? fs.filter(f => !isXl(f)) : [];
-      if(xl.length) await run(async () => (await Promise.all(xl.map(sheetsFromFile))).flat());
+      let sh = null;
+      if(xl.length && await run(async () => (sh = (await Promise.all(xl.map(sheetsFromFile))).flat()))){
+        // Firebase 버전: 올린 엑셀을 구글 시트 입력 탭에도 그대로 적어서, 시트에서 고쳐도 같은 자료가 되게
+        if(window.fbCall && !s.noTab && sh?.length){ const top = sh.reduce((a, b) => (b.raw.length > a.raw.length ? b : a));
+          call("writeInputTab", s.key, top.raw.map(r => r.map(v => v instanceof Date ? ymd(v) : String(v ?? "")))).catch(() => {}); }
+        xl.forEach(f => keepOriginal(f, s.key === "neis" || s.key === "my" || s.key === "all" ? "subject" : s.key === "events" ? "admin" : "class"));
+      }
       if(ph.length) await uploadPhotoRosters(ph);
     };
     const off = !canWrite(), btns = [navBtn(neis ? "엑셀·사진 명렬표 올리기" : "엑셀 올리기", () => file.click(), s.label + " 엑셀 올리기", off)];
@@ -3145,6 +3176,8 @@ function setupButtons(s, done){
     return [file, ...btns];
   }
 }
+// 올린 원본 파일을 드라이브 영역 폴더에 한 부 (Firebase 버전만, 실패해도 넣은 자료에는 상관없음)
+const keepOriginal = (f, area) => { if(!window.fbCall) return; readB64(f).then(data => call("uploadNoteFile", { name:f.name, type:f.type, data, area })).catch(() => {}); };
 // 사진 명렬표: 파일 이름(없으면 PDF 첫 쪽 글)에서 '1학년 5반'·'1-5'나 선택 과목 이름을 찾아, 그 반 수업마다 사진 명렬표로 이어 줌
 const codeFromText = t => { t = String(t || "");
   const m = t.match(/(\d)\s*학년\s*(\d{1,2})\s*반/) || t.match(/(?:^|[^\d])(\d)\s*-\s*(\d{1,2})(?!\d)/); return m ? m[1] + "-" + +m[2] : ""; };
@@ -3222,7 +3255,7 @@ async function photosFromPdf(f, fileCode){
         const c = await pdfImageCanvas(page.pg, im); if(!c) continue;
         const k = Math.min(1, 400 / Math.max(c.width, c.height)), o = document.createElement("canvas"); o.width = Math.round(c.width * k); o.height = Math.round(c.height * k);
         o.getContext("2d").drawImage(c, 0, 0, o.width, o.height);
-        const r = await call("uploadNoteFile", { name: key + " " + s.no + " " + s.name + ".jpg", type:"image/jpeg", data:o.toDataURL("image/jpeg", .85).split(",")[1] });
+        const r = await call("uploadNoteFile", { name: key + " " + s.no + " " + s.name + ".jpg", type:"image/jpeg", data:o.toDataURL("image/jpeg", .85).split(",")[1], area: key === config.homeroomClass ? "class" : "subject" });
         photo.set(s.no + "|" + s.name, r.fileId); total++;
       }catch{}
     }
@@ -3400,7 +3433,7 @@ const store = {
   saveConfigPatch: async p => apply(await call("saveConfig", { ...structuredClone(config), ...p })),
   uploadFile: async f => {
     if(f.size > MAX_BYTES) throw new Error("20MB보다 큰 파일은 드라이브에 직접 올리고 링크를 세부 내용에 붙여 주세요.");
-    return await call("uploadNoteFile", { name:f.name, type:f.type, data: await readB64(f) });
+    return await call("uploadNoteFile", { name:f.name, type:f.type, data: await readB64(f), area: areaOf(tab)?.id || "" });
   },
   addTodo: t => { todos.push({ ...t, id:"tmp" + Date.now(), done:false, createdAt:Date.now() }); renderHome(); call("addTodo", t).then(apply).catch(failNote); },
   updateTodo: (id, p) => { Object.assign(todos.find(t => t.id === id) || {}, p); renderHome(); call("updateTodo", id, p).then(apply).catch(failNote); },
@@ -3648,7 +3681,7 @@ async function saveSettings(btn, err){
 }
 
 function render(){
-  if(tab !== "home" && tab !== "settings" && !areaOf(tab)) tab = "home"; // 지운 영역을 보고 있었으면 홈으로
+  if(tab !== "home" && tab !== "settings" && !areaOf(tab) && !extOf(tab)) tab = "home"; // 지운 영역을 보고 있었으면 홈으로
   setCover(); renderTabs(); renderHdrPins();
   document.body.classList.toggle("onhome", tab === "home"); // 넓은 화면에서 홈은 한 화면에 (칸 안에서만 스크롤)
   const isArea = !!areaOf(tab);
@@ -3658,7 +3691,7 @@ function render(){
   $("term").textContent = curTerm() ? termName(curTerm()) : termLabel();
   $("addBtn").hidden = !ready || !!viewTerm;
   if(isArea) $("q").placeholder = `${areaOf(tab).name}에서 찾기`;
-  tab === "home" ? renderHome() : tab === "settings" ? renderSettings() : renderArea();
+  tab === "home" ? renderHome() : tab === "settings" ? renderSettings() : extOf(tab) ? renderExt(extOf(tab)) : renderArea();
   addTabBack();
 }
 

@@ -56,6 +56,7 @@
     await load();
     if (!DB.cfg) importBanner(); else if (!DB.cfg.archives) archiveBanner();
     readyRes();
+    setTimeout(() => ensureFolders().then(autoSync), 2500); // 화면이 다 그려진 뒤 폴더 확인, 시트에서 고친 것 반영
   });
   // 이미 가져왔지만 지난 학년도 보관 시트를 아직 안 찾았을 때
   function archiveBanner() {
@@ -133,6 +134,7 @@
       items: get("items"), config: cfgGet("config"), timetable: cfgGet("timetable"),
       archives: Object.entries(cfgGet("archives") || {}).sort().reverse().map(([y, id]) => ({ year: Number(y), url: "https://docs.google.com/spreadsheets/d/" + id + "/edit" })),
       folder: (() => { const y = curYear(), id = ((cfgGet("drive") || {}).years || {})[y]; return id ? { year: y, url: "https://drive.google.com/drive/folders/" + id } : null; })(),
+      links: driveLinks(),
       plans: cfgGet("plans") || {}, rosters: cfgGet("rosters") || {}, students: cfgGet("students") || [], classTT: cfgGet("classTT"),
       classRosters: get("classRosters"), allTT: teachers.length ? { periods: Number(cfgGet("periods")) || 7, teachers } : null, sheet: null,
       events: get("events"), memos, dues, memoFiles,
@@ -313,8 +315,6 @@
     // 지난 구글 시트에서 한 번에 옮겨 오기
     importFromSheet
   };
-  // 아직 Firebase 로 옮기지 않은 것: 학년도 넘기기·되돌리기 (3월 학년도 시작 전에 이어 붙임)
-  ["archiveBefore", "restoreArchive"].forEach(n => { API[n] = () => fail("새 학년도로 넘기기는 아직 예전 교무수첩에서 해 주세요. (Firebase 버전은 학년도 시작 전에 이어 붙여요)"); });
 
   // ---------- 구글 드라이브·시트 (로그인할 때 받은 구글 열쇠로 바로 부름) ----------
   async function G(url, opts = {}) {
@@ -329,9 +329,30 @@
   async function findOne(query) { const j = await (await G(DRIVE + "?q=" + q(query + " and trashed=false") + "&fields=files(id,name,webViewLink)&pageSize=20&orderBy=createdTime")).json(); return j.files || []; }
   async function makeFolder(name, parent) { return (await G(DRIVE + "?fields=id", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, mimeType: FOLDER, parents: parent ? [parent] : undefined }) })).json(); }
   const curYear = () => { const t = termOf(cfgGet("config") && cfgGet("config").term); if (t) return Number(t.slice(0, 4)); const d = new Date(); return d.getMonth() + 1 <= 2 ? d.getFullYear() - 1 : d.getFullYear(); };
+  // 영역 폴더: 2026학년도 › 교과 / 학급 / 행정 (영역 이름은 설정의 이름을 따름)
+  const AREA_NAMES = { subject: "교과", class: "학급", admin: "행정" };
+  const areaName = id => { const a = ((cfgGet("config") || {}).areas || []).find(x => x.id === id); return S((a && a.name) || AREA_NAMES[id] || "", 30).replace(/['\\/]/g, " ").trim(); };
+  async function areaFolder(id, year) {
+    const name = areaName(id); if (!name) return yearFolder(year);
+    const y = year || curYear(), d = { ...(cfgGet("drive") || {}) }, key = y + ":" + id;
+    if (d.areas && d.areas[key]) return d.areas[key];
+    const parent = await yearFolder(y);
+    const f = ((await findOne("name='" + name + "' and mimeType='" + FOLDER + "' and '" + parent + "' in parents"))[0] || await makeFolder(name, parent)).id;
+    const d2 = { ...(cfgGet("drive") || {}) }; d2.areas = { ...(d2.areas || {}), [key]: f }; await cfgPut({ drive: d2 }); return f;
+  }
+  // 학기 초 입력 탭은 영역마다 시트 하나: 교과(내 시간표·전체 교사 시간표), 학급(우리 반 시간표·학생 명단), 행정(학사일정)
+  const AREA_OF_KEY = { my: "subject", all: "subject", class: "class", students: "class", events: "admin" };
+  async function inputBookFor(key) {
+    const area = AREA_OF_KEY[key], books = cfgGet("inputBooks") || {};
+    if (books[area]) return books[area];
+    const y = curYear(), ss = await (await G(SHEETS, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ properties: { title: "교무수첩 " + y + "학년도 " + areaName(area) + " 입력" } }) })).json();
+    await moveTo(ss.spreadsheetId, await areaFolder(area, y)).catch(() => {});
+    await cfgPut({ inputBooks: { ...(cfgGet("inputBooks") || {}), [area]: ss.spreadsheetId } });
+    return ss.spreadsheetId;
+  }
   // 내 드라이브 › 교무수첩 › 2026학년도 (예전 교무수첩이 만든 폴더를 그대로 씀)
-  async function yearFolder() {
-    const y = curYear(), d = { ...(cfgGet("drive") || {}) };
+  async function yearFolder(year) {
+    const y = year || curYear(), d = { ...(cfgGet("drive") || {}) };
     if (d.years && d.years[y]) return d.years[y];
     if (!d.root) d.root = ((await findOne("name='교무수첩' and mimeType='" + FOLDER + "' and 'root' in parents"))[0] || await makeFolder("교무수첩")).id;
     const id = ((await findOne("name='" + y + "학년도' and mimeType='" + FOLDER + "' and '" + d.root + "' in parents"))[0] || await makeFolder(y + "학년도", d.root)).id;
@@ -342,7 +363,7 @@
   async function driveUpload(p) {
     const name = S(p.name, 200).trim(); if (!name) fail("파일 이름이 없어요.");
     const bytes = b64ToBytes(String(p.data || "")); if (!bytes.length) fail("빈 파일은 올릴 수 없어요."); if (bytes.length > 20 * 1024 * 1024) fail("20MB보다 큰 파일은 올릴 수 없어요.");
-    const meta = { name, parents: [await yearFolder()] }, type = String(p.type || "") || "application/octet-stream";
+    const meta = { name, parents: [p.area ? await areaFolder(String(p.area)) : await yearFolder()] }, type = String(p.type || "") || "application/octet-stream";
     const body = new Blob(["--b\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n" + JSON.stringify(meta) + "\r\n--b\r\nContent-Type: " + type + "\r\n\r\n", bytes, "\r\n--b--"]);
     const f = await (await G("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink", { method: "POST", headers: { "Content-Type": "multipart/related; boundary=b" }, body })).json();
     return { name, url: f.webViewLink, fileId: f.id, size: bytes.length };
@@ -364,15 +385,20 @@
   };
   async function inputTab(key) {
     const def = INPUT_TABS[key]; if (!def) fail("없는 입력 탭이에요.");
-    let t = (await tabsOf(OLD_SHEET)).find(s => s.title === def.name);
+    const book = await inputBookFor(key); let t = (await tabsOf(book)).find(s => s.title === def.name);
     if (!t) {
-      const r = await (await G(SHEETS + "/" + OLD_SHEET + ":batchUpdate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requests: [{ addSheet: { properties: { title: def.name, gridProperties: { frozenRowCount: def.head.length } } } }] }) })).json();
+      const r = await (await G(SHEETS + "/" + book + ":batchUpdate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requests: [{ addSheet: { properties: { title: def.name, gridProperties: { frozenRowCount: def.head.length } } } }] }) })).json();
       t = r.replies[0].addSheet.properties;
       const rows = def.head.map(r => r.length ? r : [""]);
       if (def.rows) for (let i = 0; i < def.rows * (def.pair ? 2 : 1); i++) rows.push([def.pair ? (i % 2 ? "" : String(i / 2 + 1)) : String(i + 1)]);
-      await G(SHEETS + "/" + OLD_SHEET + "/values/" + q("'" + def.name + "'!A1") + "?valueInputOption=RAW", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ values: rows }) });
+      // 예전 교무수첩 시트에 같은 입력 탭이 있으면 그 내용을 옮겨 옴 (한 번만)
+      let old = null; try { if ((await tabsOf(OLD_SHEET)).some(x => x.title === def.name)) old = (await batchGet(OLD_SHEET, ["'" + def.name + "'!A1:CB400"], "FORMATTED_VALUE"))[0]; } catch (e) {}
+      await G(SHEETS + "/" + book + "/values/" + q("'" + def.name + "'!A1") + "?valueInputOption=RAW", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ values: old && old.length > def.head.length ? old : rows }) });
+      // 새 시트에 처음 생기는 빈 탭(시트1)은 지움
+      const blank = (await tabsOf(book)).filter(x => x.sheetId !== t.sheetId && /^(Sheet|시트)\d+$/.test(x.title));
+      if (blank.length) await G(SHEETS + "/" + book + ":batchUpdate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requests: blank.map(x => ({ deleteSheet: { sheetId: x.sheetId } })) }) }).catch(() => {});
     }
-    return "https://docs.google.com/spreadsheets/d/" + OLD_SHEET + "/edit#gid=" + t.sheetId;
+    return "https://docs.google.com/spreadsheets/d/" + book + "/edit#gid=" + t.sheetId;
   }
   Object.assign(API, {
     async uploadFile(p) { const b = cleanBase(p), f = await driveUpload(p);
@@ -404,7 +430,7 @@
       if (data.length < 2) fail("명단이 비어 있어요.");
       const ss = await (await G(SHEETS, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ properties: { title }, sheets: [{ properties: { gridProperties: { frozenRowCount: 2 } } }] }) })).json();
       await G(SHEETS + "/" + ss.spreadsheetId + "/values/A1?valueInputOption=RAW", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ values: data }) });
-      await G(DRIVE + "/" + ss.spreadsheetId + "?addParents=" + await yearFolder() + "&removeParents=root&fields=id", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: "{}" }).catch(() => {});
+      await moveTo(ss.spreadsheetId, await areaFolder("subject")).catch(() => {}); // 명렬표 시트는 교과 폴더로
       return { url: ss.spreadsheetUrl };
     },
     // 양식 파일: 예전 교무수첩이 만들어 둔 '교무수첩 › 양식' 폴더의 파일
@@ -416,8 +442,18 @@
     inputTab,
     async readInputTab(key) {
       const def = INPUT_TABS[key]; if (!def) fail("없는 입력 탭이에요.");
-      if (!(await tabsOf(OLD_SHEET)).some(s => s.title === def.name)) fail("아직 입력 탭이 없어요. '시트에 입력'을 먼저 눌러 주세요.");
-      return [(await batchGet(OLD_SHEET, ["'" + def.name + "'!A1:CB400"], "FORMATTED_VALUE"))[0].map(r => r.map(v => String(v ?? "")))];
+      if (!(await tabsOf(await inputBookFor(key))).some(s => s.title === def.name)) await inputTab(key);
+      const rows = await readTab(key); await keepHash({ [key]: hash(rows) }); return [rows];
+    },
+    // 엑셀을 올리면 그 내용을 입력 탭에도 그대로 적어 둠 (시트에서 고쳐도 같은 자료)
+    async writeInputTab(key, rows) {
+      const def = INPUT_TABS[key]; if (!def) fail("없는 입력 탭이에요.");
+      const data = (Array.isArray(rows) ? rows : []).slice(0, 400).map(r => (Array.isArray(r) ? r : []).slice(0, 80).map(v => S(v, 500)));
+      await inputTab(key);
+      const book = await inputBookFor(key), w = Math.max(1, ...data.map(r => r.length));
+      await G(SHEETS + "/" + book + "/values/" + q("'" + def.name + "'") + ":clear", { method: "POST" });
+      await G(SHEETS + "/" + book + "/values/" + q("'" + def.name + "'!A1") + "?valueInputOption=RAW", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ values: data.map(r => r.concat(Array(w - r.length).fill(""))) }) });
+      await keepHash({ [key]: hash(await readTab(key)) }); return true;
     },
     // 지난 학년도 보관 시트('교무수첩 2025학년도')에서 고른 것만 가져옴 (보관 시트는 그대로)
     async importFromArchive(year, parts) {
@@ -440,6 +476,126 @@
     },
     findArchives
   });
+  // ---------- 입력 탭 ↔ 교무수첩 (시트에서 고친 것을 열 때 알아서 반영) ----------
+  const readTab = async key => (await batchGet(await inputBookFor(key), ["'" + INPUT_TABS[key].name + "'!A1:CB400"], "FORMATTED_VALUE"))[0].map(r => r.map(v => String(v ?? "")));
+  const hash = rows => { const s = JSON.stringify(rows.map(r => { const c = r.slice(); while (c.length && c[c.length - 1] === "") c.pop(); return c; }).filter(r => r.length)); let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return s.length + ":" + h; };
+  const keepHash = p => cfgPut({ inputHash: { ...(cfgGet("inputHash") || {}), ...p } });
+  // 구글 열쇠가 살아 있을 때만 (창을 띄우지 않음). 처음엔 지금 모양만 기억하고, 그 뒤 바뀐 탭만 다시 넣음
+  async function autoSync() {
+    if (!token || Date.now() - tokenAt > 50 * 60e3 || typeof window.importRows !== "function") return;
+    try {
+      // 설정 맨 아래 바로 열기: 영역 폴더 · 학기 초 입력 시트 · 처음 쓰던 교무수첩 시트
+  function driveLinks() {
+    const y = curYear(), d = cfgGet("drive") || {}, books = cfgGet("inputBooks") || {}, ids = ((cfgGet("config") || {}).areas || []).map(a => a.id);
+    const folder = id => "https://drive.google.com/drive/folders/" + id, sheet = id => "https://docs.google.com/spreadsheets/d/" + id + "/edit";
+    return [
+      { label: "영역 폴더", links: ids.filter(id => d.areas && d.areas[y + ":" + id]).map(id => ({ name: areaName(id), url: folder(d.areas[y + ":" + id]) })) },
+      { label: "학기 초 입력 시트", links: Object.keys(books).map(id => ({ name: areaName(id) + " 입력", url: sheet(books[id]) })) },
+      { label: "처음 쓰던 교무수첩 시트", links: cfgGet("legacyMoved") ? [] : [{ name: "예전 교무수첩 데이터 열기", url: sheet(OLD_SHEET) }] }
+    ];
+  }
+  // 열 때 올해 폴더와 영역 폴더가 없으면 만들어 둠 (구글 열쇠가 살아 있을 때만)
+  async function ensureFolders() {
+    if (!token || Date.now() - tokenAt > 50 * 60e3) return;
+    const before = JSON.stringify(cfgGet("drive") || {});
+    try { await yearFolder(); for (const a of ((cfgGet("config") || {}).areas || [])) await areaFolder(a.id); } catch (e) { return; }
+    if (JSON.stringify(cfgGet("drive") || {}) !== before && window.apply) window.apply(getAll());
+  }
+  // 이미 만든 영역 입력 시트만 읽음 (없는 시트를 새로 만들지 않음)
+      const books = cfgGet("inputBooks") || {}, keys = Object.keys(INPUT_TABS).filter(k => books[AREA_OF_KEY[k]]);
+      if (!keys.length) return;
+      const seen = cfgGet("inputHash") || {}, next = {}, done = [], got = {};
+      for (const id of [...new Set(keys.map(k => books[AREA_OF_KEY[k]]))]) {
+        const ks = keys.filter(k => books[AREA_OF_KEY[k]] === id), have = new Set((await tabsOf(id)).map(t => t.title)), ok = ks.filter(k => have.has(INPUT_TABS[k].name));
+        if (!ok.length) continue;
+        (await batchGet(id, ok.map(k => "'" + INPUT_TABS[k].name + "'!A1:CB400"), "FORMATTED_VALUE")).forEach((v, i) => { got[ok[i]] = v; });
+      }
+      for (const k of Object.keys(got)) {
+        const rows = got[k].map(r => r.map(v => String(v ?? ""))), h = hash(rows); next[k] = h;
+        if (seen[k] && seen[k] !== h && rows.length > 3) { try { done.push(await window.importRows(k, [{ rows, raw: rows }])); } catch (e) { /* 아직 덜 쓴 탭이면 그냥 둠 */ } }
+      }
+      await keepHash(next);
+      if (done.length) { window.apply && window.apply(getAll()); window.say && window.say("구글 시트에서 고친 것을 반영했어요: " + done.join(", ")); }
+    } catch (e) { /* 다음에 열 때 다시 */ }
+  }
+
+  // ---------- 새 학년도: 지난 학년도를 드라이브 'YYYY학년도' 폴더에 시트로 정리하고, Firebase 에도 한 부 보관 ----------
+  const YEAR_TABLES = ["items", "events", "memos", "notes", "checks", "logs", "todos", "teachers", "classRosters", "attend", "pmsg"];
+  const YEAR_CFG = ["timetable", "kept", "plans", "rosters", "students", "classTT", "periods", "studentTT", "stuPw", "classPw", "inputHash"];
+  const J = v => JSON.stringify(v ?? null);
+  // parseBook 이 다시 읽을 수 있는 모양 (예전 교무수첩 시트와 같은 탭·칸)
+  function bookTabs(db, meta) {
+    const c = db.cfg || {}, g = t => db[t] || (t === "classRosters" ? {} : []);
+    const HEAD = ["id", "title", "kind", "url", "fileId", "fileName", "size", "area", "cat", "note", "createdAt", "embed", "term", "scope", "pinned", "body"];
+    const studentsPw = (c.students || []).map(s => [String(s.no), s.name || "", (c.stuPw || {})[s.no] || ""]);
+    return {
+      config: [[J(c.config), J(meta)], [J(c.timetable)], [J(c.kept)], [""], [J(c.plans)], [J(c.rosters)], [J(c.students)], [J(c.classTT)], [String(c.periods || "")], [J(c.classPw)], [J(c.studentTT)]],
+      items: [HEAD].concat(g("items").map(o => HEAD.map(h => o[h] ?? ""))),
+      events: [["date", "title", "cat"]].concat(g("events").map(e => [e.date, e.title, e.cat])),
+      memos: [["date", "text", "due", "files"]].concat(g("memos").map(m => [m.date, m.text, !!m.due, J(m.files || [])])),
+      notes: [["id", "date", "type", "text", "done", "createdAt", "detail", "share", "files"]].concat(g("notes").map(n => [n.id, n.date, n.type, n.text, !!n.done, n.createdAt, n.detail, n.share !== false, J(n.files || [])])),
+      checks: [["id", "title", "size", "done", "closed", "createdAt", "due", "files", "memo", "memoShare"]].concat(g("checks").map(x => [x.id, x.title, x.size, (x.done || []).join(","), !!x.closed, x.createdAt, x.due, J(x.files || []), x.memo || "", x.memoShare !== false])),
+      logs: [["date", "period", "cls", "text", "lesson", "done", "files"]].concat(g("logs").map(l => [l.date, l.period, l.cls, l.text, l.lesson, !!l.done, J(l.files || [])])),
+      todos: [["id", "text", "detail", "due", "done", "createdAt", "area", "cat", "files"]].concat(g("todos").map(t => [t.id, t.text, t.detail, t.due, !!t.done, t.createdAt, t.area, t.cat, J(t.files || [])])),
+      teachers: [["name", "homeroom", "cells"]].concat(g("teachers").map(t => [t.name, t.homeroom, J(t.cells)])),
+      classRosters: [["code", "subject", "teacher", "students"]].concat(Object.entries(g("classRosters")).map(([k, v]) => [k, v.subject, v.teacher, J(v.students)])),
+      attend: [["date", "code", "no", "status", "note"]].concat(g("attend").map(a => [a.date, a.code, a.no, a.status, a.note])),
+      pmsg: [["id", "no", "text", "at"]].concat(g("pmsg").map(m => [m.id, m.no, m.text, m.at])),
+      "알림앱 비밀번호": [["번호", "이름", "비밀번호"]].concat(studentsPw)
+    };
+  }
+  async function writeBook(title, folder, db, meta) {
+    const tabs = bookTabs(db, meta), names = Object.keys(tabs);
+    const ss = await (await G(SHEETS, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ properties: { title }, sheets: names.map(n => ({ properties: { title: n, gridProperties: { frozenRowCount: n === "config" ? 0 : 1 } } })) }) })).json();
+    // 한 칸 50,000자 제한이 있어 아주 긴 글은 자름 (원본은 Firebase 보관본에 그대로 있음)
+    const data = names.map(n => ({ range: "'" + n + "'!A1", values: tabs[n].map(r => r.map(v => typeof v === "string" ? v.slice(0, 49000) : v)) }));
+    await G(SHEETS + "/" + ss.spreadsheetId + "/values:batchUpdate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ valueInputOption: "RAW", data }) });
+    await moveTo(ss.spreadsheetId, folder);
+    return ss.spreadsheetId;
+  }
+  async function moveTo(id, folder) {
+    const p = (await (await G(DRIVE + "/" + id + "?fields=parents")).json()).parents || [];
+    await G(DRIVE + "/" + id + "?addParents=" + folder + (p.length ? "&removeParents=" + p.join(",") : "") + "&fields=id", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: "{}" });
+  }
+  const snapCol = y => fs.collection("users").doc(uid).collection("years").doc(String(y)).collection("data");
+  async function snapshotYear(y) { const b = fs.batch(); TABLES.forEach(t => { if (DB[t] !== undefined) b.set(snapCol(y).doc(t), { v: JSON.stringify(DB[t]), at: Date.now() }); }); await b.commit(); }
+  Object.assign(API, {
+    // 새 학년도 시작 (설정 → 학기에서 '20XX학년도 1학기'로 바꿀 때 화면이 부름)
+    async archiveBefore(newYear) {
+      newYear = Number(newYear); if (!(newYear >= 2000 && newYear <= 2100)) fail("학년도가 올바르지 않아요.");
+      const prev = newYear - 1, c = cfgGet("config") || {}, meta = { term: c.term || "", homeroomClass: c.homeroomClass || "" };
+      const oldFolder = await yearFolder(prev);
+      await snapshotYear(prev); // Firebase 에 지난 학년도 그대로 한 부
+      const archId = await writeBook("교무수첩 " + prev + "학년도", oldFolder, DB, meta);
+      // 예전 교무수첩 시트(처음 쓰던 것)는 지난 학년도 폴더로. 영역 입력 시트는 이미 그 해 영역 폴더에 있음 → 새 학년도에는 새로 만듦
+      if (!cfgGet("legacyMoved")) { await moveTo(OLD_SHEET, oldFolder).catch(() => {}); }
+      await yearFolder(newYear);
+      // 새 학년도는 영역·분류·수업 시간 설정만 남기고 처음부터
+      for (const t of YEAR_TABLES) await put(t, t === "classRosters" ? {} : []);
+      const patch = { archives: { ...(cfgGet("archives") || {}), [prev]: archId }, inputBooks: {}, legacyMoved: true, config: { ...c, homeroomClass: "" } };
+      YEAR_CFG.forEach(k => { patch[k] = undefined; });
+      await cfgPut(patch);
+      return getAll();
+    },
+    // 보관한 학년도로 돌아가기: 지금 학년도도 Firebase 에 한 부 남긴 뒤 그 해 보관본을 되살림
+    async restoreArchive(year) {
+      year = Number(year); const cur = curYear();
+      const snap = await snapCol(year).get();
+      let back = {};
+      if (!snap.empty) snap.forEach(d => { try { back[d.id] = JSON.parse(d.data().v); } catch (e) {} });
+      else { const id = (cfgGet("archives") || {})[year]; if (!id) fail(year + "학년도 보관본이 없어요."); const o = await parseBook(id); back = o; back.cfg = { ...o.cfg }; back.meta = o.meta; }
+      if (cur !== year) await snapshotYear(cur);
+      const keep = get("cfg");
+      for (const t of YEAR_TABLES) await put(t, back[t] || (t === "classRosters" ? {} : []));
+      const bc = back.cfg || {}, patch = {};
+      YEAR_CFG.forEach(k => { patch[k] = bc[k]; });
+      const meta = back.meta || (bc.config ? { term: bc.config.term, homeroomClass: bc.config.homeroomClass } : null);
+      patch.config = { ...(keep.config || {}), term: meta && TERM_RE.test(String(meta.term || "")) && Number(String(meta.term).slice(0, 4)) === year ? meta.term : year + "-2", homeroomClass: (meta && meta.homeroomClass) || "" };
+      await cfgPut(patch); return getAll();
+    }
+  });
+  window.fbAutoSync = autoSync;
+
   // 드라이브에서 '교무수첩 2025학년도' 같은 보관 시트를 찾아 둠 (목록은 설정 → 학기에 보임)
   async function findArchives() {
     const files = await findOne("mimeType='application/vnd.google-apps.spreadsheet' and name contains '교무수첩' and name contains '학년도'"), map = {};
