@@ -21,6 +21,8 @@ const V = "10.14.1", head = [
 #fbImport{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:70;display:flex;gap:14px;align-items:center;max-width:min(640px,calc(100vw - 24px));
   padding:12px 14px 12px 18px;border-radius:16px;background:var(--forest);color:#fff;box-shadow:0 12px 30px -12px rgba(0,0,0,.45)}
 #fbImport small{opacity:.8}#fbImport .btn{flex:none}
+#fbReauth{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:80;display:flex;gap:12px;align-items:center;padding:10px 12px 10px 18px;border-radius:999px;background:var(--forest);color:#fff;box-shadow:0 12px 30px -12px rgba(0,0,0,.45);font-size:.86rem;max-width:calc(100vw - 24px)}
+#fbReauth .btn{flex:none}
 </style>`].join("\n");
 swap('<script id="errTrap">', head + '\n<script id="errTrap">');
 fs.writeFileSync(out, s);

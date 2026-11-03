@@ -90,9 +90,24 @@
   // 구글 API 열쇠 (1시간짜리). 지나면 다시 로그인 창으로 받음
   async function gtoken() {
     if (token && Date.now() - tokenAt < 50 * 60e3) return token;
+    try { return await reauth(); }
+    catch (e) {
+      // 버튼을 누른 뒤 시간이 걸려 확인 창(팝업)이 막히면: 화면 아래 [구글 확인] 단추를 보여 주고 그걸 누르게 함
+      if (/popup/.test(e.code || "")) { reauthBar(); throw new Error("구글 확인이 필요해요. 화면 아래 [구글 확인]을 누른 뒤 다시 해 주세요."); }
+      throw e;
+    }
+  }
+  async function reauth() {
     const p = new firebase.auth.GoogleAuthProvider(); SCOPES.forEach(s => p.addScope(s));
     const r = await auth.currentUser.reauthenticateWithPopup(p);
-    token = r.credential.accessToken; tokenAt = Date.now(); keepToken(); return token;
+    token = r.credential.accessToken; tokenAt = Date.now(); keepToken(); document.getElementById("fbReauth")?.remove(); return token;
+  }
+  function reauthBar() {
+    if (document.getElementById("fbReauth")) return;
+    const b = document.createElement("div"); b.id = "fbReauth";
+    b.innerHTML = '<span>구글 드라이브·시트를 쓰려면 한 번 더 확인해야 해요 (1시간마다).</span><button type="button" class="btn">구글 확인</button>';
+    b.querySelector("button").onclick = () => reauth().then(() => window.say && window.say("확인했어요. 하던 것을 다시 눌러 주세요.")).catch(e => alert(e.message || e.code));
+    document.body.append(b);
   }
 
   // ---------- 공통 정리 (Code.gs 와 같은 규칙) ----------

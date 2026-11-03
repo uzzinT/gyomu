@@ -775,10 +775,25 @@ button.dcard{cursor:pointer}
 .orderlist{display:grid;gap:4px;margin-top:6px}
 .trash>summary{cursor:pointer;font-weight:700}
 @media (max-width:700px){.dcards{grid-template-columns:repeat(2,minmax(0,1fr))}.calweek{grid-template-columns:1fr}.calday{min-height:0}.attrow .attlbl{width:100%}.setrow{flex-wrap:wrap}}
+/* 학급 출결 3차: 간격·표 높이·열 폭 */
+.colres{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:2;touch-action:none}
+.colres:hover{background:color-mix(in srgb,var(--accent) 35%,transparent)}
+.plan th{position:relative}
+.attwrap .plan th,.attwrap .plan td{padding:10px 8px}
+.attwrap .attstat th,.attwrap .attstat td{padding:8px 5px}
+.attline{padding:10px 4px;row-gap:6px}
+.attform{gap:12px}.attrow{row-gap:8px}
+.typegroups{gap:8px}.tgroup{gap:6px}.docrow{gap:6px}
+.calday{gap:7px}.calcell{gap:5px;padding:6px}
+.alertrule{gap:8px;padding:12px 0}
+.kbtn.alert{padding:8px 16px;min-width:9em}
+.stuchips{gap:6px}
+.kbtn.kid span{font-size:.9rem}.kbtn.kid small{font-size:.68rem}.kbtn.kid{padding:6px 2px}
+body.onhome .tt th,body.onhome .tt td{height:36px!important}
 /* 학급 출결 2차 */
 .kidgrid{grid-template-columns:repeat(10,minmax(0,1fr))}
 @media (max-width:1100px){.kidgrid{grid-template-columns:repeat(5,minmax(0,1fr))}}
-.attinput{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);align-items:start}
+.attinput{grid-template-columns:minmax(0,1.9fr) minmax(300px,.85fr);align-items:start}
 .attinput>.dcards{grid-column:1/-1}
 .attside{display:grid;gap:14px;align-content:start}
 .attside .kidgrid{grid-template-columns:repeat(5,minmax(0,1fr))}
@@ -908,7 +923,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="backend.js?v=ad00b55c"></script>
+<script src="backend.js?v=2c641cc1"></script>
 <style>
 #fbGate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--desk)}
 #fbGate .fbbox{background:var(--paper);border-radius:22px;padding:36px 32px;text-align:center;box-shadow:0 18px 40px -24px rgba(20,40,25,.35);max-width:340px}
@@ -916,6 +931,8 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 #fbImport{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:70;display:flex;gap:14px;align-items:center;max-width:min(640px,calc(100vw - 24px));
   padding:12px 14px 12px 18px;border-radius:16px;background:var(--forest);color:#fff;box-shadow:0 12px 30px -12px rgba(0,0,0,.45)}
 #fbImport small{opacity:.8}#fbImport .btn{flex:none}
+#fbReauth{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:80;display:flex;gap:12px;align-items:center;padding:10px 12px 10px 18px;border-radius:999px;background:var(--forest);color:#fff;box-shadow:0 12px 30px -12px rgba(0,0,0,.45);font-size:.86rem;max-width:calc(100vw - 24px)}
+#fbReauth .btn{flex:none}
 </style>
 <script id="errTrap">
 // 화면이 멈추면 원인을 상태 줄에 보여 줌 (본 스크립트의 문법 오류까지 잡도록 따로 둠)
@@ -1400,7 +1417,7 @@ function attDocs(){
     const rows = D.recs.filter(r => (!stu.value || r.name === stu.value) && (!t || (r.name + " " + r.type + " " + r.reason + " " + r.num).toLowerCase().includes(t))
       && (!s.value || !e.value || (r.startDate >= s.value && r.startDate <= e.value)) && (!hide.checked || pendingOf(r).length)).sort(cmp);
     if(!rows.length) return list.replaceChildren(el("p",{className:"hint"}, hide.checked ? "안 낸 서류가 없어요." : "조건에 맞는 기록이 없어요."));
-    list.replaceChildren(el("div",{className:"tt-wrap"}, el("table",{className:"plan doctable"},
+    list.replaceChildren(el("div",{className:"tt-wrap"}, colResize(el("table",{className:"plan doctable"},
       el("thead",{}, el("tr",{}, th("date", "날짜/기간", "16%"), th("num", "이름", "13%"), th("type", "출결(교시)", "24%"), th("", "사유", "19%"), th("", "서류 상태 (클릭)"))),
       el("tbody",{}, ...rows.map(r => { const tr = el("tr",{className:"click"},
         el("td",{}, dayLabel(parseYmd(r.startDate)) + (r.endDate && r.endDate !== r.startDate ? " ~ " + dayLabel(parseYmd(r.endDate)) : "")),
@@ -1409,7 +1426,7 @@ function attDocs(){
         el("td",{className:"rsn"}, r.reason || ""),
         el("td",{}, el("div",{className:"docrow"}, ...splitDocs(r.doc).map(d => { const b = el("button",{type:"button",className:"docbtn" + (r.docStatus[d] === true ? " done" : ""),disabled:!canWrite()}, d);
           b.onclick = ev => { ev.stopPropagation(); attDo("attDoc", [r.id, { ...r.docStatus, [d]:r.docStatus[d] !== true }]).catch(() => {}); }; return b; }))));
-        tr.style.setProperty("--c", typeColor(r.type)); tr.onclick = () => attEdit(r); return tr; }))))); };
+        tr.style.setProperty("--c", typeColor(r.type)); tr.onclick = () => attEdit(r); return tr; }))), "doc"))); };
   q.oninput = () => { att.docQ = q.value; draw(); }; [s, e, stu].forEach(x => { x.onchange = () => { att.docS = s.value; att.docE = e.value; att.docStu = stu.value; draw(); }; }); hide.onchange = () => { att.docHide = hide.checked; draw(); };
   draw();
   const trash = el("details",{className:"notes trash"}, el("summary",{}, "휴지통 ", el("small",{className:"hint"}, D.trash.length + "개")),
@@ -1456,8 +1473,8 @@ function attCal(){
       el("div",{className:"calmonth"}, ...["월","화","수","목","금"].map(w => el("div",{className:"calwd"}, w)), ...cells)),
     el("section",{className:"notes"}, el("div",{className:"panel-head"}, el("h3",{className:"nt-title"}, "월별 출결 통계"), el("div",{className:"tt-tools"}, ss, el("span",{}, "~"), se)),
       el("p",{className:"hint"}, "같은 날 출결이 여러 개면 하루 대표 출결 하나만 세요: 결석 우선 → 사유 " + reasonOrder().join(" > ") + " → 빠진 교시 많은 순 → 종류 " + tieOrder().join(" > ") + ". 총계는 인정 출결을 빼요. 이름을 누르면 자세히 보여요."),
-      el("div",{className:"tt-wrap"}, el("table",{className:"plan attstat"}, el("thead",{}, el("tr",{}, el("th",{rowSpan:2}, "성명"), ...BIG.map(b => el("th",{colSpan:4,className:"c"}, b)), ...BIG.map(b => el("th",{rowSpan:2,className:"c tot"}, b + " 총계"))),
-        el("tr",{}, ...BIG.flatMap(() => SUB.map(sb => el("th",{className:"c sub"}, sb))))), el("tbody",{}, ...statRows)))));
+      el("div",{className:"tt-wrap"}, colResize(el("table",{className:"plan attstat"}, el("thead",{}, el("tr",{}, el("th",{rowSpan:2}, "성명"), ...BIG.map(b => el("th",{colSpan:4,className:"c"}, b)), ...BIG.map(b => el("th",{rowSpan:2,className:"c tot"}, b + " 총계"))),
+        el("tr",{}, ...BIG.flatMap(() => SUB.map(sb => el("th",{className:"c sub"}, sb))))), el("tbody",{}, ...statRows)), "stat"))));
 }
 // 4. 누적 통계 & 알림
 function attStats(){
@@ -1495,6 +1512,18 @@ function attHoli(){
     el("p",{className:"hint"}, "여기 있는 날과 주말, 교무수첩 학사일정의 공휴일·재량휴업일·방학은 결석 일수 계산에서 빠져요. 교무수첩의 쉬는 날은 학급 출결을 열 때 알아서 더해져요."),
     el("div",{className:"attrow"}, name, s, el("span",{}, "~"), e, add),
     attHoliCal(list)));
+}
+function colResize(table, key){
+  const ths = [...table.querySelectorAll("thead tr:first-child th")], k = "colw:" + key;
+  let saved = {}; try{ saved = JSON.parse(localStorage.getItem(k) || "{}"); }catch{}
+  ths.forEach((th, i) => { if(saved[i]) th.style.width = saved[i] + "px"; if(i === ths.length - 1) return;
+    const h = el("span",{className:"colres",title:"끌어서 열 폭 조절 (두 번 누르면 처음대로)"}); th.append(h);
+    h.onclick = ev => ev.stopPropagation();
+    h.ondblclick = ev => { ev.stopPropagation(); try{ localStorage.removeItem(k); }catch{} ths.forEach(t => { t.style.width = ""; }); };
+    h.onpointerdown = ev => { ev.preventDefault(); ev.stopPropagation(); h.setPointerCapture(ev.pointerId); const x0 = ev.clientX, w0 = th.offsetWidth; table.style.tableLayout = "fixed";
+      h.onpointermove = e => { th.style.width = Math.max(48, w0 + e.clientX - x0) + "px"; };
+      h.onpointerup = () => { h.onpointermove = h.onpointerup = null; const o = {}; ths.forEach((t, j) => { if(t.style.width) o[j] = parseInt(t.style.width); }); try{ localStorage.setItem(k, JSON.stringify(o)); }catch{} }; }; });
+  return table;
 }
 // 쉬는 날 달력 (월~금, 한 달씩). 출결 시트의 쉬는 날은 눌러서 지울 수 있음, 교무수첩 쉬는 날은 표시만
 function attHoliCal(list){
