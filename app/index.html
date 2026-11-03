@@ -700,6 +700,9 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
   font-size:.84rem;font-weight:600;text-decoration:none;cursor:pointer;max-width:16em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:1px solid rgba(255,255,255,.14)}
 .hdrpin::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:var(--c)}
 .hdrpin:hover,.hdrpin:focus-visible{background:rgba(255,255,255,.2)}
+.hdrapp{background:var(--lime);color:var(--forest-ink);border-color:transparent;font-weight:700;order:-1;margin-right:6px}
+.hdrapp::before{display:none}
+.hdrapp:hover,.hdrapp:focus-visible{background:var(--lime);filter:brightness(1.06)}
 @media (max-width:640px){.hdr-pins{justify-content:flex-start}}
 /* 달력의 오늘: 칸은 민트 면 + 위쪽 연두 줄, 날짜는 다른 날과 같은 자리에 숲색 동그라미 */
 .bigcal .grid>.now{background:var(--mint);border-radius:0;box-shadow:inset 0 3px 0 var(--lime);padding:3px 4px}
@@ -991,7 +994,7 @@ function renderExt(x){
 }
 function setCover(){ const a = areaOf(tab); $("book").style.setProperty("--cover", a ? cloth(a.color) : "var(--slate)"); }
 function renderTabs(){
-  const tabs = [["home","오늘"], ...config.areas.map(a => [a.id, a.name]), ...EXT_TABS.map(x => [x.id, x.name]), ["settings","설정"]];
+  const tabs = [["home","오늘"], ...config.areas.map(a => [a.id, a.name]), ...EXT_TABS.filter(x => x.embed).map(x => [x.id, x.name]), ["settings","설정"]];
   $("tabs").replaceChildren(...tabs.map(([k,n]) => {
     const b = el("button",{type:"button",role:"tab",className:k==="settings"?"gear":""}, n);
     b.setAttribute("aria-selected", k === tab);
@@ -1476,7 +1479,9 @@ function starBtn(it){
 // 바로 가기: 맨 위 '나의 교무수첩' 오른편 (어느 탭에서나)
 function renderHdrPins(){
   const list = items.filter(i => i.pinned === true).sort((a, b) => a.title.localeCompare(b.title, "ko"));
-  $("hdrPins").replaceChildren(...(list.length ? [el("span",{className:"hdr-label"}, "바로 가기"), ...list.map(it => {
+  // 따로 쓰는 앱(학급 출결)은 화면 안에 못 넣으면 탭 대신 여기서 한 번에 새 창으로
+  const apps = EXT_TABS.filter(x => !x.embed).map(x => el("a",{className:"hdrpin hdrapp",href:x.url,target:"_blank",rel:"noopener noreferrer",title:(x.note || x.name) + " (새 창)"}, x.name + " ↗"));
+  $("hdrPins").replaceChildren(...apps, ...(list.length ? [el("span",{className:"hdr-label"}, "바로 가기"), ...list.map(it => {
     const a = areaOf(it.area), href = hrefOf(it);
     const l = el(href ? "a" : "span",{className:"hdrpin",href:href || undefined,target:"_blank",rel:"noopener noreferrer",title:(a ? a.name : "") + (it.note ? " · " + it.note : "")}, it.title);
     l.style.setProperty("--c", a ? cloth(a.color) : "var(--slate)");
