@@ -763,6 +763,7 @@ button.dcard{cursor:pointer}
 .calday.holi,.calcell.holi{background:color-mix(in srgb,var(--sun) 6%,var(--paper));border-style:dashed}
 .calhd{display:flex;gap:5px;flex-wrap:wrap;align-items:baseline;font-weight:700;font-size:.82rem}.calhd small{font-weight:500;color:var(--sun);font-size:.68rem}.calhd .cnt{color:var(--danger)}
 .calitem{display:grid;text-align:left;font:inherit;font-size:.74rem;line-height:1.35;padding:6px 8px;border:0;border-left:3px solid var(--c);border-radius:8px;background:var(--paper);color:var(--ink);cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.docpair{display:inline-flex;align-items:center;gap:1px}.docdel{border:0;background:none;color:var(--muted);cursor:pointer;font-size:1rem;line-height:1;padding:2px 5px;border-radius:999px}.docdel:hover{color:var(--danger);background:var(--paper2)}
 .alertpair{display:inline-flex}.alertpair>.kbtn.alert{border-radius:999px 0 0 999px}.alertpair>.alertone{border-radius:0 999px 999px 0;border-left:0;padding:6px 10px;min-width:0}
 .calitem>*{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}/* 늘 세 줄: 이름 / 출결(교시) / 사유 */
 .calitem .ty{color:var(--c);font-weight:700}.calitem small{color:var(--danger)}.calitem small.hint{color:var(--muted)}
@@ -1270,6 +1271,12 @@ async function loadAtt(){
   att.loading = false; if(tab === "attend") renderAttend();
 }
 // 시트에 쓰고 새 내용으로 다시 그림
+// 서류 단추: 누르면 냄/안 냄, ×는 이 기록에서 서류 빼기
+function docChip(d, done, toggle, del){
+  const b = el("button",{type:"button",className:"docbtn" + (done ? " done" : ""),title:"눌러서 제출 표시"}, d); b.onclick = toggle;
+  const x = el("button",{type:"button",className:"docdel",title:d + " 빼기","aria-label":d + " 빼기"}, "×"); x.onclick = del;
+  return el("span",{className:"docpair"}, b, x);
+}
 // 종류 단추 줄: 이름 앞부분(미인정·질병·인정·기타)이 같으면 한 줄, 아니면 시트의 그룹대로
 const typeRow = t => (/^(미인정|질병|인정|기타)/.exec(t.name) || [])[1] || t.group;
 // 화면에 먼저 반영하고 시트 저장은 뒤에서 (실패하면 알리고 시트에서 다시 읽음)
@@ -1319,7 +1326,7 @@ function attInput(){
     perBox.replaceChildren(...[0, ...range1(1, f.maxP), 99].map(p => { const b = el("button",{type:"button",className:"kbtn pbtn","aria-pressed":String(f.ps.includes(p)),disabled:!f.type || ab}, PN(p));
       b.onclick = () => { f.ps = clickPeriod(f.ps, p, f.type, f.maxP); drawPer(); }; return b; }),
       navBtn("+", () => { f.maxP++; drawPer(); }, "교시 하나 더"), navBtn("−", () => { f.maxP = Math.max(1, f.maxP - 1); f.ps = f.ps.filter(p => p <= f.maxP || p === 99); drawPer(); }, "교시 하나 빼기")); };
-  const drawDocs = () => docBox.replaceChildren(...(f.docs.length ? f.docs.map(d => { const b = el("button",{type:"button",className:"docbtn" + (f.st[d] ? " done" : ""),title:"눌러서 제출 표시"}, d); b.onclick = () => { f.st[d] = !f.st[d]; drawDocs(); }; return b; }) : [el("span",{className:"hint"}, "서류 없음")]),
+  const drawDocs = () => docBox.replaceChildren(...(f.docs.length ? f.docs.map(d => docChip(d, f.st[d], () => { f.st[d] = !f.st[d]; drawDocs(); }, () => { f.docs = f.docs.filter(x => x !== d); delete f.st[d]; drawDocs(); })) : [el("span",{className:"hint"}, "서류 없음")]),
     navBtn("+ 서류", () => { const n = prompt("추가할 서류 이름"); if(n && n.trim() && !f.docs.includes(n.trim())){ f.docs.push(n.trim()); drawDocs(); } }, "서류 더하기"));
   const reason = el("input",{type:"text",className:"field",value:f.reason,maxLength:300,placeholder:"사유","aria-label":"사유"});
   s.onchange = () => { f.s = s.value; f.maxP = maxPOf(s.value || today); if(/결석/.test(f.type)) f.ps = [0, ...range1(1, f.maxP), 99]; drawPer(); };
@@ -1377,7 +1384,7 @@ function attEdit(r){
   const drawT = () => typeBox.replaceChildren(...[...new Set(D.types.map(typeRow))].map(gr => el("div",{className:"tgroup"}, ...D.types.filter(t => typeRow(t) === gr).map(t => chipBtn(t.name, typeColor(t.name), g.type === t.name, () => {
     g.type = t.name; g.ps = /결석/.test(g.type) ? [0, ...range1(1, g.maxP), 99] : []; g.docs = splitDocs(t.doc); g.st = {}; drawT(); drawP(); drawD(); })))));
   const drawP = () => perBox.replaceChildren(...[0, ...range1(1, g.maxP), 99].map(p => { const b = el("button",{type:"button",className:"kbtn pbtn","aria-pressed":String(g.ps.includes(p)),disabled:/결석/.test(g.type)}, PN(p)); b.onclick = () => { g.ps = clickPeriod(g.ps, p, g.type, g.maxP); drawP(); }; return b; }));
-  const drawD = () => docBox.replaceChildren(...g.docs.map(d => { const b = el("button",{type:"button",className:"docbtn" + (g.st[d] ? " done" : "")}, d); b.onclick = () => { g.st[d] = !g.st[d]; drawD(); }; return b; }),
+  const drawD = () => docBox.replaceChildren(...g.docs.map(d => docChip(d, g.st[d], () => { g.st[d] = !g.st[d]; drawD(); }, () => { g.docs = g.docs.filter(x => x !== d); delete g.st[d]; drawD(); })),
     navBtn("+ 서류", () => { const n = prompt("추가할 서류 이름"); if(n && n.trim() && !g.docs.includes(n.trim())){ g.docs.push(n.trim()); drawD(); } }, "서류 더하기"));
   s.onchange = () => { g.s = s.value; g.maxP = maxPOf(s.value); drawP(); }; drawT(); drawP(); drawD();
   const rec = () => { const [num, name] = stu.value.split("|"); return { startDate:s.value, endDate:e.value && e.value !== s.value ? e.value : "", num, name, type:g.type, period:/결석/.test(g.type) ? "종일" : periodText(g.ps, g.type), reason:reason.value.trim(), doc:g.docs.join(", "), docStatus:Object.fromEntries(g.docs.map(d => [d, !!g.st[d]])) }; };
