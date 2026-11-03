@@ -26,17 +26,27 @@
     let g = document.getElementById("fbGate");
     if (!g) {
       g = document.createElement("div"); g.id = "fbGate";
-      g.innerHTML = '<div class="fbbox"><h1>나의 교무수첩</h1><p class="fbmsg"></p><button type="button" class="btn" id="fbLogin">구글로 로그인</button></div>';
+      g.innerHTML = '<div class="fbbox"><h1>나의 교무수첩</h1><p class="fbmsg"></p><button type="button" class="btn" id="fbLogin">구글로 로그인</button>' +
+        '<p class="fbalt" hidden><button type="button" class="btn ghost small" id="fbRedirect">이 창에서 로그인하기</button></p></div>';
       document.body.append(g);
       g.querySelector("#fbLogin").onclick = login;
+      g.querySelector("#fbRedirect").onclick = () => { const p = new firebase.auth.GoogleAuthProvider(); SCOPES.forEach(s => p.addScope(s)); auth.signInWithRedirect(p); };
     }
     g.hidden = !show; g.querySelector(".fbmsg").textContent = msg || "선생님 구글 계정으로 들어가요.";
   }
   async function login() {
     const p = new firebase.auth.GoogleAuthProvider(); SCOPES.forEach(s => p.addScope(s));
     try { const r = await auth.signInWithPopup(p); token = r.credential && r.credential.accessToken; tokenAt = Date.now(); }
-    catch (e) { gate(true, e.code === "auth/popup-blocked" ? "팝업이 막혔어요. 주소창 오른쪽에서 팝업을 허용해 주세요." : "로그인하지 못했어요: " + (e.message || e.code)); }
+    catch (e) {
+      // 팝업이 막히면 이 창에서 구글 로그인 화면으로 넘어갔다 돌아오는 방법을 보여 줌
+      const blocked = e.code === "auth/popup-blocked" || e.code === "auth/cancelled-popup-request" || e.code === "auth/popup-closed-by-user";
+      gate(true, blocked ? "로그인 창(팝업)이 막혔어요. 주소창 오른쪽 끝의 팝업 차단 아이콘에서 '항상 허용'을 고르고 다시 누르거나, 아래 버튼을 눌러 주세요."
+        : e.code === "auth/unauthorized-domain" ? "Firebase 승인된 도메인에 uzzint.github.io 가 없어요." : "로그인하지 못했어요: " + (e.message || e.code));
+      document.querySelector("#fbGate .fbalt").hidden = false;
+    }
   }
+  // 이 창에서 로그인하고 돌아왔을 때 구글 열쇠 받기
+  auth.getRedirectResult().then(r => { if (r && r.credential) { token = r.credential.accessToken; tokenAt = Date.now(); } }).catch(e => gate(true, "로그인하지 못했어요: " + (e.message || e.code)));
   auth.onAuthStateChanged(async u => {
     if (!u) { uid = null; gate(true); return; }
     uid = u.uid; gate(false);
