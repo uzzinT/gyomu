@@ -735,7 +735,11 @@ dialog::backdrop{background:rgba(16,32,21,.45);backdrop-filter:blur(2px)}
   nav button,.attseg button,.kbtn,.chip,.btn,.small,.navbtn{justify-content:center;text-align:center}
   /* 오늘 화면: 칸을 한 줄로 늘어놓고 정한 순서대로 */
   /* 오늘 화면(휴대폰): PC의 가운데(지금 수업·시간표) → 왼쪽(날짜·할 일·조종례) → 오른쪽(달력·이번 주) */
-  .home4{display:flex!important;flex-direction:column}.home4>.col:nth-child(2){order:1}.home4>.col:nth-child(1){order:2}.home4>.col:nth-child(3){order:3}
+  .home4{display:flex!important;flex-direction:column;gap:14px!important}.home4>.col{display:contents}
+  .home4>.col>*{order:2;width:100%!important;max-width:none!important;margin:0!important;box-sizing:border-box}
+  .home4>.col:nth-child(2)>*{order:1}.home4>.col:nth-child(3)>*{order:3}
+  /* 날짜·D-day 는 늘 맨 위 */
+  .home4 .datebox{order:-2!important}.home4 .dues{order:-1!important}
   /* 탭 단추는 글자 너비대로, 넘치면 다음 줄 (글자가 잘리거나 치우치지 않게) */
   /* 탭은 한 줄에 모두: 글자 너비대로 나눠 갖고, 아주 좁으면 그 줄만 좌우로 밀기 */
   nav{flex-wrap:nowrap!important;gap:3px!important;overflow-x:auto;scrollbar-width:none}nav::-webkit-scrollbar{display:none}
