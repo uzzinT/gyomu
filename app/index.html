@@ -245,6 +245,10 @@ nav{margin-bottom:14px}
 .kids button.ph b::after{content:" ●";color:var(--green);font-size:.55rem}
 .kidphoto{display:block;max-width:100%;max-height:60vh;margin:6px auto;border-radius:8px}
 .fcol{display:grid;gap:16px;align-content:start}
+.kidtels{display:grid;gap:4px;margin:8px 0}
+.kidtel{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.kidtel span{min-width:4em;color:var(--muted);font-size:.85rem}
+.kidtel a{text-decoration:none;padding:4px 8px;border:1px solid var(--line);border-radius:6px;color:var(--ink)}
 .now .free{margin:4px 0 10px;padding:10px 14px;border-radius:10px;font-size:1.15rem;font-weight:700;color:var(--green);background:color-mix(in srgb,var(--green) 14%,var(--paper))}
 .now .free{word-break:keep-all}
 .now .free b{display:block}
@@ -619,7 +623,7 @@ tr.logrow:hover td{background:var(--paper2)}
   .btn.small{min-height:32px}
   #dayDlg .daybox{padding:14px}
   dialog{width:calc(100vw - 16px);max-height:calc(100dvh - 16px)}
-  .kids{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .kids{grid-template-columns:repeat(5,minmax(0,1fr))}
   .attbar .field{flex:1 1 8em}
   .att .field{font-size:.8rem}
   .devs{font-size:1rem}
@@ -1204,7 +1208,7 @@ const pad2a = n => String(n).padStart(2, "0");
 const stuLabel = (num, name) => (isNaN(parseInt(num)) ? "?" : pad2a(parseInt(num))) + ". " + name;
 // 학생 단추: 번호는 위에 작게, 이름은 아래에 (이름이 잘리지 않게)
 const kidLabel = k => [el("small",{}, isNaN(parseInt(k.num)) ? "?" : pad2a(parseInt(k.num))), el("span",{}, k.name)];
-const splitDocs = s => String(s || "").split(",").map(x => x.trim()).filter(Boolean);
+const splitDocs = s => [...new Set(String(s || "").split(/[,，、]/).map(x => x.trim()).filter(Boolean))]; // 쉼표(,，、)마다 서류 하나
 const attSY = () => { const d = new Date(); return d.getMonth() < 2 ? d.getFullYear() - 1 : d.getFullYear(); };
 function attParse(t){
   const ui = (t["화면설정"] || []).slice(1), colors = {}, statRules = {};
@@ -1379,7 +1383,7 @@ function attInput(){
       b.onclick = () => { f.ps = clickPeriod(f.ps, p, f.type, f.maxP); drawPer(); }; return b; }),
       navBtn("+", () => { f.maxP++; drawPer(); }, "교시 하나 더"), navBtn("−", () => { f.maxP = Math.max(1, f.maxP - 1); f.ps = f.ps.filter(p => p <= f.maxP || p === 99); drawPer(); }, "교시 하나 빼기")); };
   const drawDocs = () => docBox.replaceChildren(...(f.docs.length ? f.docs.map(d => docChip(d, f.st[d], () => { f.st[d] = !f.st[d]; drawDocs(); }, () => { f.docs = f.docs.filter(x => x !== d); delete f.st[d]; drawDocs(); })) : [el("span",{className:"hint"}, "서류 없음")]),
-    navBtn("+ 서류", () => { const n = prompt("추가할 서류 이름"); if(n && n.trim() && !f.docs.includes(n.trim())){ f.docs.push(n.trim()); drawDocs(); } }, "서류 더하기"));
+    navBtn("+ 서류", () => { const n = splitDocs(prompt("추가할 서류 이름 (여러 개면 쉼표로: 출결신고서, 병원서류)")).filter(d => !f.docs.includes(d)); if(n.length){ f.docs.push(...n); drawDocs(); } }, "서류 더하기"));
   const reason = el("input",{type:"text",className:"field",value:f.reason,maxLength:300,placeholder:"사유","aria-label":"사유"});
   s.onchange = () => { f.s = s.value; f.maxP = maxPOf(s.value || today); if(/결석/.test(f.type)) f.ps = [0, ...range1(1, f.maxP), 99]; drawPer(); };
   e.onchange = () => { f.e = e.value; }; reason.oninput = () => { f.reason = reason.value; };
@@ -1439,7 +1443,7 @@ function attEdit(r){
     g.type = t.name; g.ps = /결석/.test(g.type) ? [0, ...range1(1, g.maxP), 99] : []; g.docs = splitDocs(t.doc); g.st = {}; drawT(); drawP(); drawD(); })))));
   const drawP = () => perBox.replaceChildren(...[0, ...range1(1, g.maxP), 99].map(p => { const b = el("button",{type:"button",className:"kbtn pbtn","aria-pressed":String(g.ps.includes(p)),disabled:/결석/.test(g.type)}, PN(p)); b.onclick = () => { g.ps = clickPeriod(g.ps, p, g.type, g.maxP); drawP(); }; return b; }));
   const drawD = () => docBox.replaceChildren(...g.docs.map(d => docChip(d, g.st[d], () => { g.st[d] = !g.st[d]; drawD(); }, () => { g.docs = g.docs.filter(x => x !== d); delete g.st[d]; drawD(); })),
-    navBtn("+ 서류", () => { const n = prompt("추가할 서류 이름"); if(n && n.trim() && !g.docs.includes(n.trim())){ g.docs.push(n.trim()); drawD(); } }, "서류 더하기"));
+    navBtn("+ 서류", () => { const n = splitDocs(prompt("추가할 서류 이름 (여러 개면 쉼표로: 출결신고서, 병원서류)")).filter(d => !g.docs.includes(d)); if(n.length){ g.docs.push(...n); drawD(); } }, "서류 더하기"));
   s.onchange = () => { g.s = s.value; g.maxP = maxPOf(s.value); drawP(); }; drawT(); drawP(); drawD();
   const rec = () => { const [num, name] = stu.value.split("|"); return { startDate:s.value, endDate:e.value && e.value !== s.value ? e.value : "", num, name, type:g.type, period:/결석/.test(g.type) ? "종일" : periodText(g.ps, g.type), reason:reason.value.trim(), doc:g.docs.join(", "), docStatus:Object.fromEntries(g.docs.map(d => [d, !!g.st[d]])) }; };
   const save = el("button",{type:"button",className:"btn",disabled:!canWrite()}, "수정");
@@ -3347,7 +3351,12 @@ function openKid(no){
   const box = el("div",{}, el("p",{className:"note"}, s.photo ? "사진 불러오는 중…" : "아직 사진이 없어요."));
   if(s.photo) call("getStudentPhoto", s.photo).then(src => { if(typeof src === "string" && src.startsWith("data:image/")) box.replaceChildren(el("img",{className:"kidphoto",src,alt:s.name + " 사진"})); })
     .catch(e => box.replaceChildren(el("p",{className:"note"}, e?.message || "사진을 불러오지 못했어요.")));
-  const kids = [box];
+  // 연락처: 누르면 전화·문자 (휴대폰에서)
+  const num = p => String(p || "").replace(/[^\d+]/g, ""), call1 = (label, p) => num(p) ? el("div",{className:"kidtel"}, el("span",{}, label),
+    el("a",{href:"tel:" + num(p)}, "📞 " + p), el("a",{href:"sms:" + num(p)}, "💬 문자")) : null;
+  const tels = [call1("학생", s.phone), ...(s.parents || []).map(p => call1(p.rel || "보호자", p.phone))].filter(Boolean);
+  const kids = [box, tels.length ? el("div",{className:"kidtels"}, ...tels) : el("p",{className:"hint"}, "연락처가 없어요. (명단 설정에서 넣을 수 있어요)")];
+  if(window.fbCall) kids.push(el("div",{className:"actions"}, navBtn("🔔 개별 알림 보내기", () => { $("dayDlg").close(); openStudentMsg(null, { nos:[s.no] }); }, s.name + "에게 알림 앱 개별 알림")));
   if(canWrite()){
     const file = el("input",{type:"file",accept:"image/*",hidden:true});
     file.onchange = async () => { const f = file.files[0]; file.value = ""; if(f && await uploadKidPhotos([f], s)) openKid(no); };
@@ -4111,7 +4120,7 @@ function openRosterView(){
 
 // 영역 탭 위쪽 핵심 기능 (오늘 탭은 이것들을 모아 보여 줌)
 const FEATURES = {
-  class: () => homeroom() ? [renderClassSetup(), renderClassTT(), el("div",{className:"fcol"}, renderNotes(), renderChecks())].filter(Boolean) : [], // 제출물은 조·종례 아래
+  class: () => homeroom() ? [el("div",{className:"fcol"}, renderNotes(), renderChecks()), renderClassTT(), renderClassSetup()].filter(Boolean) : [], // 왼쪽 조·종례(아래 제출물), 가운데 시간표, 오른쪽 우리 반 명단
   subject: () => [el("div",{className:"subjwrap"}, renderMyClasses(), renderTT())], // 왼쪽 내 수업 카드, 오른쪽 시간표
   admin: () => [renderCal(), renderWeek()],
 };
