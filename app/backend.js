@@ -915,36 +915,66 @@
         done: chk.filter(x => (x.done || []).includes(n)).map(x => x.id) };
       await noticeDoc().collection("students").doc(a.hb).set({ v: JSON.stringify(my), at: Date.now() }, { merge: true });
     }
+    await publishDrive({ cls: c.homeroomClass || "", notes, events, checks, tt: tt && Array.isArray(tt.cells) ? { periods: Number(tt.periods) || tt.cells.length, cells: tt.cells } : null, bells, ui: cfgGet("noticeUi") || null }, chk);
     if (problems.length) console.warn("학생 계정을 만들지 못한 번호:", problems.join(", "));
     return problems;
+  }
+  // ---------- 우리 반 알림 앱 자료를 드라이브의 '우리 반 알림 자료' 시트로 (앱스 스크립트 창구가 읽어 학생 한 명 몫만 줌) ----------
+  // 비밀번호는 그대로 두지 않고 해시만. 시트 '자료' 탭 A열에 JSON 을 4만 자씩 나눠 씀, '기기' 탭은 창구가 휴대폰 알림 등록을 씀
+  const NOTICE_BOOK = "1Dfh1QpEk2-SsDOpQi07ZJHoZhSl7ORpLEXhZjTvG6uY";
+  let noticeTabsOk = false;
+  const sha = async s => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)))].map(x => x.toString(16).padStart(2, "0")).join("");
+  async function publishDrive(shared, chk) {
+    if (!noticeTabsOk) { const have = (await tabsOf(NOTICE_BOOK)).map(x => x.title), miss = ["자료", "기기"].filter(n => !have.includes(n));
+      if (miss.length) await sheetUpdate(NOTICE_BOOK, miss.map(n => ({ addSheet: { properties: { title: n } } })));
+      if (miss.includes("기기")) await putRange(NOTICE_BOOK, "'기기'!A1", [["학번", "알림 열쇠", "등록 시각"]]);
+      noticeTabsOk = true; }
+    let salt = cfgGet("pubSalt"); if (!salt) { salt = uuid(); await cfgPut({ pubSalt: salt }); }
+    const pwAll = cfgGet("stuPw") || {}, stt = cfgGet("studentTT") || {}, roster = cfgGet("students") || [], att = cfgGet("pubAtt") || {}, old = Date.now() - 90 * 864e5, kids = {}, pw = {};
+    for (const no of Object.keys(pwAll)) {
+      const hb = hakbunOf(no), n = Number(no), s = roster.find(k => k.no === n); if (!hb || !String(pwAll[no] || "").trim()) continue;
+      pw[hb] = await sha(salt + ":" + hb + ":" + String(pwAll[no]).trim());
+      kids[hb] = { hb, no: n, name: (s && s.name) || (stt[no] && stt[no].name) || "", cells: stt[no] && Array.isArray(stt[no].cells) ? stt[no].cells : null,
+        msgs: get("pmsg").filter(m => m.no === n && m.at > old).sort((x, y) => y.at - x.at).slice(0, 50).map(m => ({ text: m.text, at: m.at })),
+        done: chk.filter(x => (x.done || []).includes(n)).map(x => x.id), att: att[hb] || [] };
+    }
+    const tp = String(cfgGet("noticeTeacherPw") || "").trim();
+    const text = JSON.stringify({ v: 1, at: Date.now(), salt, pw, teacher: tp ? await sha(salt + ":teacher:" + tp) : "", shared, kids }), rows = [];
+    for (let i = 0; i < text.length; i += 40000) rows.push([text.slice(i, i + 40000)]);
+    await clearRange(NOTICE_BOOK, "'자료'!A:A"); await putRange(NOTICE_BOOK, "'자료'!A1", rows);
   }
   let pubTimer = null;
   const schedulePublish = () => { clearTimeout(pubTimer); pubTimer = setTimeout(() => publishNotice().catch(e => console.warn("알림 앱 내보내기", e)), 2500); };
   // 학급 출결 → 학생 몫에 출결 기록 (사유 빼고: 날짜·종류·교시·수업일 수)
   let attPubKey = "";
   async function publishAtt(tabs) {
-    const acct = cfgGet("stuAcct") || {}; if (!Object.keys(acct).length) return;
+    const acct = cfgGet("stuAcct") || {}, pwAll = cfgGet("stuPw") || {}; if (!Object.keys(pwAll).length && !Object.keys(acct).length) return;
     const recs = (tabs["출결기록"] || []).slice(1).filter(r => r[0] && r[3]), key = JSON.stringify(recs.map(r => r.slice(0, 6))) + JSON.stringify(tabs["학사일정"] || []);
     if (key === attPubKey) return; attPubKey = key;
     const holi = (tabs["학사일정"] || []).slice(1).filter(r => r[0]).map(r => ({ s: normD(r[1]), e: normD(r[2]) || normD(r[1]) }));
     const bookHoli = new Set(get("events").filter(e => !e.cat && HOLI_RE.test(String(e.title).replace(/\([^)]*\)/g, ""))).map(e => e.date));
     const school = k => { const w = new Date(k + "T12:00:00").getDay(); return w > 0 && w < 6 && !bookHoli.has(k) && !holi.some(h => k >= h.s && k <= h.e); };
     const days = (s, e) => { let n = 0; for (let d = new Date(s + "T12:00:00"); ymd(d) <= e && n < 400; d.setDate(d.getDate() + 1)) if (school(ymd(d))) n++; return n || 1; };
-    for (const no of Object.keys(acct)) {
+    const pubAtt = {};
+    for (const no of new Set([...Object.keys(acct), ...Object.keys(pwAll)])) {
       const list = recs.filter(r => Number(r[2]) === Number(no)).map(r => { const s = normD(r[0]), e = normD(r[1]) || s; return { s, e, type: r[4] || "", period: r[5] || "", days: days(s, e) }; }).sort((a, b) => b.s.localeCompare(a.s));
-      await noticeDoc().collection("students").doc(acct[no].hb).set({ att: JSON.stringify(list), attAt: Date.now() }, { merge: true });
+      if (hakbunOf(no)) pubAtt[hakbunOf(no)] = list;
+      if (acct[no]) await noticeDoc().collection("students").doc(acct[no].hb).set({ att: JSON.stringify(list), attAt: Date.now() }, { merge: true });
     }
+    await cfgPut({ pubAtt }); schedulePublish(); // 드라이브 알림 자료에도 (출결을 안 연 날에도 남게 교무수첩 자료에 둠)
   }
   // 휴대폰 알림 (FCM): 그 학생들 기기로. 선생님 구글 로그인 열쇠로 바로 보냄
   async function pushTo(nos, title, body) {
-    const acct = cfgGet("stuAcct") || {}, hbs = new Set(nos.map(n => (acct[n] || {}).hb).filter(Boolean)); if (!hbs.size) return 0;
+    const hbs = new Set(nos.map(n => hakbunOf(n)).filter(Boolean)); if (!hbs.size) return 0;
     const snap = await noticeDoc().collection("push").get(), targets = []; snap.forEach(d => { const x = d.data(); if (x.token && hbs.has(x.hakbun)) targets.push({ id: d.id, token: x.token }); });
+    // 창구(앱스 스크립트)가 드라이브 시트 '기기' 탭에 적어 둔 휴대폰도 (같은 열쇠는 한 번만)
+    try { ((await batchGet(NOTICE_BOOK, ["'기기'!A2:B2000"], "FORMATTED_VALUE"))[0] || []).forEach(r => { if (r[1] && hbs.has(String(r[0])) && !targets.some(x => x.token === r[1])) targets.push({ id: "", token: String(r[1]) }); }); } catch (e) {}
     let sent = 0;
     for (const t of targets) {
       const r = await fetch("https://fcm.googleapis.com/v1/projects/" + FB.projectId + "/messages:send", { method: "POST", headers: { Authorization: "Bearer " + await gtoken(), "Content-Type": "application/json" },
         body: JSON.stringify({ message: { token: t.token, notification: { title, body: body.slice(0, 180) }, webpush: { fcm_options: { link: PWA_URL } } } }) });
       if (r.ok) sent++;
-      else if (r.status === 404 || r.status === 400) await noticeDoc().collection("push").doc(t.id).delete().catch(() => {}); // 지운 기기
+      else if ((r.status === 404 || r.status === 400) && t.id) await noticeDoc().collection("push").doc(t.id).delete().catch(() => {}); // 지운 기기
       else if (r.status === 401 || r.status === 403) { token = null; throw new Error("휴대폰 알림을 보내려면 구글 확인을 한 번 더 받아야 해요. 다시 보내기를 눌러 주세요."); }
     }
     return sent;
