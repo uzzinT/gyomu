@@ -1327,7 +1327,7 @@ function docChip(d, done, toggle, del){
   return el("span",{className:"docpair"}, b, x);
 }
 // 종류 단추 줄: 이름 앞부분(미인정·질병·인정·기타)이 같으면 한 줄, 아니면 시트의 그룹대로
-const typeRow = t => (/^(미인정|질병|인정|기타)/.exec(t.name) || [])[1] || t.group;
+const typeRow = t => /생리/.test(t.name) ? "생리" : (/^(미인정|질병|인정|기타)/.exec(t.name) || [])[1] || t.group; // 생리(인정)는 다른 인정과 따로 한 줄
 // 화면에 먼저 반영하고 시트 저장은 뒤에서 (실패하면 알리고 시트에서 다시 읽음)
 function attQuick(apply, fn, args, ok){
   apply(); renderAttend(); say("저장하는 중…");
