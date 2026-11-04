@@ -10,7 +10,7 @@
   firebase.initializeApp(FB);
   const auth = firebase.auth(), fs = firebase.firestore();
 
-  const TABLES = ["cfg", "items", "events", "memos", "notes", "checks", "logs", "todos", "teachers", "classRosters", "attend", "pmsg"];
+  const TABLES = ["cfg", "items", "events", "memos", "notes", "checks", "logs", "todos", "teachers", "classRosters", "attend", "pmsg", "evnotes"];
   const EMPTY = { cfg: {}, classRosters: {} };
   let uid = null, DB = null;
   try { localStorage.removeItem("gtok"); } catch (e) {} // 예전 1시간짜리 구글 열쇠 (이제 안 씀)
@@ -183,6 +183,8 @@
       plans: cfgGet("plans") || {}, rosters: cfgGet("rosters") || {}, students: cfgGet("students") || [], classTT: cfgGet("classTT"),
       classRosters: get("classRosters"), allTT: teachers.length ? { periods: Number(cfgGet("periods")) || 7, teachers } : null, sheet: null,
       events: get("events"), memos, dues, memoFiles,
+      // 학사일정 행사 하나마다 글·마감·사진·파일 ('날짜|행사 이름' 으로 찾음: 학사일정을 다시 불러와도 그대로 남게)
+      evNotes: Object.fromEntries(get("evnotes").filter(n => n && n.key).map(n => [n.key, { text: n.text || "", due: !!n.due, files: n.files || [] }])),
       notes: get("notes").filter(n => n.date >= t), checks: get("checks").filter(c => !c.closed),
       logs: get("logs").filter(l => l.date >= lt && (l.text || l.lesson > 0 || (l.files || []).length)),
       todos: get("todos").filter(x => !x.done || x.createdAt >= old)
@@ -237,6 +239,13 @@
     async saveEvents(list) {
       if (!Array.isArray(list) || list.length > 1000) fail("학사일정이 너무 많아요.");
       await put("events", list.filter(e => e && DATE_RE.test(e.date) && String(e.title || "").trim()).map(e => ({ date: e.date, title: S(e.title, 40).trim(), cat: S(e.cat, 40) }))); return getAll();
+    },
+    async saveEvNote(date, title, text, due, files) {
+      if (!DATE_RE.test(String(date))) fail("날짜가 올바르지 않아요."); title = S(title, 40).trim(); if (!title) fail("행사 이름이 없어요.");
+      const key = date + "|" + title; text = S(text, 2000).trim(); files = cleanFiles(files);
+      const rows = get("evnotes").filter(n => n.key !== key);
+      if (text || files.length || due === true) rows.push({ key, date, title, text, due: due === true, files });
+      await put("evnotes", rows); return getAll();
     },
     async saveMemo(date, text, due, files) {
       if (!DATE_RE.test(String(date))) fail("날짜가 올바르지 않아요.");
