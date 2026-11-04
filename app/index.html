@@ -248,8 +248,11 @@ nav{margin-bottom:14px}
 .kidtels{display:grid;gap:4px;margin:8px 0}
 .kidtel{display:grid;grid-template-columns:4.5em 11em auto;gap:10px;align-items:center}
 .kidtel span{color:var(--muted);font-size:.85rem}
-.rostertbl .telcol{width:11em;min-width:11em;white-space:nowrap}
-.rostertbl .telcol input{width:100%;min-width:0;font-variant-numeric:tabular-nums}
+/* 학생 명단 표: 칸 폭 고정, 고치기 칸도 글자 줄과 같은 높이 (눌러도 크기가 그대로) */
+.rostertbl{table-layout:fixed;width:100%;min-width:560px}
+.rostertbl td,.rostertbl th{height:2.1em;padding:2px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
+.rostertbl .rin{width:100%;min-width:0;height:1.8em;min-height:0;padding:0 4px;font-size:inherit;font-variant-numeric:tabular-nums;box-sizing:border-box}
+.smsmini{font-size:.72rem;padding:1px 6px !important}
 .rostertools{flex-wrap:wrap;gap:6px;margin:6px 0}
 .rostertools #rosterFind{flex:1 1 10em}
 .kidtel a{text-decoration:none;padding:4px 8px;border:1px solid var(--line);border-radius:6px;color:var(--ink)}
@@ -879,6 +882,7 @@ body.onhome .tt th,body.onhome .tt td{height:46px!important;padding:4px 3px!impo
 .smsrow{display:flex;align-items:center;gap:8px;padding-top:6px;border-top:1px dashed var(--line)}
 .smswho{flex:none;min-width:4.5em;font-weight:700;font-size:.86rem}.smsnum{font-variant-numeric:tabular-nums;color:var(--muted);font-size:.84rem;width:11em}
 .smsrow .btn,.smshead .btn{display:inline-flex;align-items:center;justify-content:center;min-width:4.6em;text-align:center}
+.smsrow .btn{min-width:3em;min-height:26px;padding:2px 8px;font-size:.75rem} /* 문자·전화 단추는 작게 */
 .smshead .spacer,.smsrow .spacer{flex:1}
 .smsrow{display:grid;grid-template-columns:5em 11em 1fr auto auto;align-items:center}
 .smsrow .spacer{display:none}
@@ -995,7 +999,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="backend.js?v=8b726102"></script>
+<script src="backend.js?v=d0cfa6ba"></script>
 <style>
 #fbGate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--desk)}
 #fbGate .fbbox{background:var(--paper);border-radius:22px;padding:36px 32px;text-align:center;box-shadow:0 18px 40px -24px rgba(20,40,25,.35);max-width:340px}
@@ -1230,6 +1234,12 @@ function attParse(t){
 const AD = () => att.data;
 const groupOf = n => AD().types.find(t => t.name === n)?.group || (/체험학습/.test(n) ? "체험학습" : /질병/.test(n) ? "질병" : /미인정/.test(n) ? "미인정" : /인정/.test(n) ? "인정" : "기타");
 const typeColor = n => AD().colors[groupOf(n)] || "#94a3b8";
+// 연락처는 한 곳에서: 출결 시트를 이었으면 그 '학생명부'(학생 연락처·학부모 관계·학부모 연락처), 아니면 교무수첩 학생 명단
+const attLinked = () => !!(window.fbCall && attCfg().url);
+const contactOf = no => { const r = AD()?.roster.find(k => Number(k.num) === Number(no)), s = students.find(x => x.no === Number(no));
+  return r ? { phone:r.sPhone || "", rel:r.pRel || "", pPhone:r.pPhone || "" } : { phone:s?.phone || "", rel:s?.parents?.[0]?.rel || "", pPhone:s?.parents?.[0]?.phone || "" }; };
+// 출결 시트를 아직 안 읽었으면 읽고 옴 (이 기기에 둔 것이 있으면 그것 먼저)
+async function ensureAtt(){ if(!attLinked() || att.data) return; say("연락처를 불러오는 중…"); try{ await loadAtt(); }finally{ say(""); } }
 const attKids = () => AD()?.roster.length ? AD().roster : students.map(s => ({ num:s.no, name:s.name, sPhone:s.phone || "", pRel:s.parents?.[0]?.rel || "", pPhone:s.parents?.[0]?.phone || "", msg:"" }));
 // 수업일: 주말·교무수첩 쉬는 날·출결 시트 학사일정 제외
 function holiName(k){
@@ -1491,7 +1501,7 @@ function attSms(list){
       const line = (who, phone) => el("div",{className:"smsrow"}, el("span",{className:"smswho"}, who), el("span",{className:"smsnum" + (phone ? "" : " hint")}, phone || "번호 없음"),
         el("span",{}), phone ? link("sms:" + phone + "?body=" + encodeURIComponent(k.msg || ""), "문자") : off("문자"), phone ? link("tel:" + phone, "전화") : off("전화"));
       return el("div",{className:"smscard"}, el("div",{className:"smshead"}, el("b",{}, stuLabel(k.num, k.name)), el("span",{className:"spacer"}), navBtn("내용 복사", () => copyText(k.msg || "", "문자 내용"), "문자 내용 복사")),
-        el("p",{className:"smsmsg"}, k.msg || "(메시지 내용 없음)"), line("학생", k.sPhone), line("학부모님", k.pPhone)); }));
+        el("p",{className:"smsmsg"}, k.msg || "(메시지 내용 없음)"), line("학생", k.sPhone), line("학부모", k.pPhone)); }));
 }
 // 2. 서류 관리 (+ 휴지통)
 function attDocs(){
@@ -3358,7 +3368,8 @@ async function uploadKidPhotos(files, only){
   }catch(e){ say(e?.message && !e.code ? e.message : "사진을 올리지 못했어요. 잠시 뒤 다시 시도해 주세요."); return 0; }
 }
 // 학생 한 명: 누르면 그때 사진을 불러옴
-function openKid(no){
+function openKid(no, again){
+  if(!again && attLinked() && !AD()){ ensureAtt().catch(() => {}).then(() => openKid(no, true)); return; } // 연락처(출결 시트)를 먼저 읽고
   const s = students.find(x => x.no === no); if(!s) return;
   // 사진은 [사진 보기]를 누를 때만 불러옴
   const box = el("div",{});
@@ -3367,11 +3378,11 @@ function openKid(no){
       .catch(e => box.replaceChildren(el("p",{className:"note"}, e?.message || "사진을 불러오지 못했어요."))); };
   if(s.photo) box.append(navBtn("📷 사진 보기", showPic, s.name + " 사진 보기"));
   // 연락처: 누르면 전화·문자 (휴대폰에서)
+  // 연락처는 출결 시트 '학생명부' 한 곳 (없으면 교무수첩 명단). 학생 줄과 학부모 줄은 같은 모양·같은 폭
   const num = p => String(p || "").replace(/[^\d+]/g, ""), call1 = (label, p) => el("div",{className:"kidtel"}, el("span",{}, label),
-    num(p) ? el("a",{href:"tel:" + num(p)}, "📞 " + p) : el("span",{className:"hint"}, "번호 없음"), num(p) ? el("a",{href:"sms:" + num(p)}, "💬 문자") : el("span",{}));
-  // 학생 줄과 학부모 줄은 같은 모양·같은 폭 (번호는 명단 보기 → 연락처 고치기에서)
-  const pp = (s.parents || []).filter(p => num(p.phone));
-  const kids = [box, el("div",{className:"kidtels"}, call1("학생", s.phone), ...(pp.length ? pp.map(p => call1("학부모님", p.phone)) : [call1("학부모님", "")]))];
+    num(p) ? el("a",{href:"tel:" + num(p)}, "📞 " + phoneOf(p)) : el("span",{className:"hint"}, "번호 없음"), num(p) ? el("a",{className:"smsmini",href:"sms:" + num(p)}, "문자") : el("span",{}));
+  const ct = contactOf(s.no);
+  const kids = [box, el("div",{className:"kidtels"}, call1("학생", ct.phone), call1("학부모", ct.pPhone))];
   if(window.fbCall) kids.push(el("div",{className:"actions"}, navBtn("🔔 개별 알림 보내기", () => { $("dayDlg").close(); openStudentMsg(null, { nos:[s.no] }); }, s.name + "에게 알림 앱 개별 알림")));
   if(canWrite()){
     const file = el("input",{type:"file",accept:"image/*",hidden:true});
@@ -4115,51 +4126,47 @@ setTimeout(() => {
   const r = parseRoster([["학생 명단"],[],["번호","이름","학생 연락처","보호자1 관계","보호자1 연락처","보호자2 관계","보호자2 연락처","비고"],["1","가나다","010-1111-2222","어머니","010-3333-4444","","",""],["2","라마바","",  "", 1055556666, "아버지", "010-7777-8888", "알레르기"]]);
   console.assert(r && r.length === 2 && r[0].phone === "010-1111-2222" && r[0].parents[0].rel === "어머니" && r[1].parents[0].phone === "01055556666" && r[1].parents[1].rel === "아버지" && r[1].note === "알레르기");
 }, 0);
-function openRosterView(){
+async function openRosterView(){
   if(!students.length) return modal("학생 명단", el("p",{className:"note"}, "아직 학생 명단이 없어요. 설정 → 학기 초 세팅에서 올리거나 입력해 주세요."));
+  await ensureAtt().catch(() => {});
+  const linked = attLinked() && !!AD();
   let q = "", editing = false;
-  const body = el("tbody"), head = el("tr"), err = el("div",{className:"err"});
-  const tel = p => p ? el("a",{href:"tel:" + p.replace(/[^\d+]/g, "")}, p) : "";
-  const telIn = (v, label) => el("input",{type:"tel",className:"field",value:v || "",placeholder:"010-0000-0000","aria-label":label});
-  const edits = {}; // 번호 → [학생, 학부모1, 학부모2] 입력 칸
-  const draw = () => {
-    head.replaceChildren(...["번호","이름","학생 연락처","학부모 연락처", editing ? "학부모 연락처 2" : "비고"].map((h, i) => el("th",{className:i === 2 || i === 3 || (editing && i === 4) ? "telcol" : ""}, h)));
-    body.replaceChildren(...students.filter(s => !q || (s.name + " " + s.no + " " + (s.note || "")).includes(q)).map(s => {
-      const ps = s.parents || [], name = (() => { const b = el("button",{type:"button",className:"linkbtn",title:"특이사항·파일 적기"}, s.name); b.onclick = () => openKid(s.no); return b; })();
-      if(editing){ const e = edits[s.no] ||= [telIn(s.phone, s.name + " 학생 연락처"), telIn(ps[0]?.phone, s.name + " 학부모 연락처"), telIn(ps[1]?.phone, s.name + " 학부모 연락처 2")];
-        return el("tr",{}, el("td",{className:"c"}, String(s.no)), el("td",{}, s.name), ...e.map(i => el("td",{className:"telcol"}, i))); }
-      return el("tr",{}, el("td",{className:"c"}, String(s.no)), el("td",{}, name), el("td",{className:"telcol"}, tel(s.phone || "")),
-        el("td",{className:"telcol"}, ...ps.filter(p => p.phone).flatMap((p, i) => [i ? el("br") : "", tel(p.phone)])),
-        el("td",{}, [s.note, s.memo].filter(Boolean).join(" · ").slice(0, 80), s.files?.length ? el("small",{className:"hint"}, " · 파일 " + s.files.length) : "")); }));
-  };
+  const body = el("tbody"), err = el("div",{className:"err"});
+  const tel = p => p ? el("a",{href:"tel:" + String(p).replace(/[^\d+]/g, "")}, p) : "";
+  const inp = (v, label, ph, cls) => el("input",{type:cls === "rel" ? "text" : "tel",className:"field rin" + (cls === "rel" ? " relin" : ""),value:v || "",placeholder:ph,"aria-label":label,maxLength:cls === "rel" ? 10 : 20});
+  const edits = {}; // 번호 → [학생 연락처, 학부모 연락처, 비고(관계)]
+  // 표 칸 폭은 고정 (고치기를 눌러도 크기가 그대로)
+  const cols = el("colgroup",{}, ...["3em","6.5em","11em","11em","7em"].map(w => el("col",{style:"width:" + w})));
+  const head = el("tr",{}, ...["번호","이름","학생 연락처","학부모 연락처","비고"].map(h => el("th",{}, h)));
+  const draw = () => body.replaceChildren(...students.filter(x => !q || (x.name + " " + x.no).includes(q)).map(x => {
+    const c = contactOf(x.no);
+    if(editing){ const e = edits[x.no] ||= [inp(c.phone, x.name + " 학생 연락처", "010-0000-0000"), inp(c.pPhone, x.name + " 학부모 연락처", "010-0000-0000"), inp(c.rel, x.name + " 비고 (어머님·아버님)", "어머님", "rel")];
+      return el("tr",{}, el("td",{className:"c"}, String(x.no)), el("td",{}, x.name), ...e.map(i => el("td",{}, i))); }
+    const nm = el("button",{type:"button",className:"linkbtn",title:"특이사항·파일 적기"}, x.name); nm.onclick = () => openKid(x.no);
+    return el("tr",{}, el("td",{className:"c"}, String(x.no)), el("td",{}, nm), el("td",{}, tel(phoneOf(c.phone))), el("td",{}, tel(phoneOf(c.pPhone))), el("td",{}, c.rel || "")); }));
   const find = el("input",{type:"search",className:"field",id:"rosterFind",placeholder:"이름·번호 찾기"});
   find.oninput = () => { q = find.value.trim(); draw(); };
-  // 연락처 고치기: 교무수첩에 저장하고, 새 교무수첩이면 구글 시트 '입력_학생명단' 탭에도 똑같이 적음 (시트에서 고친 것은 열 때 교무수첩으로 들어옴)
   const editBtn = navBtn("✎ 연락처 고치기", () => { editing = true; editBtn.hidden = true; saveBtn.hidden = cancelBtn.hidden = false; draw(); }, "학생·학부모 연락처 고치기", !canWrite());
   const cancelBtn = navBtn("취소", () => { editing = false; Object.keys(edits).forEach(k => delete edits[k]); editBtn.hidden = false; saveBtn.hidden = cancelBtn.hidden = true; err.textContent = ""; draw(); }, "고치기 취소");
-  const saveBtn = el("button",{type:"button",className:"btn"}, "저장"); saveBtn.hidden = cancelBtn.hidden = true;
+  const saveBtn = el("button",{type:"button",className:"btn small"}, "저장"); saveBtn.hidden = cancelBtn.hidden = true;
   saveBtn.onclick = async () => {
     saveBtn.disabled = true; err.textContent = "";
-    const next = students.map(s => { const e = edits[s.no]; if(!e) return s;
-      const ps = [...(s.parents || [])], setP = (i, v) => { v = phoneOf(v); if(v) ps[i] = { rel:ps[i]?.rel || "학부모", phone:v }; else if(ps[i]) ps[i] = { ...ps[i], phone:"" }; };
-      setP(0, e[1].value); setP(1, e[2].value);
-      return { ...s, phone:phoneOf(e[0].value), parents:ps.filter(p => p && (p.phone || p.rel)) }; });
+    const list = students.filter(x => edits[x.no]).map(x => { const e = edits[x.no]; return { no:x.no, name:x.name, phone:phoneOf(e[0].value), parentPhone:phoneOf(e[1].value), rel:e[2].value.trim() }; });
     try{
-      await store.saveStudents(next);
-      let sheetMsg = "";
-      if(window.fbCall) try{ await call("writeInputTab", "students", [["※ 한 줄에 학생 한 명. 쓰지 않는 칸은 비워 두세요. 이 탭은 나만 볼 수 있어요."], [], ["번호", "이름", "학생 연락처", "보호자1 관계", "보호자1 연락처", "보호자2 관계", "보호자2 연락처", "비고"],
-          ...next.map(s => [String(s.no), s.name, s.phone || "", s.parents?.[0]?.rel || "", s.parents?.[0]?.phone || "", s.parents?.[1]?.rel || "", s.parents?.[1]?.phone || "", s.note || ""])]); sheetMsg = " 구글 시트에도 적었어요."; }
-        catch(e){ sheetMsg = " (구글 시트에는 못 적었어요: " + (e?.message || "") + ")"; }
-      say("연락처를 저장했어요." + sheetMsg); $("dayDlg").close(); openRosterView();
+      if(linked){ attSet(await call("attSaveContacts", list)); say("연락처를 출결 시트 '학생명부'에 저장했어요."); }
+      else { await store.saveStudents(students.map(x => { const c = list.find(y => y.no === x.no); if(!c) return x; const ps = [...(x.parents || [])];
+          ps[0] = { rel:c.rel || ps[0]?.rel || "", phone:c.parentPhone }; return { ...x, phone:c.phone, parents:ps.filter(p => p.phone || p.rel) }; }));
+        say("연락처를 저장했어요."); }
+      $("dayDlg").close(); openRosterView();
     }catch(e){ saveBtn.disabled = false; err.textContent = e?.message && !e.code ? e.message : "저장하지 못했어요. 잠시 뒤 다시 시도해 주세요."; }
   };
-  const stSetup = SETUP.find(x => x.key === "students");
-  const sheetBtn = window.fbCall && stSetup ? navBtn("구글 시트 열기", () => openInputTab(stSetup), "학생 명단 구글 시트(입력_학생명단 탭) 열기") : null;
+  const url = linked ? (att.url || attCfg().url) : "";
+  const sheetBtn = url ? el("a",{className:"btn ghost small",href:url,target:"_blank",rel:"noopener noreferrer",title:"출결 시트의 '학생명부' 탭에서 고칠 수 있어요"}, "구글 시트 열기") : null;
   draw();
   modal((config.homeroomClass ? config.homeroomClass + " " : "") + "학생 명단",
-    el("p",{className:"hint"}, "학생과 학부모 연락처는 내 교무수첩과 내 구글 시트에만 있어요. 화면을 띄워 둔 채 자리를 비우지 마세요."),
+    el("p",{className:"hint"}, linked ? "연락처는 출결 시트 '학생명부' 한 곳에 있어요. 여기서 고치거나 시트에서 고치면 출결 연락·학생 창에 똑같이 보여요." : "학생과 학부모 연락처는 내 교무수첩에만 있어요. 설정 → 학급 출결에서 출결 시트를 이으면 그 시트의 '학생명부'와 하나로 써요."),
     el("div",{className:"tt-tools rostertools"}, find, editBtn, sheetBtn, cancelBtn, saveBtn), err,
-    el("div",{className:"tt-wrap"}, el("table",{className:"plan rostertbl"}, el("thead",{}, head), body)));
+    el("div",{className:"tt-wrap"}, el("table",{className:"plan rostertbl"}, cols, el("thead",{}, head), body)));
   setTimeout(() => find.focus(), 0);
 }
 
