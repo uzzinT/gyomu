@@ -5,18 +5,15 @@
   const FB = { apiKey: "AIzaSyCO4Mc-lGPDZWddX1E5WwAVFBh5ofc2cvc", authDomain: "gyomu-7e9e1.firebaseapp.com", projectId: "gyomu-7e9e1",
     storageBucket: "gyomu-7e9e1.firebasestorage.app", messagingSenderId: "778560026907", appId: "1:778560026907:web:82f4dab5fcbe9fcc86fbbe" };
   const OLD_SHEET = "18QiESGXlKZLdsTKEuegCWCwJagI-H6OGbnQyMbMztjs"; // 지금까지 쓰던 교무수첩 구글 시트 (가져오기용)
-  // 드라이브·시트, 그리고 휴대폰 알림(FCM) 보내기
-  const SCOPES = ["https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/firebase.messaging"];
+  // 드라이브·시트·휴대폰 알림은 '교무수첩 창구'(앱스 스크립트, 선생님 계정으로 돌아감)가 대신 부름 → 1시간마다 구글 확인 창이 안 뜸
+  const PROXY = "https://script.google.com/macros/s/AKfycbxAVUJ_m3IAD84RWzttzXSuxY5LLsQwEzkkzwmYfmF-LEwLDO-khwgcrIJ2S8pNQ3E_GA/exec";
   firebase.initializeApp(FB);
   const auth = firebase.auth(), fs = firebase.firestore();
 
   const TABLES = ["cfg", "items", "events", "memos", "notes", "checks", "logs", "todos", "teachers", "classRosters", "attend", "pmsg"];
   const EMPTY = { cfg: {}, classRosters: {} };
-  let uid = null, DB = null, token = null, tokenAt = 0;
-  // 구글 열쇠는 이 탭에서만 1시간 기억 (새로 고침해도 다시 묻지 않게)
-  try { const t = JSON.parse(localStorage.getItem("gtok") || "null"); if (t && Date.now() - t.at < 50 * 60e3) { token = t.v; tokenAt = t.at; } } catch (e) {}
-  // 구글 권한(1시간짜리)은 새 탭·다시 열기에도 이어 쓰게 이 기기에 둠
-  const keepToken = () => { try { localStorage.setItem("gtok", JSON.stringify({ v: token, at: tokenAt })); } catch (e) {} };
+  let uid = null, DB = null;
+  try { localStorage.removeItem("gtok"); } catch (e) {} // 예전 1시간짜리 구글 열쇠 (이제 안 씀)
   const col = () => fs.collection("users").doc(uid).collection("data"); // 예전 저장 자리 (드라이브로 옮길 때 한 번 읽음)
   const get = t => DB[t] ?? (EMPTY[t] !== undefined ? structuredClone(EMPTY[t]) : []);
   // 표를 바꾸면 이 기기에 바로 두고, 드라이브 파일에는 잠시 모았다가 한 번에 씀
@@ -67,13 +64,12 @@
         '<p class="fbalt" hidden><button type="button" class="btn ghost small" id="fbRedirect">이 창에서 로그인하기</button></p></div>';
       document.body.append(g);
       g.querySelector("#fbLogin").onclick = login;
-      g.querySelector("#fbRedirect").onclick = () => { const p = new firebase.auth.GoogleAuthProvider(); SCOPES.forEach(s => p.addScope(s)); auth.signInWithRedirect(p); };
+      g.querySelector("#fbRedirect").onclick = () => auth.signInWithRedirect(new firebase.auth.GoogleAuthProvider());
     }
     g.hidden = !show; g.querySelector(".fbmsg").textContent = msg || "선생님 구글 계정으로 들어가요.";
   }
   async function login() {
-    const p = new firebase.auth.GoogleAuthProvider(); SCOPES.forEach(s => p.addScope(s));
-    try { const r = await auth.signInWithPopup(p); token = r.credential && r.credential.accessToken; tokenAt = Date.now(); keepToken(); }
+    try { await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }
     catch (e) {
       // 팝업이 막히면 이 창에서 구글 로그인 화면으로 넘어갔다 돌아오는 방법을 보여 줌
       const blocked = e.code === "auth/popup-blocked" || e.code === "auth/cancelled-popup-request" || e.code === "auth/popup-closed-by-user";
@@ -83,7 +79,7 @@
     }
   }
   // 이 창에서 로그인하고 돌아왔을 때 구글 열쇠 받기
-  auth.getRedirectResult().then(r => { if (r && r.credential) { token = r.credential.accessToken; tokenAt = Date.now(); keepToken(); } }).catch(e => gate(true, "로그인하지 못했어요: " + (e.message || e.code)));
+  auth.getRedirectResult().catch(e => gate(true, "로그인하지 못했어요: " + (e.message || e.code)));
   auth.onAuthStateChanged(async u => {
     if (!u) { uid = null; gate(true); return; }
     uid = u.uid; gate(false);
@@ -121,7 +117,6 @@
     DB = {}; await refreshFromDrive(true);
   }
   async function refreshFromDrive(first) {
-    if (!first && (!token || Date.now() - tokenAt > 50 * 60e3)) return; // 구글 확인이 끝났으면 창을 띄우지 않고 다음에
     const d = await readData();
     if (!d) { // 처음: 예전에 Firebase 에 있던 자료를 드라이브로 옮김 (Firebase 쪽은 그대로 둠, 나중에 따로 정리)
       const snap = await col().get(), old = {}; snap.forEach(x => { try { old[x.id] = JSON.parse(x.data().v); } catch (e) {} });
@@ -140,40 +135,9 @@
     return new Promise(res => {
       gate(true, "교무수첩 자료는 선생님 구글 드라이브에 있어요. 아래를 눌러 불러와 주세요.");
       const b = document.getElementById("fbLogin"); b.textContent = "구글 드라이브에서 불러오기";
-      b.onclick = async () => { try { await reauth(); await load(); gate(false); res(); } catch (e) { gate(true, "불러오지 못했어요: " + (e.message || e.code)); } };
+      b.onclick = async () => { try { await load(); gate(false); res(); } catch (e) { gate(true, "불러오지 못했어요: " + (e.message || e.code)); } };
     });
   }
-  // 구글 API 열쇠 (1시간짜리). 지나면 다시 로그인 창으로 받음
-  async function gtoken() {
-    if (token && Date.now() - tokenAt < 50 * 60e3) return token;
-    try { return await reauth(); }
-    catch (e) {
-      // 버튼을 누른 뒤 시간이 걸려 확인 창(팝업)이 막히면: 화면 아래 [구글 확인] 단추를 보여 주고 그걸 누르게 함
-      if (/popup/.test(e.code || "")) { reauthBar(); throw new Error("구글 확인이 필요해요. 화면 아래 [구글 확인]을 누른 뒤 다시 해 주세요."); }
-      throw e;
-    }
-  }
-  // 같은 계정이면 계정 고르기 없이 창이 잠깐 떴다 닫힘 (login_hint). 여러 곳에서 불러도 창은 하나
-  let reauthing = null;
-  function reauth() {
-    if (reauthing) return reauthing;
-    const p = new firebase.auth.GoogleAuthProvider(); SCOPES.forEach(s => p.addScope(s));
-    if (auth.currentUser.email) p.setCustomParameters({ login_hint: auth.currentUser.email });
-    return reauthing = auth.currentUser.reauthenticateWithPopup(p).then(r => {
-      token = r.credential.accessToken; tokenAt = Date.now(); keepToken(); document.getElementById("fbReauth")?.remove(); if (dirty) saveSoon(0); return token;
-    }).finally(() => { reauthing = null; });
-  }
-  // 구글 열쇠는 1시간짜리라: 45분이 지나면 선생님이 화면을 누를 때 미리 새로 받음 (누를 때만 창을 열 수 있음)
-  let autoFail = 0; // 창을 닫았으면 5분 동안은 누를 때마다 다시 열지 않음
-  addEventListener("pointerdown", () => { if (uid && auth.currentUser && (!token || Date.now() - tokenAt > 45 * 60e3) && Date.now() - autoFail > 5 * 60e3) reauth().catch(() => { autoFail = Date.now(); }); }, true);
-  function reauthBar() {
-    if (document.getElementById("fbReauth")) return;
-    const b = document.createElement("div"); b.id = "fbReauth";
-    b.innerHTML = '<span>구글 드라이브·시트를 쓰려면 한 번 더 확인해야 해요 (1시간마다).</span><button type="button" class="btn">구글 확인</button>';
-    b.querySelector("button").onclick = () => reauth().then(() => window.say && window.say("확인했어요. 하던 것을 다시 눌러 주세요.")).catch(e => alert(e.message || e.code));
-    document.body.append(b);
-  }
-
   // ---------- 공통 정리 (Code.gs 와 같은 규칙) ----------
   const DATE_RE = /^\d{4}-\d{2}-\d{2}$/, TERM_RE = /^\d{4}-[12]$/, CLOTHS = ["navy", "green", "ochre", "wine", "slate"], AREA_IDS = ["subject", "class", "admin"];
   const S = (v, n) => String(v == null ? "" : v).slice(0, n);
@@ -398,9 +362,18 @@
   };
 
   // ---------- 구글 드라이브·시트 (로그인할 때 받은 구글 열쇠로 바로 부름) ----------
+  // 창구에 부탁: 로그인 확인증(저절로 새로 받아짐) + 부를 주소·내용. 답은 보통 fetch 답 모양으로 돌려줌
+  async function GX(url, opts = {}) {
+    const body = opts.body, b64 = body == null ? null : bytesToB64(typeof body === "string" ? new TextEncoder().encode(body) : await new Response(body).arrayBuffer());
+    const id = await auth.currentUser.getIdToken();
+    let r; try { r = await fetch(PROXY, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ id, url, method: opts.method || "GET", headers: opts.headers || {}, b64 }) }); }
+    catch (e) { fail("인터넷 연결을 확인해 주세요."); }
+    let j = null; try { j = await r.json(); } catch (e) { fail("교무수첩 창구가 아직 준비되지 않았어요. (권한 허용을 했는지 확인해 주세요)"); }
+    if (j.error) fail(j.error === "auth" ? "선생님 로그인을 확인하지 못했어요. 새로 고침해 주세요." : "교무수첩 창구: " + j.error);
+    return new Response([204, 205, 304].includes(j.status) ? null : b64ToBytes(j.b64 || ""), { status: j.status, headers: { "Content-Type": j.type || "" } });
+  }
   async function G(url, opts = {}) {
-    const r = await fetch(url, { ...opts, headers: { Authorization: "Bearer " + await gtoken(), ...(opts.headers || {}) } });
-    if (r.status === 401) { token = null; fail("구글 확인이 끝났어요. 한 번 더 눌러 주세요."); }
+    const r = await GX(url, opts);
     if (!r.ok) { let m = ""; try { m = (await r.json()).error.message; } catch (e) {} fail("구글 드라이브·시트에서 거절했어요 (" + r.status + ") " + m); }
     return r;
   }
@@ -573,14 +546,13 @@
   }
   // 열 때 올해 폴더와 영역 폴더가 없으면 만들어 둠 (구글 열쇠가 살아 있을 때만)
   async function ensureFolders() {
-    if (!token || Date.now() - tokenAt > 50 * 60e3) return;
     const before = JSON.stringify(cfgGet("drive") || {});
     try { await yearFolder(); for (const a of ((cfgGet("config") || {}).areas || [])) await areaFolder(a.id); } catch (e) { return; }
     if (JSON.stringify(cfgGet("drive") || {}) !== before && window.apply) window.apply(getAll());
   }
   // 구글 열쇠가 살아 있을 때만 (창을 띄우지 않음). 처음엔 지금 모양만 기억하고, 그 뒤 바뀐 탭만 다시 넣음
   async function autoSync() {
-    if (!token || Date.now() - tokenAt > 50 * 60e3 || typeof window.importRows !== "function") return;
+    if (typeof window.importRows !== "function") return;
     try {
       // 이미 만든 영역 입력 시트만 읽음 (없는 시트를 새로 만들지 않음)
       const books = cfgGet("inputBooks") || {}, keys = Object.keys(INPUT_TABS).filter(k => books[AREA_OF_KEY[k]]);
@@ -968,12 +940,11 @@
     try { ((await batchGet(NOTICE_BOOK, ["'기기'!A2:B2000"], "FORMATTED_VALUE"))[0] || []).forEach(r => { if (r[1] && hbs.has(String(r[0])) && !targets.some(x => x.token === r[1])) targets.push({ id: "", token: String(r[1]) }); }); } catch (e) {}
     let sent = 0, why = "";
     for (const t of targets) {
-      const r = await fetch("https://fcm.googleapis.com/v1/projects/" + FB.projectId + "/messages:send", { method: "POST", headers: { Authorization: "Bearer " + await gtoken(), "Content-Type": "application/json" },
+      const r = await GX("https://fcm.googleapis.com/v1/projects/" + FB.projectId + "/messages:send", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: { token: t.token, notification: { title, body: body.slice(0, 180) }, webpush: { fcm_options: { link: PWA_URL } } } }) });
       if (r.ok) { sent++; continue; }
       why = r.status + " " + (await r.text().catch(() => "")).slice(0, 200); console.warn("휴대폰 알림", why);
       if ((r.status === 404 || r.status === 400) && t.id) await noticeDoc().collection("push").doc(t.id).delete().catch(() => {}); // 지운 기기
-      else if (r.status === 401) { token = null; throw new Error("구글 확인이 끝났어요. 다시 보내기를 눌러 주세요."); }
     }
     if (targets.length && !sent) throw new Error("구글 알림 서버가 받지 않았어요 (" + why + ")"); // 이유를 선생님 화면에
     return sent;
@@ -995,6 +966,6 @@
     if (PUB_FNS.has(fn) && fn !== "sendStudentMessages") schedulePublish();
     return r;
   };
-  window.fbSignOut = () => { try { localStorage.removeItem("gtok"); } catch (e) {} return auth.signOut().then(() => location.reload()); };
+  window.fbSignOut = () => { return auth.signOut().then(() => location.reload()); };
   window.fbUser = () => auth.currentUser;
 })();
