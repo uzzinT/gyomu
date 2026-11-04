@@ -252,16 +252,16 @@ nav{margin-bottom:14px}
 .fprevname{display:flex;gap:4px;align-items:center;padding:4px 6px;font-size:.78rem}
 .fprevname a{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .kidtels{display:grid;gap:4px;margin:8px 0}
-.kidtel{display:grid;grid-template-columns:4.5em 11em auto;gap:10px;align-items:center}
+.kidtel{display:grid;grid-template-columns:4.5em 11em max-content;gap:10px;align-items:center} /* 문자 단추는 글자만큼만 */
 .kidtel span{color:var(--muted);font-size:.85rem}
 /* 학생 명단 표: 칸 폭 고정, 고치기 칸도 글자 줄과 같은 높이 (눌러도 크기가 그대로) */
 .rostertbl{table-layout:fixed;width:100%;min-width:560px}
 .rostertbl td,.rostertbl th{height:2.1em;padding:2px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
 .rostertbl .rin{width:100%;min-width:0;height:1.8em;min-height:0;padding:0 4px;font-size:inherit;font-variant-numeric:tabular-nums;box-sizing:border-box}
-.smsmini{font-size:.72rem;padding:1px 6px !important}
+.smsmini{padding:0 10px !important;font-size:.8rem}
 .rostertools{flex-wrap:wrap;gap:6px;margin:6px 0}
 .rostertools #rosterFind{flex:1 1 10em}
-.kidtel a{text-decoration:none;padding:4px 8px;border:1px solid var(--line);border-radius:6px;color:var(--ink)}
+.kidtel a{display:inline-flex;align-items:center;box-sizing:border-box;height:2.1em;text-decoration:none;padding:0 8px;border:1px solid var(--line);border-radius:6px;color:var(--ink)} /* 전화번호·문자 같은 높이 */
 .now .free{margin:4px 0 10px;padding:10px 14px;border-radius:10px;font-size:1.15rem;font-weight:700;color:var(--green);background:color-mix(in srgb,var(--green) 14%,var(--paper))}
 .now .free{word-break:keep-all}
 .now .free b{display:block}
