@@ -987,7 +987,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="backend.js?v=90610c45"></script>
+<script src="backend.js?v=7aaa7e08"></script>
 <style>
 #fbGate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--desk)}
 #fbGate .fbbox{background:var(--paper);border-radius:22px;padding:36px 32px;text-align:center;box-shadow:0 18px 40px -24px rgba(20,40,25,.35);max-width:340px}
@@ -2677,8 +2677,11 @@ function openStudentMsg(sent, pre){
     const nos = boxes.filter(b => b.cb.checked).map(b => b.s.no);
     if(!nos.length) return say("받을 학생을 골라 주세요.");
     if(!ta.value.trim()) return say("보낼 말을 적어 주세요.");
-    try{ const r = await call("sendStudentMessages", nos, ta.value.trim(), show.checked); say(nos.length + "명에게 보냈어요."); $("dayDlg").dataset.dirty = ""; openStudentMsg(r); }
-    catch(e){ say(e?.message || "보내지 못했어요."); }
+    send.disabled = true; send.textContent = "보내는 중…";
+    // 결과는 누를 때까지 남게 (정말 갔는지, 휴대폰 몇 대에 울렸는지)
+    try{ const r = await call("sendStudentMessages", nos, ta.value.trim(), show.checked); $("dayDlg").dataset.dirty = ""; openStudentMsg(r);
+      alert("✅ " + nos.length + "명 학생 앱에 들어갔어요.\n" + (r?.pushError ? "⚠️ 휴대폰 알림은 못 보냈어요: " + r.pushError : r?.pushed ? "🔔 휴대폰 " + r.pushed + "대에 알림이 울렸어요." : r?.pushed === 0 ? "🔕 알림 받기를 켠 휴대폰이 없어서 휴대폰은 울리지 않았어요." : "")); }
+    catch(e){ send.disabled = false; send.textContent = "보내기"; alert("보내지 못했어요.\n" + (e?.message || "")); }
   }, "개별 알림 보내기"); send.className = "btn";
   modal("개별 알림",
     el("p",{className:"hint"}, "고른 학생 번호로 들어온 학생·학부모의 알림 앱에만 보여요."),

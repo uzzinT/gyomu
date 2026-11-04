@@ -153,11 +153,19 @@
       throw e;
     }
   }
-  async function reauth() {
+  // 같은 계정이면 계정 고르기 없이 창이 잠깐 떴다 닫힘 (login_hint). 여러 곳에서 불러도 창은 하나
+  let reauthing = null;
+  function reauth() {
+    if (reauthing) return reauthing;
     const p = new firebase.auth.GoogleAuthProvider(); SCOPES.forEach(s => p.addScope(s));
-    const r = await auth.currentUser.reauthenticateWithPopup(p);
-    token = r.credential.accessToken; tokenAt = Date.now(); keepToken(); document.getElementById("fbReauth")?.remove(); if (dirty) saveSoon(0); return token;
+    if (auth.currentUser.email) p.setCustomParameters({ login_hint: auth.currentUser.email });
+    return reauthing = auth.currentUser.reauthenticateWithPopup(p).then(r => {
+      token = r.credential.accessToken; tokenAt = Date.now(); keepToken(); document.getElementById("fbReauth")?.remove(); if (dirty) saveSoon(0); return token;
+    }).finally(() => { reauthing = null; });
   }
+  // 구글 열쇠는 1시간짜리라: 45분이 지나면 선생님이 화면을 누를 때 미리 새로 받음 (누를 때만 창을 열 수 있음)
+  let autoFail = 0; // 창을 닫았으면 5분 동안은 누를 때마다 다시 열지 않음
+  addEventListener("pointerdown", () => { if (uid && auth.currentUser && (!token || Date.now() - tokenAt > 45 * 60e3) && Date.now() - autoFail > 5 * 60e3) reauth().catch(() => { autoFail = Date.now(); }); }, true);
   function reauthBar() {
     if (document.getElementById("fbReauth")) return;
     const b = document.createElement("div"); b.id = "fbReauth";
@@ -969,19 +977,21 @@
     const snap = await noticeDoc().collection("push").get(), targets = []; snap.forEach(d => { const x = d.data(); if (x.token && hbs.has(x.hakbun)) targets.push({ id: d.id, token: x.token }); });
     // 창구(앱스 스크립트)가 드라이브 시트 '기기' 탭에 적어 둔 휴대폰도 (같은 열쇠는 한 번만)
     try { ((await batchGet(NOTICE_BOOK, ["'기기'!A2:B2000"], "FORMATTED_VALUE"))[0] || []).forEach(r => { if (r[1] && hbs.has(String(r[0])) && !targets.some(x => x.token === r[1])) targets.push({ id: "", token: String(r[1]) }); }); } catch (e) {}
-    let sent = 0;
+    let sent = 0, why = "";
     for (const t of targets) {
       const r = await fetch("https://fcm.googleapis.com/v1/projects/" + FB.projectId + "/messages:send", { method: "POST", headers: { Authorization: "Bearer " + await gtoken(), "Content-Type": "application/json" },
         body: JSON.stringify({ message: { token: t.token, notification: { title, body: body.slice(0, 180) }, webpush: { fcm_options: { link: PWA_URL } } } }) });
-      if (r.ok) sent++;
-      else if ((r.status === 404 || r.status === 400) && t.id) await noticeDoc().collection("push").doc(t.id).delete().catch(() => {}); // 지운 기기
-      else if (r.status === 401 || r.status === 403) { token = null; throw new Error("휴대폰 알림을 보내려면 구글 확인을 한 번 더 받아야 해요. 다시 보내기를 눌러 주세요."); }
+      if (r.ok) { sent++; continue; }
+      why = r.status + " " + (await r.text().catch(() => "")).slice(0, 200); console.warn("휴대폰 알림", why);
+      if ((r.status === 404 || r.status === 400) && t.id) await noticeDoc().collection("push").doc(t.id).delete().catch(() => {}); // 지운 기기
+      else if (r.status === 401) { token = null; throw new Error("구글 확인이 끝났어요. 다시 보내기를 눌러 주세요."); }
     }
+    if (targets.length && !sent) throw new Error("구글 알림 서버가 받지 않았어요 (" + why + ")"); // 이유를 선생님 화면에
     return sent;
   }
   const PUB_FNS = new Set(["addNote", "updateNote", "deleteNote", "saveEvents", "addCheck", "updateCheck", "deleteCheck", "saveConfig", "saveClassTT", "saveStudentTT", "setStudentPasswords", "setNoticePassword", "sendStudentMessages", "deleteStudentMessage", "saveStudents", "importFromSheet", "importFromArchive", "restoreArchive", "archiveBefore"]);
   const sendMsg = API.sendStudentMessages;
-  API.sendStudentMessages = async (nos, text, show = true) => { const r = await sendMsg(nos, text); try { await publishNotice(); const n = await pushTo((Array.isArray(nos) ? nos : []).map(Number), "담임 선생님 알림", show === false ? "담임 선생님 새 알림이 있어요. 앱에서 확인해 주세요." : String(text || "")); if (n) r.pushed = n; } catch (e) { r.pushError = e.message; } return r; };
+  API.sendStudentMessages = async (nos, text, show = true) => { const r = await sendMsg(nos, text); try { await publishNotice(); const n = await pushTo((Array.isArray(nos) ? nos : []).map(Number), "담임 선생님 알림", show === false ? "담임 선생님 새 알림이 있어요. 앱에서 확인해 주세요." : String(text || "")); r.pushed = n; } catch (e) { r.pushError = e.message; } return r; };
   API.publishNow = async () => ({ problems: await publishNotice() });
   const attLoad0 = API.attLoad;
   API.attLoad = async () => { const r = await attLoad0(); publishAtt(r.tabs).catch(e => console.warn("출결 내보내기", e)); return r; };
