@@ -1,5 +1,5 @@
 // 교무수첩 Firebase 버전의 '서버': Apps Script(Code.gs)와 같은 이름·같은 모양으로 답해서 화면 코드는 그대로 씀
-// 자료는 Firestore users/{uid}/data/{표이름} 문서 하나에 JSON 글로 저장 (Firestore 는 배열 안 배열을 못 넣음)
+// 자료는 선생님 구글 드라이브 '교무수첩' 폴더의 JSON 파일 하나에 저장 (Firebase 에는 두지 않음). 이 기기에도 한 부 두어 바로 열림
 // 1단계: 자료 기능만. 드라이브가 필요한 것(파일 올리기·사진·시트 만들기·보관)은 2단계에서 이어짐
 (function () {
   const FB = { apiKey: "AIzaSyCO4Mc-lGPDZWddX1E5WwAVFBh5ofc2cvc", authDomain: "gyomu-7e9e1.firebaseapp.com", projectId: "gyomu-7e9e1",
@@ -9,7 +9,6 @@
   const SCOPES = ["https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/firebase.messaging"];
   firebase.initializeApp(FB);
   const auth = firebase.auth(), fs = firebase.firestore();
-  fs.enablePersistence({ synchronizeTabs: true }).catch(() => {}); // 이 기기에 남겨 두어 다음에 바로 열림
 
   const TABLES = ["cfg", "items", "events", "memos", "notes", "checks", "logs", "todos", "teachers", "classRosters", "attend", "pmsg"];
   const EMPTY = { cfg: {}, classRosters: {} };
@@ -18,10 +17,43 @@
   try { const t = JSON.parse(localStorage.getItem("gtok") || "null"); if (t && Date.now() - t.at < 50 * 60e3) { token = t.v; tokenAt = t.at; } } catch (e) {}
   // 구글 권한(1시간짜리)은 새 탭·다시 열기에도 이어 쓰게 이 기기에 둠
   const keepToken = () => { try { localStorage.setItem("gtok", JSON.stringify({ v: token, at: tokenAt })); } catch (e) {} };
-  const col = () => fs.collection("users").doc(uid).collection("data");
+  const col = () => fs.collection("users").doc(uid).collection("data"); // 예전 저장 자리 (드라이브로 옮길 때 한 번 읽음)
   const get = t => DB[t] ?? (EMPTY[t] !== undefined ? structuredClone(EMPTY[t]) : []);
-  // 표 하나를 통째로 저장 (선생님 혼자 쓰니 마지막에 쓴 것이 남음)
-  async function put(t, v) { DB[t] = v; await col().doc(t).set({ v: JSON.stringify(v), at: Date.now() }); }
+  // 표를 바꾸면 이 기기에 바로 두고, 드라이브 파일에는 잠시 모았다가 한 번에 씀
+  // shortcut: 두 기기에서 동시에 고치면 나중에 저장한 쪽이 남음 (선생님 혼자 쓰니 괜찮음), 여럿이 쓰게 되면 표마다 합치기
+  async function put(t, v) { DB[t] = v; dirty = true; keepLocal(); saveSoon(); }
+  const UP = "https://www.googleapis.com/upload/drive/v3/files";
+  let fileId = null, fileVer = 0, dirty = false, saving = null, saveTimer = 0;
+  const CACHE = () => "gyomuDB:" + uid;
+  const keepLocal = () => { try { localStorage.setItem(CACHE(), JSON.stringify({ db: DB, ver: fileVer, dirty })); } catch (e) {} };
+  function saveSoon(ms = 600) { clearTimeout(saveTimer); saveTimer = setTimeout(() => flush().catch(e => {
+    if (!/구글 확인/.test(e.message || "")) { window.say && window.say("구글 드라이브에 저장하지 못했어요. 30초 뒤 다시 저장해요."); saveSoon(30e3); } }), ms); }
+  async function flush() {
+    while (saving) await saving.catch(() => {});
+    if (!dirty) return;
+    saving = (async () => { dirty = false; try { await writeData(JSON.stringify({ app: "gyomu", v: 1, at: Date.now(), tables: DB })); } catch (e) { dirty = true; throw e; } finally { keepLocal(); } })();
+    try { await saving; } finally { saving = null; }
+  }
+  // 드라이브의 자료 파일은 이름이 아니라 표시(appProperties)로 찾음 (이름을 바꿔도 됨)
+  async function dataFile() { if (fileId) return fileId; const f = (await findOne("appProperties has { key='gyomu' and value='data' }"))[0]; return f ? (fileId = f.id) : null; }
+  async function rootFolder() { const d = (DB.cfg || {}).drive || {}; if (d.root) return d.root; return ((await findOne("name='교무수첩' and mimeType='" + FOLDER + "' and 'root' in parents"))[0] || await makeFolder("교무수첩")).id; }
+  async function driveJson(meta, body, id) {
+    if (id) return (await G(UP + "/" + id + "?uploadType=media&fields=id,version", { method: "PATCH", headers: { "Content-Type": "application/json" }, body })).json();
+    const bd = "gyomu" + Date.now();
+    const mp = "--" + bd + "\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n" + JSON.stringify({ mimeType: "application/json", ...meta }) + "\r\n--" + bd + "\r\nContent-Type: application/json\r\n\r\n" + body + "\r\n--" + bd + "--";
+    return (await G(UP + "?uploadType=multipart&fields=id,version", { method: "POST", headers: { "Content-Type": "multipart/related; boundary=" + bd }, body: mp })).json();
+  }
+  async function writeData(body) {
+    const id = await dataFile();
+    const j = await driveJson({ name: "교무수첩 자료 (지우지 마세요).json", parents: [await rootFolder()], appProperties: { gyomu: "data" }, description: "나의 교무수첩이 저장하는 자료예요. 지우거나 고치지 마세요. 드라이브의 버전 기록에 지난 모습이 남아요." }, body, id);
+    fileId = j.id; fileVer = Number(j.version) || 0;
+  }
+  async function readData() {
+    const id = await dataFile(); if (!id) return null;
+    const ver = Number((await (await G(DRIVE + "/" + id + "?fields=version")).json()).version) || 0;
+    if (ver === fileVer && DB && Object.keys(DB).length) return { same: true, ver };
+    return { tables: ((await (await G(DRIVE + "/" + id + "?alt=media")).json()) || {}).tables || {}, ver };
+  }
   const cfgGet = k => get("cfg")[k] ?? null;
   async function cfgPut(patch) { const c = { ...get("cfg"), ...patch }; Object.keys(patch).forEach(k => { if (patch[k] === undefined) delete c[k]; }); await put("cfg", c); }
 
@@ -55,7 +87,7 @@
   auth.onAuthStateChanged(async u => {
     if (!u) { uid = null; gate(true); return; }
     uid = u.uid; gate(false);
-    await load();
+    try { await load(); } catch (e) { await needGoogle(); }
     if (!DB.cfg) importBanner(); else if (!DB.cfg.archives) archiveBanner();
     readyRes();
     setTimeout(() => ensureFolders().then(autoSync), 2500); // 화면이 다 그려진 뒤 폴더 확인, 시트에서 고친 것 반영
@@ -82,11 +114,34 @@
       catch (e) { btn.disabled = false; btn.textContent = "다시 해 보기"; b.querySelector("small").textContent = e.message || String(e); }
     };
   }
+  // 이 기기에 둔 것을 먼저 보여 주고, 드라이브에서 새로 받아 바뀌었으면 화면을 고침
   async function load() {
-    const snap = await col().get(); DB = {};
-    snap.forEach(d => { try { DB[d.id] = JSON.parse(d.data().v); } catch (e) { /* 깨진 문서는 빈 것으로 */ } });
-    // 다른 기기에서 바꾼 것도 바로 반영
-    col().onSnapshot(s => s.docChanges().forEach(ch => { if (ch.doc.metadata.hasPendingWrites) return; try { DB[ch.doc.id] = JSON.parse(ch.doc.data().v); } catch (e) {} }));
+    let c = null; try { c = JSON.parse(localStorage.getItem(CACHE()) || "null"); } catch (e) {}
+    if (c && c.db) { DB = c.db; fileVer = c.ver || 0; dirty = !!c.dirty; if (dirty) saveSoon(); refreshFromDrive().catch(() => {}); return; }
+    DB = {}; await refreshFromDrive(true);
+  }
+  async function refreshFromDrive(first) {
+    if (!first && (!token || Date.now() - tokenAt > 50 * 60e3)) return; // 구글 확인이 끝났으면 창을 띄우지 않고 다음에
+    const d = await readData();
+    if (!d) { // 처음: 예전에 Firebase 에 있던 자료를 드라이브로 옮김 (Firebase 쪽은 그대로 둠, 나중에 따로 정리)
+      const snap = await col().get(), old = {}; snap.forEach(x => { try { old[x.id] = JSON.parse(x.data().v); } catch (e) {} });
+      if (Object.keys(old).length) { DB = { ...old, ...DB }; dirty = true; await flush(); window.say && window.say("교무수첩 자료를 구글 드라이브로 옮겼어요."); if (!first && window.apply) window.apply(getAll()); }
+      return;
+    }
+    if (d.same || dirty) return;
+    DB = d.tables; fileVer = d.ver; keepLocal();
+    if (!first && window.apply) window.apply(getAll());
+  }
+  // 다른 기기에서 고친 것: 이 창으로 돌아올 때 확인. 창을 떠날 때는 남은 것을 저장
+  document.addEventListener("visibilitychange", () => { if (!uid) return; if (document.visibilityState === "visible") refreshFromDrive().catch(() => {}); else if (dirty) flush().catch(() => {}); });
+  addEventListener("beforeunload", e => { if (dirty || saving) { flush().catch(() => {}); e.preventDefault(); e.returnValue = ""; } });
+  // 이 기기에 둔 것이 없고 구글 확인도 끝났을 때: 단추를 눌러 드라이브에서 불러옴
+  function needGoogle() {
+    return new Promise(res => {
+      gate(true, "교무수첩 자료는 선생님 구글 드라이브에 있어요. 아래를 눌러 불러와 주세요.");
+      const b = document.getElementById("fbLogin"); b.textContent = "구글 드라이브에서 불러오기";
+      b.onclick = async () => { try { await reauth(); await load(); gate(false); res(); } catch (e) { gate(true, "불러오지 못했어요: " + (e.message || e.code)); } };
+    });
   }
   // 구글 API 열쇠 (1시간짜리). 지나면 다시 로그인 창으로 받음
   async function gtoken() {
@@ -101,7 +156,7 @@
   async function reauth() {
     const p = new firebase.auth.GoogleAuthProvider(); SCOPES.forEach(s => p.addScope(s));
     const r = await auth.currentUser.reauthenticateWithPopup(p);
-    token = r.credential.accessToken; tokenAt = Date.now(); keepToken(); document.getElementById("fbReauth")?.remove(); return token;
+    token = r.credential.accessToken; tokenAt = Date.now(); keepToken(); document.getElementById("fbReauth")?.remove(); if (dirty) saveSoon(0); return token;
   }
   function reauthBar() {
     if (document.getElementById("fbReauth")) return;
@@ -575,8 +630,14 @@
     const p = (await (await G(DRIVE + "/" + id + "?fields=parents")).json()).parents || [];
     await G(DRIVE + "/" + id + "?addParents=" + folder + (p.length ? "&removeParents=" + p.join(",") : "") + "&fields=id", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: "{}" });
   }
-  const snapCol = y => fs.collection("users").doc(uid).collection("years").doc(String(y)).collection("data");
-  async function snapshotYear(y) { const b = fs.batch(); TABLES.forEach(t => { if (DB[t] !== undefined) b.set(snapCol(y).doc(t), { v: JSON.stringify(DB[t]), at: Date.now() }); }); await b.commit(); }
+  const snapCol = y => fs.collection("users").doc(uid).collection("years").doc(String(y)).collection("data"); // 예전 보관 자리 (읽기만)
+  // 학년도 보관본: 그 해 폴더에 JSON 파일로 (같은 해를 다시 보관하면 덮어씀)
+  const yearFile = async y => (await findOne("appProperties has { key='gyomuYear' and value='" + y + "' }"))[0];
+  async function snapshotYear(y) {
+    const keep = {}; TABLES.forEach(t => { if (DB[t] !== undefined) keep[t] = DB[t]; });
+    const f = await yearFile(y);
+    await driveJson({ name: "교무수첩 " + y + "학년도 보관본 (지우지 마세요).json", parents: [await yearFolder(y)], appProperties: { gyomuYear: String(y) } }, JSON.stringify({ app: "gyomu", year: y, at: Date.now(), tables: keep }), f && f.id);
+  }
   Object.assign(API, {
     // 새 학년도 시작 (설정 → 학기에서 '20XX학년도 1학기'로 바꿀 때 화면이 부름)
     async archiveBefore(newYear) {
@@ -598,9 +659,10 @@
     // 보관한 학년도로 돌아가기: 지금 학년도도 Firebase 에 한 부 남긴 뒤 그 해 보관본을 되살림
     async restoreArchive(year) {
       year = Number(year); const cur = curYear();
-      const snap = await snapCol(year).get();
       let back = {};
-      if (!snap.empty) snap.forEach(d => { try { back[d.id] = JSON.parse(d.data().v); } catch (e) {} });
+      const yf = await yearFile(year), snap = yf ? null : await snapCol(year).get();
+      if (yf) back = ((await (await G(DRIVE + "/" + yf.id + "?alt=media")).json()) || {}).tables || {};
+      else if (!snap.empty) snap.forEach(d => { try { back[d.id] = JSON.parse(d.data().v); } catch (e) {} });
       else { const id = (cfgGet("archives") || {})[year]; if (!id) fail(year + "학년도 보관본이 없어요."); const o = await parseBook(id); back = o; back.cfg = { ...o.cfg }; back.meta = o.meta; }
       if (cur !== year) await snapshotYear(cur);
       const keep = get("cfg");
@@ -658,15 +720,15 @@
       lastAtt = { id, tabs: out };
       return { url: "https://docs.google.com/spreadsheets/d/" + id + "/edit", tabs: out };
     },
-    // 하루 한 번 출결 시트 전체를 Firebase 에 따로 한 부 (users/{uid}/attBackup/날짜). 구글 시트의 버전 기록과 함께 이중 백업
+    // 하루 한 번 출결 시트를 통째로 복사해 드라이브 '올해 폴더 › 출결 백업'에 둠 (최근 14개만, 오래된 것은 휴지통으로). 시트 버전 기록과 함께 이중 백업
     async attBackup() {
       if (!lastAtt) return false;
       const day = ymd(new Date()); if (cfgGet("attBackupDay") === day) return false;
-      const text = JSON.stringify({ sheet: lastAtt.id, at: Date.now(), tabs: lastAtt.tabs }), parts = [];
-      for (let i = 0; i < text.length; i += 800000) parts.push(text.slice(i, i + 800000)); // 문서 하나 1MB 제한이라 나눠 씀
-      const c = fs.collection("users").doc(uid).collection("attBackup"), b = fs.batch();
-      parts.forEach((p, i) => b.set(c.doc(day + "_" + i), { v: p, part: i, parts: parts.length, at: Date.now() }));
-      await b.commit(); await cfgPut({ attBackupDay: day }); return true;
+      const yf = await yearFolder(), bf = ((await findOne("name='출결 백업' and mimeType='" + FOLDER + "' and '" + yf + "' in parents"))[0] || await makeFolder("출결 백업", yf)).id;
+      await G(DRIVE + "/" + lastAtt.id + "/copy?fields=id", { method: "POST", headers: JSONH, body: JSON.stringify({ name: "출결 백업 " + day, parents: [bf] }) });
+      const all = await findOne("'" + bf + "' in parents"); // 오래된 것부터
+      for (const f of all.slice(0, Math.max(0, all.length - 14))) await G(DRIVE + "/" + f.id + "?fields=id", { method: "PATCH", headers: JSONH, body: JSON.stringify({ trashed: true }) }).catch(() => {});
+      await cfgPut({ attBackupDay: day }); return true;
     },
     async attAdd(list) {
       const id = attId(), tabs = await attTabs(id), at = nowStamp(), base = Date.now();
