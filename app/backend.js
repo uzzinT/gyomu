@@ -363,19 +363,25 @@
 
   // ---------- 구글 드라이브·시트 (로그인할 때 받은 구글 열쇠로 바로 부름) ----------
   // 창구에 부탁: 로그인 확인증(저절로 새로 받아짐) + 부를 주소·내용. 답은 보통 fetch 답 모양으로 돌려줌
-  async function GX(url, opts = {}) {
-    const body = opts.body, b64 = body == null ? null : bytesToB64(typeof body === "string" ? new TextEncoder().encode(body) : await new Response(body).arrayBuffer());
+  const reqOf = async (url, opts = {}) => { const body = opts.body;
+    return { url, method: opts.method || "GET", headers: opts.headers || {}, b64: body == null ? null : bytesToB64(typeof body === "string" ? new TextEncoder().encode(body) : await new Response(body).arrayBuffer()) }; };
+  const respOf = j => new Response([0, 204, 205, 304].includes(j.status) ? null : b64ToBytes(j.b64 || ""), { status: j.status || 599, headers: { "Content-Type": j.type || "" } });
+  async function proxy(body) {
     const id = await auth.currentUser.getIdToken();
-    let r; try { r = await fetch(PROXY, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ id, url, method: opts.method || "GET", headers: opts.headers || {}, b64 }) }); }
+    let r; try { r = await fetch(PROXY, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ id, ...body }) }); }
     catch (e) { fail("인터넷 연결을 확인해 주세요."); }
     let j = null; try { j = await r.json(); } catch (e) { fail("교무수첩 창구가 아직 준비되지 않았어요. (권한 허용을 했는지 확인해 주세요)"); }
     if (j.error) fail(j.error === "auth" ? "선생님 로그인을 확인하지 못했어요. 새로 고침해 주세요." : "교무수첩 창구: " + j.error);
-    return new Response([204, 205, 304].includes(j.status) ? null : b64ToBytes(j.b64 || ""), { status: j.status, headers: { "Content-Type": j.type || "" } });
+    return j;
   }
-  async function G(url, opts = {}) {
-    const r = await GX(url, opts);
-    if (!r.ok) { let m = ""; try { m = (await r.json()).error.message; } catch (e) {} fail("구글 드라이브·시트에서 거절했어요 (" + r.status + ") " + m); }
-    return r;
+  const GX = async (url, opts) => respOf(await proxy(await reqOf(url, opts)));
+  async function okR(r) { if (!r.ok) { let m = ""; try { m = (await r.json()).error.message; } catch (e) {} fail("구글 드라이브·시트에서 거절했어요 (" + r.status + ") " + m); } return r; }
+  const G = async (url, opts) => okR(await GX(url, opts));
+  // 여러 개를 창구 한 번에: [[주소, 옵션], ...]. 차례로(하나 실패하면 멈춤) 또는 parallel 이면 한꺼번에. 실패가 있으면 그 이유로 멈춤
+  async function GM(list, parallel, raw) { // raw: 실패해도 멈추지 않고 답을 그대로 (휴대폰 알림처럼 하나씩 따질 때)
+    const rs = (await proxy({ many: await Promise.all(list.map(([u, o]) => reqOf(u, o))), parallel: !!parallel })).many.map(respOf);
+    if (!raw) for (const r of rs) if (r.status) await okR(r.clone());
+    return rs;
   }
   const DRIVE = "https://www.googleapis.com/drive/v3/files", SHEETS = "https://sheets.googleapis.com/v4/spreadsheets";
   const FOLDER = "application/vnd.google-apps.folder";
@@ -686,12 +692,16 @@
     const i = col.findIndex(r => String(r[0] || "") === String(recId)); if (i < 1) fail("기록을 찾지 못했어요. 이미 지워졌거나 다른 곳에서 바뀌었어요. 새로 고침 해 주세요."); return i + 1;
   }
   // 그 앱처럼 시작일 최근 순 → 학번 순으로 정렬
-  async function sortRecs(id, tabs) { const t = tabs.find(x => x.title === "출결기록"); if (t) await sheetUpdate(id, [{ sortRange: { range: { sheetId: t.sheetId, startRowIndex: 1, startColumnIndex: 0, endColumnIndex: 11 }, sortSpecs: [{ dimensionIndex: 0, sortOrder: "DESCENDING" }, { dimensionIndex: 2, sortOrder: "ASCENDING" }] } }]); }
+  const sortReq = t => ({ sortRange: { range: { sheetId: t.sheetId, startRowIndex: 1, startColumnIndex: 0, endColumnIndex: 11 }, sortSpecs: [{ dimensionIndex: 0, sortOrder: "DESCENDING" }, { dimensionIndex: 2, sortOrder: "ASCENDING" }] } });
+  async function sortRecs(id, tabs) { const t = tabs.find(x => x.title === "출결기록"); if (t) await sheetUpdate(id, [sortReq(t)]); }
   const cleanRec = r => [S(r.startDate, 10), S(r.endDate, 10), S(r.num, 10), S(r.name, 30), S(r.type, 40), S(r.period, 60), S(r.reason, 300), S(r.doc, 300), JSON.stringify(r.docStatus && typeof r.docStatus === "object" ? r.docStatus : {})];
   Object.assign(API, {
-    async attLoad() {
-      const id = attId(), names = Object.keys(ATT_TABS), tabs = await attTabs(id);
-      const vals = await batchGet(id, names.map(n => "'" + n + "'!" + ATT_TABS[n]), "FORMATTED_VALUE"), out = {};
+    // after: 쓰기 부탁들 [[주소, 옵션]...] 을 먼저 하고 바로 이어서 읽음 (창구 한 번에)
+    async attLoad(after) {
+      const id = attId(), names = Object.keys(ATT_TABS); await attTabs(id);
+      const u = SHEETS + "/" + id + "/values:batchGet?valueRenderOption=FORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING&" + names.map(n => "ranges=" + q("'" + n + "'!" + ATT_TABS[n])).join("&");
+      const rs = await GM([...(Array.isArray(after) ? after : []), [u]]);
+      const vals = ((await rs[rs.length - 1].json()).valueRanges || []).map(v => v.values || []), out = {};
       names.forEach((n, i) => { out[n] = vals[i].map(r => r.map(v => String(v ?? ""))); });
       // 기록ID 가 빈 줄에는 ID 를 붙여 둠 (그 앱과 같은 방식)
       const recs = out["출결기록"] || [], fix = [];
@@ -714,17 +724,23 @@
       const id = attId(), tabs = await attTabs(id), at = nowStamp(), base = Date.now();
       const rows = (Array.isArray(list) ? list : []).slice(0, 60).map((r, i) => cleanRec(r).concat([at, "R" + base + "_" + i + "_" + Math.floor(Math.random() * 1000)]));
       if (!rows.length) fail("넣을 기록이 없어요.");
-      await appendRows(id, "출결기록", rows); await sortRecs(id, tabs); return API.attLoad();
+      const t = tabs.find(x => x.title === "출결기록");
+      return API.attLoad([[SHEETS + "/" + id + "/values/" + q("'출결기록'!A1") + ":append?valueInputOption=RAW&insertDataOption=INSERT_ROWS", { method: "POST", headers: JSONH, body: JSON.stringify({ values: rows }) }],
+        ...(t ? [[SHEETS + "/" + id + ":batchUpdate", { method: "POST", headers: JSONH, body: JSON.stringify({ requests: [sortReq(t)] }) }]] : [])]);
     },
-    async attUpdate(recId, r) { const id = attId(), row = await recRow(id, recId); await putRange(id, "'출결기록'!A" + row + ":I" + row, [cleanRec(r)]); return API.attLoad(); },
-    async attDoc(recId, status) { const id = attId(), row = await recRow(id, recId); await putRange(id, "'출결기록'!I" + row, [[JSON.stringify(status || {})]]); return API.attLoad(); },
+    async attUpdate(recId, r) { const id = attId(), row = await recRow(id, recId); return API.attLoad([[SHEETS + "/" + id + "/values/" + q("'출결기록'!A" + row + ":I" + row) + "?valueInputOption=RAW", { method: "PUT", headers: JSONH, body: JSON.stringify({ values: [cleanRec(r)] }) }]]); },
+    async attDoc(recId, status) { const id = attId(), row = await recRow(id, recId); return API.attLoad([[SHEETS + "/" + id + "/values/" + q("'출결기록'!I" + row) + "?valueInputOption=RAW", { method: "PUT", headers: JSONH, body: JSON.stringify({ values: [[JSON.stringify(status || {})]] }) }]]); },
     // 지우면 휴지통 탭으로 (돌려받은 휴지통ID 로 되살릴 수 있음)
     async attTrash(recId) {
-      const id = attId(), tabs = await attTabs(id), row = await recRow(id, recId), t = tabs.find(x => x.title === "출결기록");
-      const d = ((await batchGet(id, ["'출결기록'!A" + row + ":K" + row], "FORMATTED_VALUE"))[0][0] || []).map(String), tid = String(Date.now());
-      await appendRows(id, "휴지통", [[tid, d[0] || "", d[1] || "", d[2] || "", d[3] || "", d[4] || "", d[5] || "", d[6] || "", d[7] || "", d[8] || "", d[9] || "", nowStamp()]]);
-      await sheetUpdate(id, [{ deleteDimension: { range: { sheetId: t.sheetId, dimension: "ROWS", startIndex: row - 1, endIndex: row } } }]);
-      const data = await API.attLoad(); data.trashId = tid; return data;
+      // 기록 줄 찾기와 그 줄 내용을 한 번에 읽고, 휴지통에 넣기·줄 지우기·다시 읽기도 창구 한 번에
+      const id = attId(), tabs = await attTabs(id), t = tabs.find(x => x.title === "출결기록");
+      const all = (await batchGet(id, ["'출결기록'!A1:K8000"], "FORMATTED_VALUE"))[0], i = all.findIndex(r => String(r[10] || "") === String(recId));
+      if (i < 1) fail("기록을 찾지 못했어요. 이미 지워졌거나 다른 곳에서 바뀌었어요. 새로 고침 해 주세요.");
+      const row = i + 1, d = (all[i] || []).map(String), tid = String(Date.now());
+      const data = await API.attLoad([
+        [SHEETS + "/" + id + "/values/" + q("'휴지통'!A1") + ":append?valueInputOption=RAW&insertDataOption=INSERT_ROWS", { method: "POST", headers: JSONH, body: JSON.stringify({ values: [[tid, d[0] || "", d[1] || "", d[2] || "", d[3] || "", d[4] || "", d[5] || "", d[6] || "", d[7] || "", d[8] || "", d[9] || "", nowStamp()]] }) }],
+        [SHEETS + "/" + id + ":batchUpdate", { method: "POST", headers: JSONH, body: JSON.stringify({ requests: [{ deleteDimension: { range: { sheetId: t.sheetId, dimension: "ROWS", startIndex: row - 1, endIndex: row } } }] }) }]]);
+      data.trashId = tid; return data;
     },
     async attRestore(tid) {
       const id = attId(), tabs = await attTabs(id), tr = (await batchGet(id, ["'휴지통'!A1:L3000"], "FORMATTED_VALUE"))[0], i = tr.findIndex((r, k) => k && String(r[0]) === String(tid));
@@ -910,7 +926,8 @@
     const cp = cfgGet("classPw"); // 선생님 비밀번호: 창구가 sha256(salt + 비밀번호) 로 비교
     const text = JSON.stringify({ v: 1, at: Date.now(), salt, pw, teacher: cp && cp.hash ? { salt: cp.salt, hash: cp.hash } : null, shared, kids }), rows = [];
     for (let i = 0; i < text.length; i += 40000) rows.push([text.slice(i, i + 40000)]);
-    await clearRange(NOTICE_BOOK, "'자료'!A:A"); await putRange(NOTICE_BOOK, "'자료'!A1", rows);
+    await GM([[SHEETS + "/" + NOTICE_BOOK + "/values/" + q("'자료'!A:A") + ":clear", { method: "POST" }],
+      [SHEETS + "/" + NOTICE_BOOK + "/values/" + q("'자료'!A1") + "?valueInputOption=RAW", { method: "PUT", headers: JSONH, body: JSON.stringify({ values: rows }) }]]); // 지우고 쓰기를 창구 한 번에
   }
   let pubTimer = null;
   const schedulePublish = () => { clearTimeout(pubTimer); pubTimer = setTimeout(() => publishNotice().catch(e => console.warn("알림 앱 내보내기", e)), 2500); };
@@ -939,9 +956,12 @@
     // 창구(앱스 스크립트)가 드라이브 시트 '기기' 탭에 적어 둔 휴대폰도 (같은 열쇠는 한 번만)
     try { ((await batchGet(NOTICE_BOOK, ["'기기'!A2:B2000"], "FORMATTED_VALUE"))[0] || []).forEach(r => { if (r[1] && hbs.has(String(r[0])) && !targets.some(x => x.token === r[1])) targets.push({ id: "", token: String(r[1]) }); }); } catch (e) {}
     let sent = 0, why = "";
-    for (const t of targets) {
-      const r = await GX("https://fcm.googleapis.com/v1/projects/" + FB.projectId + "/messages:send", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: { token: t.token, notification: { title, body: body.slice(0, 180) }, webpush: { fcm_options: { link: PWA_URL } } } }) });
+    if (!targets.length) return 0;
+    // 모든 휴대폰에 한꺼번에 (창구 한 번)
+    const rs = await GM(targets.map(t => ["https://fcm.googleapis.com/v1/projects/" + FB.projectId + "/messages:send", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: { token: t.token, notification: { title, body: body.slice(0, 180) }, webpush: { fcm_options: { link: PWA_URL } } } }) }]), true, true);
+    for (const [k, t] of targets.entries()) {
+      const r = rs[k];
       if (r.ok) { sent++; continue; }
       why = r.status + " " + (await r.text().catch(() => "")).slice(0, 200); console.warn("휴대폰 알림", why);
       if ((r.status === 404 || r.status === 400) && t.id) await noticeDoc().collection("push").doc(t.id).delete().catch(() => {}); // 지운 기기
@@ -951,10 +971,14 @@
   }
   const PUB_FNS = new Set(["addNote", "updateNote", "deleteNote", "saveEvents", "addCheck", "updateCheck", "deleteCheck", "saveConfig", "saveClassTT", "saveStudentTT", "setStudentPasswords", "setNoticePassword", "sendStudentMessages", "deleteStudentMessage", "saveStudents", "importFromSheet", "importFromArchive", "restoreArchive", "archiveBefore"]);
   const sendMsg = API.sendStudentMessages;
-  API.sendStudentMessages = async (nos, text, show = true) => { const r = await sendMsg(nos, text); try { await publishNotice(); const n = await pushTo((Array.isArray(nos) ? nos : []).map(Number), "담임 선생님 알림", show === false ? "담임 선생님 새 알림이 있어요. 앱에서 확인해 주세요." : String(text || "")); r.pushed = n; } catch (e) { r.pushError = e.message; } return r; };
+  // 학생 앱 자료 고치기와 휴대폰 알림을 동시에 (기다리는 시간을 줄임)
+  API.sendStudentMessages = async (nos, text, show = true) => { const r = await sendMsg(nos, text);
+    const [pub, push] = await Promise.allSettled([publishNotice(), pushTo((Array.isArray(nos) ? nos : []).map(Number), "담임 선생님 알림", show === false ? "담임 선생님 새 알림이 있어요. 앱에서 확인해 주세요." : String(text || ""))]);
+    if (push.status === "fulfilled") r.pushed = push.value; else r.pushError = push.reason && push.reason.message;
+    if (pub.status === "rejected") r.pushError = "학생 앱에 올리지 못했어요: " + (pub.reason && pub.reason.message); return r; };
   API.publishNow = async () => ({ problems: await publishNotice() });
   const attLoad0 = API.attLoad;
-  API.attLoad = async () => { const r = await attLoad0(); publishAtt(r.tabs).catch(e => console.warn("출결 내보내기", e)); return r; };
+  API.attLoad = async (...a) => { const r = await attLoad0(...a); publishAtt(r.tabs).catch(e => console.warn("출결 내보내기", e)); return r; };
 
   // 화면 코드가 부르는 곳: 로그인·자료 준비가 끝날 때까지 기다렸다가 같은 이름의 함수를 부름
   let firstPub = false;
