@@ -2203,6 +2203,7 @@ function openDay(k){
       // ✎ 고치기: 이름·분류·날짜를 그 자리에서 바꿈 (학교 학사일정도)
       const fix = el("button",{className:"x",type:"button",title:"고치기","aria-label":e.title + " 고치기"}, "✎");
       fix.onclick = () => {
+        if(window.fbCall) return openEvNote(k, e); // 이름·분류·날짜와 글·마감·사진·파일을 한 창에서
         const t = el("input",{className:"field",id:"evFixTitle",maxLength:40,value:e.title,"aria-label":"일정 이름"});
         const c = el("select",{className:"field",id:"evFixCat","aria-label":"분류"}, ...evCats().map(x => el("option",{value:x.id,selected:x.id === e.cat}, x.name)), el("option",{value:"",selected:!e.cat}, "학교"));
         const dt = el("input",{type:"date",className:"field",id:"evFixDate",value:e.date,"aria-label":"날짜"});
@@ -2267,14 +2268,19 @@ function openDay(k){
   dlg.showModal();
 }
 
-// 행사 하나의 창: 글 · 마감일 표시 · 사진·파일(미리 보기). 사진·파일은 드라이브 올해 폴더 › 학사일정 자료
-function openEvNote(k, e){
-  const n = evNoteOf(k, e) || { text:"", due:false, files:[] }, edit = canWrite(), files = (n.files || []).slice(), d = parseYmd(k);
+// 행사 하나의 창: 이름·분류·날짜 고치기 + 글 · 마감일 표시 · 사진·파일(미리 보기). 사진·파일은 드라이브 올해 폴더 › 학사일정 자료
+function openEvNote(k, e0){
+  const e = events.find(x => x === e0) || events.find(x => x.date === k && x.title === e0.title) || e0; // 홈 D-day 에서 열면 이름으로 찾음
+  const n = evNoteOf(k, e) || { text:"", due:false, files:[] }, edit = canWrite(), files = (n.files || []).slice(), real = events.includes(e);
+  const tIn = el("input",{className:"field",maxLength:40,value:e.title,readOnly:!edit || !real,"aria-label":"행사 이름"});
+  const cIn = el("select",{className:"field",disabled:!edit || !real,"aria-label":"분류"}, ...evCats().map(x => el("option",{value:x.id,selected:x.id === e.cat}, x.name)), el("option",{value:"",selected:!e.cat}, "학교"));
+  const dIn = el("input",{type:"date",className:"field",value:k,readOnly:!edit || !real,"aria-label":"날짜"});
   const ta = el("textarea",{rows:4,maxLength:2000,value:n.text || "",placeholder:"이 행사에 대한 글 (준비물, 안내, 연락 등)",readOnly:!edit,"aria-label":"글"});
   const due = el("input",{type:"checkbox",checked:!!n.due,disabled:!edit});
   const err = el("div",{className:"err"}), prevBox = el("div",{});
-  const save = async (msg) => { await store.saveEvNote(k, e.title, ta.value, due.checked, files); if(msg) say(msg); };
-  const drawFiles = () => prevBox.replaceChildren(files.length ? filePreviews(files, edit ? i => { if(confirm(files[i].name + "을(를) 이 행사에서 뺄까요? (드라이브 파일은 남아요)")){ files.splice(i, 1); drawFiles(); save().catch(x => { err.textContent = x?.message || "저장하지 못했어요."; }); } } : null) : el("p",{className:"hint"}, "사진·파일이 없어요."));
+  // 글·마감·파일 저장 (이름·날짜는 [저장]을 누를 때만 바뀜)
+  const saveNote = async msg => { await store.saveEvNote(k, e.title, ta.value, due.checked, files); if(msg) say(msg); };
+  const drawFiles = () => prevBox.replaceChildren(files.length ? filePreviews(files, edit ? i => { if(confirm(files[i].name + "을(를) 이 행사에서 뺄까요? (드라이브 파일은 남아요)")){ files.splice(i, 1); drawFiles(); saveNote().catch(x => { err.textContent = x?.message || "저장하지 못했어요."; }); } } : null) : el("p",{className:"hint"}, "사진·파일이 없어요."));
   drawFiles();
   const pick = el("input",{type:"file",hidden:true,multiple:true});
   pick.onchange = async () => {
@@ -2285,16 +2291,31 @@ function openEvNote(k, e){
       try{ files.push(await store.uploadFile(f, "events")); drawFiles(); err.textContent = ""; }
       catch(x){ err.textContent = x?.message && !x.code ? x.message : "올리지 못했어요."; break; }
     }
-    try{ await save(); }catch(x){ err.textContent = x?.message || "저장하지 못했어요."; }
+    try{ await saveNote(); }catch(x){ err.textContent = x?.message || "저장하지 못했어요."; }
   };
-  due.onchange = () => save(due.checked ? "마감일로 표시했어요. 홈에 D-day로 떠요." : "마감일 표시를 뺐어요.").catch(x => { err.textContent = x?.message || "저장하지 못했어요."; });
+  due.onchange = () => saveNote(due.checked ? "마감일로 표시했어요. 홈에 D-day로 떠요." : "마감일 표시를 뺐어요.").catch(x => { err.textContent = x?.message || "저장하지 못했어요."; });
   const ok = el("button",{className:"btn",type:"button"}, "저장");
-  ok.onclick = async () => { ok.disabled = true; try{ await save("저장했어요."); $("dayDlg").close(); }catch(x){ ok.disabled = false; err.textContent = x?.message && !x.code ? x.message : "저장하지 못했어요."; } };
+  ok.onclick = async () => {
+    const nt = tIn.value.trim(), nd = dIn.value; if(!nt) return tIn.focus(); if(!/^\d{4}-\d{2}-\d{2}$/.test(nd)) return dIn.focus();
+    ok.disabled = true;
+    try{
+      if(real && (nt !== e.title || cIn.value !== (e.cat || "") || nd !== k)){
+        // 이름·날짜가 바뀌면 행사를 고치고, 글·파일도 새 이름·날짜로 옮김
+        await store.saveEvents(events.map(x => x === e ? { ...x, title:nt, cat:cIn.value, date:nd } : x));
+        if(evNoteOf(k, e)) await store.saveEvNote(k, e.title, "", false, []);
+        await store.saveEvNote(nd, nt, ta.value, due.checked, files);
+      } else await saveNote();
+      say("저장했어요."); openDay(nd);
+    }catch(x){ ok.disabled = false; err.textContent = x?.message && !x.code ? x.message : "저장하지 못했어요. 잠시 뒤 다시 시도해 주세요."; }
+  };
+  const d = parseYmd(k);
   modal(e.title + " · " + (d.getMonth() + 1) + "월 " + d.getDate() + "일",
+    el("div",{className:"evfix"}, cIn, tIn, dIn),
     el("label",{className:"memo-label"}, "글", ta),
     el("label",{className:"inline"}, due, " 이 행사를 마감일로 표시 (홈에 D-day로 떠요)"),
     el("h3",{className:"sub"}, "사진·파일"), prevBox, err, edit ? pick : null,
     el("div",{className:"actions"}, edit ? navBtn("📎 사진·파일 올리기", () => pick.click(), e.title + " 사진·파일 올리기") : null, navBtn("← 날짜로", () => openDay(k), "그날 일정으로"), el("span",{className:"spacer"}), edit ? ok : null));
+  if(edit && real) setTimeout(() => tIn.focus(), 0);
 }
 const hrefOf = it => it.kind === "memo" ? null : safeUrl(it.url);
 // 바로 가기: 카드에서 ☆로 고정한 항목 (출결, 교과 진도표처럼 자주 쓰는 것)
