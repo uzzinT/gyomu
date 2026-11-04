@@ -938,8 +938,8 @@
         msgs: get("pmsg").filter(m => m.no === n && m.at > old).sort((x, y) => y.at - x.at).slice(0, 50).map(m => ({ text: m.text, at: m.at })),
         done: chk.filter(x => (x.done || []).includes(n)).map(x => x.id), att: att[hb] || [] };
     }
-    const tp = String(cfgGet("noticeTeacherPw") || "").trim();
-    const text = JSON.stringify({ v: 1, at: Date.now(), salt, pw, teacher: tp ? await sha(salt + ":teacher:" + tp) : "", shared, kids }), rows = [];
+    const cp = cfgGet("classPw"); // 선생님 비밀번호: 창구가 sha256(salt + 비밀번호) 로 비교
+    const text = JSON.stringify({ v: 1, at: Date.now(), salt, pw, teacher: cp && cp.hash ? { salt: cp.salt, hash: cp.hash } : null, shared, kids }), rows = [];
     for (let i = 0; i < text.length; i += 40000) rows.push([text.slice(i, i + 40000)]);
     await clearRange(NOTICE_BOOK, "'자료'!A:A"); await putRange(NOTICE_BOOK, "'자료'!A1", rows);
   }
