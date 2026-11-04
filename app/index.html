@@ -245,6 +245,12 @@ nav{margin-bottom:14px}
 .kids button.ph b::after{content:" ●";color:var(--green);font-size:.55rem}
 .kidphoto{display:block;max-width:100%;max-height:60vh;margin:6px auto;border-radius:8px}
 .fcol{display:grid;gap:16px;align-content:start}
+.fprevs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:8px 0}
+.fprev{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--paper2)}
+.fprev iframe{display:block;width:100%;height:150px;border:0;background:#fff}
+.fprevnone{height:150px;display:grid;place-items:center;color:var(--muted);font-size:.8rem}
+.fprevname{display:flex;gap:4px;align-items:center;padding:4px 6px;font-size:.78rem}
+.fprevname a{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .kidtels{display:grid;gap:4px;margin:8px 0}
 .kidtel{display:grid;grid-template-columns:4.5em 11em auto;gap:10px;align-items:center}
 .kidtel span{color:var(--muted);font-size:.85rem}
@@ -999,7 +1005,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="backend.js?v=d0cfa6ba"></script>
+<script src="backend.js?v=b9aeca19"></script>
 <style>
 #fbGate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--desk)}
 #fbGate .fbbox{background:var(--paper);border-radius:22px;padding:36px 32px;text-align:center;box-shadow:0 18px 40px -24px rgba(20,40,25,.35);max-width:340px}
@@ -2210,14 +2216,28 @@ function openDay(k){
     return li; };
   const ta = el("textarea",{id:"dayMemo",rows:2,maxLength:2000,value:memos[k] || "",placeholder:"이날의 메모 (준비물, 할 일, 연락 등)",readOnly:!edit});
   const dueBox = el("input",{type:"checkbox",id:"dayDue",checked:!!dues[k],disabled:!edit});
-  const att = attachBox(memoFiles[k], edit);
+  const files = (memoFiles[k] || []).slice(), att = { node:null, files:() => files.slice() }; // 사진·파일은 아래 미리 보기에서 따로 올리고 빼고 바로 저장
   const err = el("div",{className:"err"});
+  const keepFiles = async next => { await store.saveMemo(k, memos[k] || "", !!dues[k], next); openDay(k); };
+  const pick = el("input",{type:"file",hidden:true,multiple:true});
+  pick.onchange = async () => {
+    const fs = [...pick.files]; pick.value = ""; const next = files.slice();
+    for(const f of fs){
+      if(next.length >= 10){ err.textContent = "사진·파일은 하루에 10개까지 넣을 수 있어요."; break; }
+      err.textContent = f.name + " 올리는 중…";
+      try{ next.push(await store.uploadFile(f, "events")); err.textContent = ""; }
+      catch(e){ err.textContent = e?.message && !e.code ? e.message : "올리지 못했어요."; break; }
+    }
+    if(next.length !== files.length) try{ await keepFiles(next); }catch(e){ err.textContent = e?.message && !e.code ? e.message : "저장하지 못했어요."; }
+  };
+  const fileBtn = navBtn("📎 사진·파일 올리기", () => pick.click(), "이날 사진·파일 올리기 (드라이브 올해 폴더 › 학사일정 자료)");
+  const prevs = files.length ? filePreviews(files, edit ? i => { if(confirm(files[i].name + "을(를) 이날에서 뺄까요? (드라이브 파일은 남아요)")) keepFiles(files.filter((_, j) => j !== i)).catch(e => { err.textContent = e?.message || "저장하지 못했어요."; }); } : null) : null;
   const save = el("button",{className:"btn",type:"button",hidden:true}, "저장");
   // 처음엔 그날 일정만: 메모·일정 넣기는 단추를 눌러야 열림
-  const memoWrap = el("div",{className:"dayx",hidden:true}, el("label",{className:"memo-label"}, "메모", ta), el("label",{className:"inline"}, dueBox, " 이날을 마감일로 표시 (홈 날짜 아래에 D-day로 떠요)"), att.node);
-  const memoView = memos[k] ? el("div",{className:"memoview"}, el("b",{}, "메모"), el("p",{}, memos[k])) : null;
+  const memoWrap = el("div",{className:"dayx",hidden:true}, el("label",{className:"memo-label"}, "메모", ta), el("label",{className:"inline"}, dueBox, " 이날을 마감일로 표시 (홈 날짜 아래에 D-day로 떠요)"));
+  const memoView = memos[k] ? el("div",{className:"memoview"}, el("b",{}, "글"), el("p",{}, memos[k])) : null;
   const addWrap = el("div",{className:"evadd",hidden:true}, evCat, evTitle, el("label",{className:"inline"}, "~ ", evEnd), navBtn("추가", addEv, "일정 추가"), navBtn("분류 고치기", () => openEvCats(), "일정 분류 고치기"));
-  const memoBtn = navBtn(memos[k] ? "✎ 메모 고치기" : "+ 메모 쓰기", () => { memoWrap.hidden = false; save.hidden = false; memoBtn.hidden = true; if(memoView) memoView.hidden = true; setTimeout(() => ta.focus(), 0); }, "이날 메모");
+  const memoBtn = navBtn(memos[k] ? "✎ 글 고치기" : "+ 글 쓰기", () => { memoWrap.hidden = false; save.hidden = false; memoBtn.hidden = true; if(memoView) memoView.hidden = true; setTimeout(() => ta.focus(), 0); }, "이날 메모");
   const addBtn = navBtn("+ 일정 추가", () => { addWrap.hidden = false; addBtn.hidden = true; setTimeout(() => evTitle.focus(), 0); }, "이날 일정 추가");
   // 마감일 표시는 메모를 열지 않고 바로 (누르면 저장)
   const dueBtn = navBtn(dues[k] ? "⏰ 마감일 표시 빼기" : "⏰ 마감일로 표시", async () => {
@@ -2235,9 +2255,9 @@ function openDay(k){
   dlg.replaceChildren(el("div",{className:"daybox"},
     el("h2",{}, d.getFullYear() + "년 " + (d.getMonth() + 1) + "월 " + d.getDate() + "일 " + WD[d.getDay()] + "요일"),
     evs.length ? el("ul",{className:"devs"}, ...evs.map(evLi)) : el("p",{className:"note"}, "일정이 없어요."),
-    memoView, dues[k] ? el("p",{className:"note"}, "⏰ 이날은 마감일로 표시돼 있어요.") : null,
-    edit ? addWrap : null, edit ? memoWrap : null, err,
-    el("div",{className:"actions"}, edit ? addBtn : null, edit ? memoBtn : null, edit ? dueBtn : null, el("span",{className:"spacer"}), close, save)));
+    memoView, prevs, dues[k] ? el("p",{className:"note"}, "⏰ 이날은 마감일로 표시돼 있어요.") : null,
+    edit ? addWrap : null, edit ? memoWrap : null, err, edit ? pick : null,
+    el("div",{className:"actions"}, edit ? addBtn : null, edit ? memoBtn : null, edit ? fileBtn : null, edit ? dueBtn : null, el("span",{className:"spacer"}), close, save)));
   dlg.showModal();
 }
 
@@ -2754,6 +2774,18 @@ function renderNoticeBox(){
 
 // 첨부 파일 링크 (Claude 페이지는 /_blob/ 주소, 앱스스크립트는 드라이브 주소)
 const fileHref = f => /^\/_blob\/[0-9a-f]{32}$/.test(f?.url || "") ? f.url : safeUrl(f?.url);
+// 사진·파일 미리 보기: 드라이브의 미리 보기 화면을 작게 (사진·PDF·한글·문서 모두). 이름을 누르면 크게 열림
+const driveIdOf = f => f?.fileId || (String(f?.url || "").match(/\/d\/([\w-]{20,})/) || String(f?.url || "").match(/[?&]id=([\w-]{20,})/) || [])[1] || "";
+function filePreviews(files, onRemove){
+  return el("div",{className:"fprevs"}, ...files.map((f, i) => {
+    const id = driveIdOf(f), href = fileHref(f);
+    const card = el("div",{className:"fprev"},
+      id ? el("iframe",{src:"https:" + "/" + "/drive.google.com/file/d/" + id + "/preview",loading:"lazy",title:f.name + " 미리 보기"}) : el("div",{className:"fprevnone"}, "미리 보기 없음"),
+      el("div",{className:"fprevname"}, href ? el("a",{href,target:"_blank",rel:"noopener noreferrer",title:"크게 열기"}, f.name) : f.name));
+    if(onRemove){ const x = el("button",{className:"x",type:"button","aria-label":f.name + " 빼기",title:"이날에서 빼기"}, "✕"); x.onclick = () => onRemove(i); card.querySelector(".fprevname").append(x); }
+    return card;
+  }));
+}
 function fileList(files, onRemove){
   return el("ul",{className:"files"}, ...files.map((f, i) => {
     const href = fileHref(f), li = el("li",{}, href ? el("a",{href,target:"_blank",rel:"noopener noreferrer"}, f.name) : el("span",{}, f.name));
@@ -4246,9 +4278,9 @@ const store = {
   updateNote: (id, p) => { Object.assign(notes.find(n => n.id === id) || {}, p); renderHome(); call("updateNote", id, p).then(apply).catch(failNote); },
   pin: it => { it.pinned = !it.pinned; render(); call("setPinned", it.id, it.pinned).then(apply).catch(failNote); },
   saveConfigPatch: async p => apply(await call("saveConfig", { ...structuredClone(config), ...p })),
-  uploadFile: async f => {
+  uploadFile: async (f, folder) => { // folder: "events" 면 올해 폴더 › 학사일정 자료
     if(f.size > MAX_BYTES) throw new Error("20MB보다 큰 파일은 드라이브에 직접 올리고 링크를 세부 내용에 붙여 주세요.");
-    return await call("uploadNoteFile", { name:f.name, type:f.type, data: await readB64(f), area: areaOf(tab)?.id || "" });
+    return await call("uploadNoteFile", { name:f.name, type:f.type, data: await readB64(f), area: areaOf(tab)?.id || "", folder: folder || "" });
   },
   addTodo: t => { todos.push({ ...t, id:"tmp" + Date.now(), done:false, createdAt:Date.now() }); renderHome(); call("addTodo", t).then(apply).catch(failNote); },
   updateTodo: (id, p) => { Object.assign(todos.find(t => t.id === id) || {}, p); renderHome(); call("updateTodo", id, p).then(apply).catch(failNote); },

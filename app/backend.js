@@ -420,10 +420,16 @@
   }
   const b64ToBytes = b => Uint8Array.from(atob(b), c => c.charCodeAt(0));
   const bytesToB64 = buf => { const u = new Uint8Array(buf); let s = ""; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); };
+  // 학사일정에 올린 사진·파일: 올해 폴더 › '학사일정 자료' (없으면 만듦, 한 번 찾으면 기억)
+  async function eventsFolder() {
+    const y = curYear(), d = { ...(cfgGet("drive") || {}) }; if (d.events && d.events[y]) return d.events[y];
+    const yf = await yearFolder(y), id = ((await findOne("name='학사일정 자료' and mimeType='" + FOLDER + "' and '" + yf + "' in parents"))[0] || await makeFolder("학사일정 자료", yf)).id;
+    const d2 = { ...(cfgGet("drive") || {}) }; d2.events = { ...(d2.events || {}), [y]: id }; await cfgPut({ drive: d2 }); return id;
+  }
   async function driveUpload(p) {
     const name = S(p.name, 200).trim(); if (!name) fail("파일 이름이 없어요.");
     const bytes = b64ToBytes(String(p.data || "")); if (!bytes.length) fail("빈 파일은 올릴 수 없어요."); if (bytes.length > 20 * 1024 * 1024) fail("20MB보다 큰 파일은 올릴 수 없어요.");
-    const meta = { name, parents: [p.area ? await areaFolder(String(p.area)) : await yearFolder()] }, type = String(p.type || "") || "application/octet-stream";
+    const meta = { name, parents: [p.folder === "events" ? await eventsFolder() : p.area ? await areaFolder(String(p.area)) : await yearFolder()] }, type = String(p.type || "") || "application/octet-stream";
     const body = new Blob(["--b\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n" + JSON.stringify(meta) + "\r\n--b\r\nContent-Type: " + type + "\r\n\r\n", bytes, "\r\n--b--"]);
     const f = await (await G("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink", { method: "POST", headers: { "Content-Type": "multipart/related; boundary=b" }, body })).json();
     return { name, url: f.webViewLink, fileId: f.id, size: bytes.length };
