@@ -987,7 +987,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="backend.js?v=535fffc1"></script>
+<script src="backend.js?v=1ff23943"></script>
 <style>
 #fbGate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--desk)}
 #fbGate .fbbox{background:var(--paper);border-radius:22px;padding:36px 32px;text-align:center;box-shadow:0 18px 40px -24px rgba(20,40,25,.35);max-width:340px}
@@ -1641,7 +1641,7 @@ function attHoliCal(list){
 function attNotify(nums, text){
   const nos = [...new Set(nums.map(n => parseInt(n)).filter(Boolean))];
   if(!nos.length) return say("보낼 학생이 없어요.");
-  openStudentMsg(null, { nos, text });
+  openStudentMsg(null, { nos, text, hide:true }); // 출결 알림은 잠금 화면에 내용이 안 뜨게 시작
 }
 // 6. 설정: 출결 종류 · 알림 규칙 · 색상 그룹 · 하루 대표 출결 집계 규칙 · 요일별 교시
 function attSettings(){
@@ -2664,7 +2664,9 @@ function openStudentMsg(sent, pre){
   const sel = el("select",{className:"field","aria-label":"제출물에서 안 낸 학생 고르기"}, el("option",{value:""}, "안 낸 학생 고르기…"), ...open.map(c => el("option",{value:c.id}, c.title)));
   sel.onchange = () => { const c = open.find(x => x.id === sel.value); if(c) pickNos(students.map(s => s.no).filter(n => !c.done.includes(n))); };
   const ta = el("textarea",{className:"field",rows:3,maxLength:1000,placeholder:"보낼 말 (예: 내일까지 체험학습 보고서를 내 주세요.)","aria-label":"보낼 말"});
-  if(pre){ pickNos(pre.nos || []); ta.value = pre.text || ""; }
+  // 휴대폰 알림에 문구를 그대로 띄울지 (끄면 '새 알림이 있어요'만, 내용은 앱에서)
+  const show = el("input",{type:"checkbox",checked:true});
+  if(pre){ pickNos(pre.nos || []); ta.value = pre.text || ""; if(pre.hide) show.checked = false; }
   const list = el("div",{className:"pmsglist"}, el("p",{className:"hint"}, "보낸 알림을 불러오는 중…"));
   const nameList = nos => nos.map(n => n + "번" + (nameOf(n) ? " " + nameOf(n) : "")).join(", ");
   const drawSent = arr => list.replaceChildren(...(arr.length ? arr.map(m => { const x = navBtn("지우기", async () => { if(!confirm("이 알림을 지울까요? 학생 앱에서도 사라져요.")) return; try{ drawSent(await call("deleteStudentMessage", m.id)); }catch(e){ say(e?.message || "지우지 못했어요."); } }, "보낸 알림 지우기");
@@ -2675,14 +2677,14 @@ function openStudentMsg(sent, pre){
     const nos = boxes.filter(b => b.cb.checked).map(b => b.s.no);
     if(!nos.length) return say("받을 학생을 골라 주세요.");
     if(!ta.value.trim()) return say("보낼 말을 적어 주세요.");
-    try{ const r = await call("sendStudentMessages", nos, ta.value.trim()); say(nos.length + "명에게 보냈어요."); $("dayDlg").dataset.dirty = ""; openStudentMsg(r); }
+    try{ const r = await call("sendStudentMessages", nos, ta.value.trim(), show.checked); say(nos.length + "명에게 보냈어요."); $("dayDlg").dataset.dirty = ""; openStudentMsg(r); }
     catch(e){ say(e?.message || "보내지 못했어요."); }
   }, "개별 알림 보내기"); send.className = "btn";
   modal("개별 알림",
     el("p",{className:"hint"}, "고른 학생 번호로 들어온 학생·학부모의 알림 앱에만 보여요."),
     el("div",{className:"attbar"}, navBtn("모두", () => pickNos(students.map(s => s.no)), "모두 고르기"), navBtn("모두 풀기", () => pickNos([]), "모두 풀기"), open.length ? sel : ""),
     el("div",{className:"pmsgpick"}, ...boxes.map(b => el("label",{className:"inline"}, b.cb, " " + b.s.no + " " + b.s.name))),
-    ta, el("div",{className:"actions"}, el("span",{className:"spacer"}), send),
+    ta, el("div",{className:"actions"}, el("label",{className:"inline",title:"끄면 잠금 화면에 '담임 선생님 새 알림이 있어요'만 보이고, 내용은 앱을 열어야 보여요"}, show, " 알림에 내용 보이기"), el("span",{className:"spacer"}), send),
     el("h3",{className:"nt-title"}, "보낸 알림"), list);
 }
 function renderNoticeBox(){
