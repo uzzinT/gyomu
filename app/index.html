@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>나의 교무수첩</title>
 <link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-title" content="교무수첩">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#26402e">
 <base target="_blank">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
@@ -722,16 +726,39 @@ dialog::backdrop{background:rgba(16,32,21,.45);backdrop-filter:blur(2px)}
   .tt table{table-layout:fixed;width:100%!important;min-width:0!important}
   .tt th,.tt td{font-size:.68rem!important;padding:3px 1px!important;overflow-wrap:anywhere;word-break:keep-all;line-height:1.25}
   .tt thead th:first-child,.tt tbody th{width:3.4em}
-  .tt td small,.tt th small{font-size:.56rem}.tt tbody th,.tt tbody th small{white-space:normal!important;overflow-wrap:anywhere}
+  .tt td small,.tt th small{font-size:.56rem}.tt .te{display:none}/* 좁으면 시작 시각만 */
+  .tt tbody th{overflow:visible}.tt tbody th small{display:block;white-space:nowrap}
+  .attwrap .docwide{display:none}.attwrap .doccards{display:block}
+  .attrow .drange{display:flex;flex:1 1 100%}.attrow .drange input{flex:1 1 0;min-width:0}
+  /* 날짜: 이름표는 윗줄, 시작~끝은 한 줄에 */
+  .attrow:has(>.attlbl+input[type=date]) input{flex:1 1 0;min-width:0;font-size:.85rem;padding-inline:6px}
+  nav button,.attseg button,.kbtn,.chip,.btn,.small,.navbtn{justify-content:center;text-align:center}
+  /* 오늘 화면: 칸을 한 줄로 늘어놓고 정한 순서대로 */
+  /* 오늘 화면(휴대폰): PC의 가운데(지금 수업·시간표) → 왼쪽(날짜·할 일·조종례) → 오른쪽(달력·이번 주) */
+  .home4{display:flex!important;flex-direction:column}.home4>.col:nth-child(2){order:1}.home4>.col:nth-child(1){order:2}.home4>.col:nth-child(3){order:3}
+  /* 탭 단추는 글자 너비대로, 넘치면 다음 줄 (글자가 잘리거나 치우치지 않게) */
+  nav{flex-wrap:wrap!important}nav button:not(.tabback){flex:none!important;white-space:nowrap}
+  /* '← 이전'은 탭 줄에 끼지 않게 머리띠 오른쪽 맨 위로 */
+  header{position:relative}
+  nav .tabback{position:absolute!important;top:12px;right:12px;margin:0!important;padding:5px 10px!important;font-size:.76rem!important}
   .attseg{flex-wrap:nowrap;overflow-x:auto;width:auto;max-width:100%;scrollbar-width:none}.attseg::-webkit-scrollbar{display:none}.attseg button{flex:none;white-space:nowrap}
   .attwrap .tt-wrap,.attstat,.doctable{max-width:100%}.attwrap .tt-wrap{overflow-x:auto}
   .attrow{flex-wrap:wrap}.attrow .field{min-width:0;flex:1 1 9em}
   .kidgrid{grid-template-columns:repeat(5,minmax(0,1fr))!important}
   .calweek,.calmonth{overflow-x:auto;padding-bottom:4px}.calweek{grid-template-columns:repeat(5,minmax(124px,1fr))}.calmonth{grid-template-columns:repeat(5,minmax(100px,1fr))}
 }
+.memoview{padding:10px 12px;border-radius:10px;background:var(--paper2);font-size:.95rem}.memoview p{margin:4px 0 0;white-space:pre-wrap}
+.wkaddbtn{display:flex;justify-content:flex-end;margin-top:8px}
+.doccards{display:none}
+.doccard{display:grid!important;grid-template-columns:5.6em minmax(0,1fr);gap:4px 10px;align-items:start;border-left:3px solid var(--c);padding-left:8px!important}
+.doccard .dd{display:flex;flex-direction:column;font-size:.8rem;font-weight:600;color:var(--ink)}.doccard .dd small{font-weight:400;color:var(--muted)}
+.doccard .l1{display:flex;gap:6px;align-items:baseline;flex-wrap:wrap}.doccard .ty{font-weight:700;color:var(--c)}.doccard .ty small{color:var(--danger);font-weight:500}
+.doccard .l2{display:flex;gap:6px;align-items:center;margin-top:4px;min-height:1.6em}.doccard .l2 .t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
+.doccard .docs{display:flex;gap:4px;flex:none}
+.drange{display:inline-flex;gap:6px;align-items:center;min-width:0}
 /* 출결 고치기 창 넓게 · 종류는 그룹마다 한 줄 (넘치면 좌우로 밀기) */
 #dayDlg:has(.typegroups){width:min(860px,calc(100vw - 32px))}
-.tgroup{flex-wrap:nowrap;overflow-x:auto;padding-bottom:3px;scrollbar-width:thin}.tgroup>*{flex:none}
+.typegroups>.tgroup{flex-wrap:nowrap;overflow-x:auto;padding-bottom:3px;scrollbar-width:thin}.typegroups>.tgroup>*{flex:none}
 /* 서류 관리: 붙어 있던 곳 띄우기 (거르기 줄↔표, 휴지통 제목↔목록, 목록↔단추) */
 .attwrap .notes>.attrow+div{margin-top:12px}.attwrap .trash>summary+.attlist{margin-top:8px}.attwrap .attlist>.attline+.actions{margin-top:12px}
 /* 행정 영역 학사일정: 달력 넓게, 이번 주 일정 좁게 */
@@ -1313,6 +1340,9 @@ function renderAttend(){
   const alertsN = D ? attAlerts().length : 0;
   const seg = el("div",{className:"attseg",role:"tablist","aria-label":"학급 출결 보기"}, ...ATT_VIEWS.map(([k, n]) => { const badge = k === "input" ? todayN : k === "docs" ? pend : k === "stats" ? alertsN : 0;
     const b = el("button",{type:"button",role:"tab","aria-selected":String(att.view === k)}, n, badge ? el("span",{className:"tbadge"}, String(badge)) : ""); b.onclick = () => { att.view = k; renderAttend(); }; return b; }));
+  // 휴대폰에서 탭 줄을 다시 그려도 보고 있는 탭이 보이게 (가운데로)
+  setTimeout(() => { const on = seg.querySelector('[aria-selected="true"]'); if(!on || seg.scrollWidth <= seg.clientWidth) return;
+    seg.scrollLeft += on.getBoundingClientRect().left - seg.getBoundingClientRect().left - (seg.clientWidth - on.offsetWidth) / 2; }, 0);
   const tools = el("div",{className:"tt-tools"},
     navBtn("새로 고침", () => { att.data = null; att.err = ""; renderAttend(); }, "출결 시트 다시 읽기"),
     navBtn("교무수첩과 맞추기", async () => { try{ await attSyncNow(); renderAttend(); }catch(e){ say(e?.message || "맞추지 못했어요."); } }, "학생 명단·쉬는 날·교시 수를 출결 시트에 보내기", !canWrite()),
@@ -1461,7 +1491,7 @@ function attDocs(){
     const rows = D.recs.filter(r => (!stu.value || r.name === stu.value) && (!t || (r.name + " " + r.type + " " + r.reason + " " + r.num).toLowerCase().includes(t))
       && (!s.value || !e.value || (r.startDate >= s.value && r.startDate <= e.value)) && (!hide.checked || pendingOf(r).length)).sort(cmp);
     if(!rows.length) return list.replaceChildren(el("p",{className:"hint"}, hide.checked ? "안 낸 서류가 없어요." : "조건에 맞는 기록이 없어요."));
-    list.replaceChildren(el("div",{className:"tt-wrap"}, colResize(el("table",{className:"plan doctable"},
+    list.replaceChildren(docCards(rows), el("div",{className:"tt-wrap docwide"}, colResize(el("table",{className:"plan doctable"},
       el("thead",{}, el("tr",{}, th("date", "날짜/기간", "16%"), th("num", "이름", "13%"), th("type", "출결(교시)", "24%"), th("", "사유", "19%"), th("", "서류 상태 (클릭)"))),
       el("tbody",{}, ...rows.map(r => { const tr = el("tr",{className:"click"},
         el("td",{}, dayLabel(parseYmd(r.startDate)) + (r.endDate && r.endDate !== r.startDate ? " ~ " + dayLabel(parseYmd(r.endDate)) : "")),
@@ -1469,7 +1499,7 @@ function attDocs(){
         el("td",{}, el("b",{className:"ty"}, r.type || "-"), el("small",{className:"per"}, " (" + (r.period || "-") + ")")),
         el("td",{className:"rsn"}, r.reason || ""),
         el("td",{}, el("div",{className:"docrow"}, ...splitDocs(r.doc).map(d => { const b = el("button",{type:"button",className:"docbtn" + (r.docStatus[d] === true ? " done" : ""),disabled:!canWrite()}, d);
-          b.onclick = ev => { ev.stopPropagation(); attDo("attDoc", [r.id, { ...r.docStatus, [d]:r.docStatus[d] !== true }]).catch(() => {}); }; return b; }))));
+          b.onclick = ev => { ev.stopPropagation(); const st = { ...r.docStatus, [d]:r.docStatus[d] !== true }; attQuick(() => { r.docStatus = st; }, "attDoc", [r.id, st]); }; return b; }))));
         tr.style.setProperty("--c", typeColor(r.type)); tr.onclick = () => attEdit(r); return tr; }))), "doc"))); };
   q.oninput = () => { att.docQ = q.value; draw(); }; [s, e, stu].forEach(x => { x.onchange = () => { att.docS = s.value; att.docE = e.value; att.docStu = stu.value; draw(); }; }); hide.onchange = () => { att.docHide = hide.checked; draw(); };
   draw();
@@ -1481,8 +1511,19 @@ function attDocs(){
       el("div",{className:"actions"}, el("span",{className:"spacer"}), navBtn("휴지통 비우기", () => { if(confirm("휴지통을 모두 비울까요? 되살릴 수 없어요.")) attDo("attPurge", ["ALL"], "휴지통을 비웠어요.").catch(() => {}); }, "휴지통 비우기", !canWrite())))
       : el("p",{className:"hint"}, "비어 있어요."));
   return el("div",{className:"attgrid"}, el("section",{className:"notes"},
-    el("div",{className:"attrow"}, q, s, el("span",{}, "~"), e, stu, el("label",{className:"inline"}, hide, " 다 낸 것 숨기기"),
+    el("div",{className:"attrow"}, q, el("span",{className:"drange"}, s, el("span",{}, "~"), e), stu, el("label",{className:"inline"}, hide, " 다 낸 것 숨기기"),
       navBtn("초기화", () => { att.docQ = att.docS = att.docE = att.docStu = ""; renderAttend(); }, "찾기 조건 비우기")), list), trash);
+}
+// 서류 관리 (휴대폰): 표 대신 카드. 왼쪽 날짜(기간이면 두 줄), 1줄 이름·출결(교시), 2줄 사유·서류
+function docCards(rows){
+  return el("div",{className:"attlist doccards"}, ...rows.map(r => { const multi = r.endDate && r.endDate !== r.startDate;
+    const docs = el("span",{className:"docs"}, ...splitDocs(r.doc).map(d => { const b = el("button",{type:"button",className:"docbtn" + (r.docStatus[d] === true ? " done" : ""),disabled:!canWrite()}, d);
+      b.onclick = ev => { ev.stopPropagation(); const st = { ...r.docStatus, [d]:r.docStatus[d] !== true }; attQuick(() => { r.docStatus = st; }, "attDoc", [r.id, st]); }; return b; }));
+    const row = el("div",{className:"attline click doccard",tabIndex:0,role:"button"},
+      el("span",{className:"dd"}, dayLabel(parseYmd(r.startDate)), multi ? el("small",{}, "~ " + dayLabel(parseYmd(r.endDate))) : ""),
+      el("div",{className:"dm"}, el("div",{className:"l1"}, el("b",{}, stuLabel(r.num, r.name)), el("span",{className:"ty"}, r.type || "-", el("small",{}, " (" + (r.period || "-") + ")"))),
+        el("div",{className:"l2"}, el("span",{className:"t"}, r.reason || ""), docs)));
+    row.style.setProperty("--c", typeColor(r.type)); row.onclick = () => attEdit(r); row.onkeydown = ev => { if(ev.key === "Enter") attEdit(r); }; return row; }));
 }
 // 3. 주간·월간 캘린더 + 월별 통계
 function attCal(){
@@ -1769,7 +1810,7 @@ function renderTT(){
   const head = el("tr",{}, el("th",{}, "교시"), ...dates.map((d, j) =>
     el("th",{className: ymd(d) === today ? "on" : ""}, DAYS[j], el("small",{}, (d.getMonth() + 1) + "/" + d.getDate()))));
   const B = bells(), M = weekOff === 0 ? ttMark() : null;
-  const rows = tt.cells.map((r, i) => el("tr",{}, el("th",{className:"per"}, (i + 1) + "교시", el("small",{}, B[i].s + "~" + B[i].e)), ...dates.map((d, j) => {
+  const rows = tt.cells.map((r, i) => el("tr",{}, el("th",{className:"per"}, (i + 1) + "교시", el("small",{}, B[i].s, el("span",{className:"te"}, "~" + B[i].e))), ...dates.map((d, j) => {
     const key = ymd(d), ov = tt.overrides[key]?.[i], has = ov !== undefined;
     const td = el("td",{className: (key === today ? "on " : "") + (has ? "swap " : "") + markCls(M, i, j),...(M && M.now && M.i === i && M.j === j ? {"aria-current":"time"} : {})});
     if(ttCell === key + ":" + i){
@@ -2046,17 +2087,21 @@ function weekAdd(){
   const title = el("input",{className:"field",id:"wkTitle",maxLength:40,placeholder:"내 일정 넣기","aria-label":"일정 이름"});
   const cat = el("select",{className:"field",id:"wkCat","aria-label":"분류"}, ...evCats().map(c => el("option",{value:c.id}, c.name)), el("option",{value:""}, "학교"));
   const end = el("input",{type:"date",className:"field",id:"wkEnd","aria-label":"끝나는 날 (여러 날이면)",title:"여러 날이면 끝나는 날"});
+  const go = el("button",{className:"btn",type:"button"}, "추가");
   const add = async () => {
     const t = title.value.trim(); if(!t) return title.focus();
     if(!/^\d{4}-\d{2}-\d{2}$/.test(date.value)) return say("날짜를 골라 주세요.");
     const last = end.value && end.value > date.value ? end.value : date.value, list = [];
     for(let x = parseYmd(date.value); ymd(x) <= last && list.length < 60; x = addDays(x, 1)) list.push({ date:ymd(x), title:t, cat:cat.value });
-    try{ await store.saveEvents(events.concat(list)); say(date.value + (list.length > 1 ? "부터 " + list.length + "일 동안" : "에") + " '" + t + "' 일정을 넣었어요."); }
+    try{ await store.saveEvents(events.concat(list)); say(date.value + (list.length > 1 ? "부터 " + list.length + "일 동안" : "에") + " '" + t + "' 일정을 넣었어요."); return true; }
     catch(e){ say(e?.message && !e.code ? e.message : "저장하지 못했어요. 잠시 뒤 다시 시도해 주세요."); }
   };
-  title.onkeyup = e => { if(e.key === "Enter" && !e.isComposing) add(); };
+  title.onkeyup = e => { if(e.key === "Enter" && !e.isComposing) go.click(); };
   date.onchange = () => { end.min = date.value; };
-  return el("div",{className:"wkadd"}, date, el("span",{className:"tilde"}, "~"), end, el("div",{className:"wkrow2"}, title, cat, navBtn("추가", add, "일정 추가")));
+  // 늘 펼쳐 두지 않고 [+ 일정 추가] 단추로 창을 열어 넣음
+  const form = el("div",{className:"wkadd"}, date, el("span",{className:"tilde"}, "~"), end, el("div",{className:"wkrow2"}, title, cat));
+  go.onclick = async () => { if(await add()) $("dayDlg")?.close(); };
+  return el("div",{className:"wkaddbtn"}, navBtn("+ 일정 추가", () => { modal("일정 추가", form, el("div",{className:"actions"}, navBtn("분류 고치기", () => openEvCats(), "일정 분류 고치기"), el("span",{className:"spacer"}), go)); setTimeout(() => title.focus(), 0); }, "내 일정 추가"));
 }
 
 // 내 일정 분류 나누기: 이름·색을 고치고 더하고 지움 (지운 분류의 일정은 '기타'로 남음)
@@ -2139,7 +2184,13 @@ function openDay(k){
   const dueBox = el("input",{type:"checkbox",id:"dayDue",checked:!!dues[k],disabled:!edit});
   const att = attachBox(memoFiles[k], edit);
   const err = el("div",{className:"err"});
-  const save = el("button",{className:"btn",type:"button",hidden:!edit}, "저장");
+  const save = el("button",{className:"btn",type:"button",hidden:true}, "저장");
+  // 처음엔 그날 일정만: 메모·일정 넣기는 단추를 눌러야 열림
+  const memoWrap = el("div",{className:"dayx",hidden:true}, el("label",{className:"memo-label"}, "메모", ta), el("label",{className:"inline"}, dueBox, " 이날을 마감일로 표시 (홈 날짜 아래에 D-day로 떠요)"), att.node);
+  const memoView = memos[k] ? el("div",{className:"memoview"}, el("b",{}, "메모"), el("p",{}, memos[k])) : null;
+  const addWrap = el("div",{className:"evadd",hidden:true}, evCat, evTitle, el("label",{className:"inline"}, "~ ", evEnd), navBtn("추가", addEv, "일정 추가"), navBtn("분류 고치기", () => openEvCats(), "일정 분류 고치기"));
+  const memoBtn = navBtn(memos[k] ? "✎ 메모 고치기" : "+ 메모 쓰기", () => { memoWrap.hidden = false; save.hidden = false; memoBtn.hidden = true; if(memoView) memoView.hidden = true; setTimeout(() => ta.focus(), 0); }, "이날 메모");
+  const addBtn = navBtn("+ 일정 추가", () => { addWrap.hidden = false; addBtn.hidden = true; setTimeout(() => evTitle.focus(), 0); }, "이날 일정 추가");
   save.onclick = async () => {
     save.disabled = true;
     try{ await store.saveMemo(k, ta.value.trim(), dueBox.checked, att.files()); dlg.close(); }
@@ -2150,11 +2201,10 @@ function openDay(k){
   dlg.replaceChildren(el("div",{className:"daybox"},
     el("h2",{}, d.getFullYear() + "년 " + (d.getMonth() + 1) + "월 " + d.getDate() + "일 " + WD[d.getDay()] + "요일"),
     evs.length ? el("ul",{className:"devs"}, ...evs.map(evLi)) : el("p",{className:"note"}, "일정이 없어요."),
-    el("div",{className:"dayx"},
-    ...(edit ? [el("div",{className:"evadd"}, evCat, evTitle, el("label",{className:"inline"}, "~ ", evEnd), navBtn("추가", addEv, "일정 추가"), navBtn("분류 고치기", () => openEvCats(), "일정 분류 고치기"))] : []),
-    el("label",{className:"memo-label"}, "메모", ta), el("label",{className:"inline"}, dueBox, " 이날을 마감일로 표시 (홈 날짜 아래에 D-day로 떠요)"), att.node), err,
-    el("div",{className:"actions"}, el("span",{className:"spacer"}), close, save)));
-  dlg.showModal(); if(edit) setTimeout(() => ta.focus(), 0);
+    memoView, dues[k] ? el("p",{className:"note"}, "⏰ 이날은 마감일로 표시돼 있어요.") : null,
+    edit ? addWrap : null, edit ? memoWrap : null, err,
+    el("div",{className:"actions"}, edit ? addBtn : null, edit ? memoBtn : null, el("span",{className:"spacer"}), close, save)));
+  dlg.showModal();
 }
 
 const hrefOf = it => it.kind === "memo" ? null : safeUrl(it.url);

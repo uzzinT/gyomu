@@ -7,7 +7,7 @@ let s = fs.readFileSync(src, "utf8");
 const swap = (a, b) => { if (!s.includes(a)) throw new Error("못 찾음: " + a.slice(0, 60)); s = s.replace(a, b); };
 swap("const call = (fn, ...args) => new Promise((res, rej) => google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn](...args));",
   "const call = (fn, ...args) => window.fbCall(fn, ...args); // Firebase 버전 (backend.js)");
-swap('<meta charset="utf-8">', '<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">\n<title>나의 교무수첩</title>\n<link rel="icon" type="image/svg+xml" href="icon.svg">\n<meta name="theme-color" content="#26402e">');
+swap('<meta charset="utf-8">', '<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">\n<title>나의 교무수첩</title>\n<link rel="icon" type="image/svg+xml" href="icon.svg">\n<link rel="apple-touch-icon" href="apple-touch-icon.png">\n<link rel="manifest" href="manifest.webmanifest">\n<meta name="apple-mobile-web-app-title" content="교무수첩">\n<meta name="apple-mobile-web-app-capable" content="yes">\n<meta name="theme-color" content="#26402e">');
 const V = "10.14.1", head = [
   `<script src="https://www.gstatic.com/firebasejs/${V}/firebase-app-compat.js"></script>`,
   `<script src="https://www.gstatic.com/firebasejs/${V}/firebase-auth-compat.js"></script>`,
