@@ -2203,6 +2203,12 @@ function openDay(k){
   const addWrap = el("div",{className:"evadd",hidden:true}, evCat, evTitle, el("label",{className:"inline"}, "~ ", evEnd), navBtn("추가", addEv, "일정 추가"), navBtn("분류 고치기", () => openEvCats(), "일정 분류 고치기"));
   const memoBtn = navBtn(memos[k] ? "✎ 메모 고치기" : "+ 메모 쓰기", () => { memoWrap.hidden = false; save.hidden = false; memoBtn.hidden = true; if(memoView) memoView.hidden = true; setTimeout(() => ta.focus(), 0); }, "이날 메모");
   const addBtn = navBtn("+ 일정 추가", () => { addWrap.hidden = false; addBtn.hidden = true; setTimeout(() => evTitle.focus(), 0); }, "이날 일정 추가");
+  // 마감일 표시는 메모를 열지 않고 바로 (누르면 저장)
+  const dueBtn = navBtn(dues[k] ? "⏰ 마감일 표시 빼기" : "⏰ 마감일로 표시", async () => {
+    dueBtn.disabled = true;
+    try{ await store.saveMemo(k, memos[k] || "", !dues[k], memoFiles[k] || []); openDay(k); } // 되돌리기 안내는 wrapUndo 가 띄움
+    catch(e){ dueBtn.disabled = false; err.textContent = e?.message && !e.code ? e.message : "저장하지 못했어요. 잠시 뒤 다시 시도해 주세요."; }
+  }, "이날을 마감일로 표시 (홈에 D-day)");
   save.onclick = async () => {
     save.disabled = true;
     try{ await store.saveMemo(k, ta.value.trim(), dueBox.checked, att.files()); dlg.close(); }
@@ -2215,7 +2221,7 @@ function openDay(k){
     evs.length ? el("ul",{className:"devs"}, ...evs.map(evLi)) : el("p",{className:"note"}, "일정이 없어요."),
     memoView, dues[k] ? el("p",{className:"note"}, "⏰ 이날은 마감일로 표시돼 있어요.") : null,
     edit ? addWrap : null, edit ? memoWrap : null, err,
-    el("div",{className:"actions"}, edit ? addBtn : null, edit ? memoBtn : null, el("span",{className:"spacer"}), close, save)));
+    el("div",{className:"actions"}, edit ? addBtn : null, edit ? memoBtn : null, edit ? dueBtn : null, el("span",{className:"spacer"}), close, save)));
   dlg.showModal();
 }
 
