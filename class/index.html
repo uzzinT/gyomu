@@ -298,15 +298,21 @@ async function load(manual){
 setTimeout(() => { if(sess.get()) load(); else if(!data) showLogin(); }, 0);
 
 // 휴대폰 알림 받기: 이 기기를 등록 (선생님이 개별 알림을 보내면 울림)
-async function enablePush(btn){
+// 단계마다 시간 제한: 멈추면 어느 단계인지 알려 줌 (아무 반응 없이 멈추지 않게)
+const within = (p, ms, what) => Promise.race([p, new Promise((_, no) => setTimeout(() => no(new Error(what + " 단계에서 멈췄어요. 앱을 완전히 닫았다가 다시 열고 한 번 더 눌러 주세요.")), ms))]);
+let pushBusy = false;
+async function enablePush(){
+  if(pushBusy) return; pushBusy = true;
+  const pb = $("pushBtn"); pb.textContent = "⏳"; pb.disabled = true;
   try{
-    if(!("Notification" in window) || !firebase.messaging.isSupported()) throw new Error("이 브라우저는 알림을 못 받아요. 아이폰은 '홈 화면에 추가'한 앱에서 켜 주세요.");
-    if(await Notification.requestPermission() !== "granted") throw new Error("알림을 허용해야 받을 수 있어요. 휴대폰 설정에서 이 앱 알림을 켜 주세요.");
-    const reg = await navigator.serviceWorker.ready;
-    const token = await firebase.messaging().getToken({ vapidKey:VAPID, serviceWorkerRegistration:reg });
-    const r = await api({ act:"push", token:sess.get(), fcm:token }); if(r.error) throw new Error(r.error);
-    store.set("pushOn", token, true); draw();
-  }catch(x){ alert(x.message || "알림을 켜지 못했어요."); }
+    if(!("Notification" in window) || !firebase.messaging.isSupported()) throw new Error("이 브라우저는 알림을 못 받아요. 아이폰은 사파리에서 '홈 화면에 추가'한 앱으로 열어서 켜 주세요.");
+    if(await Notification.requestPermission() !== "granted") throw new Error("알림이 꺼져 있어요. 휴대폰 설정 → 알림 → '우리 반 알림'에서 알림 허용을 켠 뒤 다시 눌러 주세요.");
+    const reg = await within(navigator.serviceWorker.ready, 10000, "앱 준비");
+    const token = await within(firebase.messaging().getToken({ vapidKey:VAPID, serviceWorkerRegistration:reg }), 20000, "알림 열쇠 받기");
+    const r = await within(api({ act:"push", token:sess.get(), fcm:token }), 20000, "등록"); if(r.error) throw new Error(r.error);
+    store.set("pushOn", token, true); alert("알림을 켰어요. 이제 선생님 알림이 휴대폰에 떠요.");
+  }catch(x){ alert("알림을 켜지 못했어요.\n" + (x.message || x)); }
+  pushBusy = false; pb.disabled = false; draw();
 }
 // 알림 그만 받기: 이 기기 등록을 지움 (선생님이 보내도 안 울림)
 async function disablePush(quiet){
