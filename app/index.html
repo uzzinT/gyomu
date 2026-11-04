@@ -246,8 +246,12 @@ nav{margin-bottom:14px}
 .kidphoto{display:block;max-width:100%;max-height:60vh;margin:6px auto;border-radius:8px}
 .fcol{display:grid;gap:16px;align-content:start}
 .kidtels{display:grid;gap:4px;margin:8px 0}
-.kidtel{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.kidtel span{min-width:4em;color:var(--muted);font-size:.85rem}
+.kidtel{display:grid;grid-template-columns:4.5em 11em auto;gap:10px;align-items:center}
+.kidtel span{color:var(--muted);font-size:.85rem}
+.rostertbl .telcol{width:11em;min-width:11em;white-space:nowrap}
+.rostertbl .telcol input{width:100%;min-width:0;font-variant-numeric:tabular-nums}
+.rostertools{flex-wrap:wrap;gap:6px;margin:6px 0}
+.rostertools #rosterFind{flex:1 1 10em}
 .kidtel a{text-decoration:none;padding:4px 8px;border:1px solid var(--line);border-radius:6px;color:var(--ink)}
 .now .free{margin:4px 0 10px;padding:10px 14px;border-radius:10px;font-size:1.15rem;font-weight:700;color:var(--green);background:color-mix(in srgb,var(--green) 14%,var(--paper))}
 .now .free{word-break:keep-all}
@@ -873,10 +877,10 @@ body.onhome .tt th,body.onhome .tt td{height:46px!important;padding:4px 3px!impo
 .smshead{display:flex;align-items:center;gap:8px}
 .smsmsg{margin:0;padding:10px 12px;border-radius:10px;background:var(--paper2);font-size:.86rem;white-space:pre-wrap;color:var(--ink)}
 .smsrow{display:flex;align-items:center;gap:8px;padding-top:6px;border-top:1px dashed var(--line)}
-.smswho{flex:none;min-width:4.5em;font-weight:700;font-size:.86rem}.smsnum{font-variant-numeric:tabular-nums;color:var(--muted);font-size:.84rem}
+.smswho{flex:none;min-width:4.5em;font-weight:700;font-size:.86rem}.smsnum{font-variant-numeric:tabular-nums;color:var(--muted);font-size:.84rem;width:11em}
 .smsrow .btn,.smshead .btn{display:inline-flex;align-items:center;justify-content:center;min-width:4.6em;text-align:center}
 .smshead .spacer,.smsrow .spacer{flex:1}
-.smsrow{display:grid;grid-template-columns:4.5em 1fr auto auto;align-items:center}
+.smsrow{display:grid;grid-template-columns:5em 11em 1fr auto auto;align-items:center}
 .smsrow .spacer{display:none}
 .taborder{display:grid;gap:4px}
 /* 따로 쓰는 앱 탭: 남은 화면 높이만큼 */
@@ -1482,10 +1486,12 @@ function attSms(list){
   if(!list.length) return say("연락할 학생을 골라 주세요.");
   const link = (href, label) => el("a",{className:"btn ghost small",href}, label);
   modal("학생·학부모 연락", el("p",{className:"hint"}, "휴대폰에서 누르면 문자 앱·전화가 열려요. 문자 내용은 출결 시트 '학생명부'의 메시지내용이에요."),
-    ...list.map(k => { const line = (who, phone) => el("div",{className:"smsrow"}, el("span",{className:"smswho"}, who), phone ? el("span",{className:"smsnum"}, phone) : el("span",{className:"hint"}, "번호 없음"),
-        el("span",{className:"spacer"}), phone ? [link("sms:" + phone + "?body=" + encodeURIComponent(k.msg || ""), "문자"), link("tel:" + phone, "전화")] : "");
+    ...list.map(k => { // 학생 줄과 학부모 줄을 같은 모양·같은 폭으로 (번호가 없어도 문자·전화 자리는 남김)
+      const off = label => el("span",{className:"btn ghost small",style:"opacity:.35;pointer-events:none","aria-disabled":"true"}, label);
+      const line = (who, phone) => el("div",{className:"smsrow"}, el("span",{className:"smswho"}, who), el("span",{className:"smsnum" + (phone ? "" : " hint")}, phone || "번호 없음"),
+        el("span",{}), phone ? link("sms:" + phone + "?body=" + encodeURIComponent(k.msg || ""), "문자") : off("문자"), phone ? link("tel:" + phone, "전화") : off("전화"));
       return el("div",{className:"smscard"}, el("div",{className:"smshead"}, el("b",{}, stuLabel(k.num, k.name)), el("span",{className:"spacer"}), navBtn("내용 복사", () => copyText(k.msg || "", "문자 내용"), "문자 내용 복사")),
-        el("p",{className:"smsmsg"}, k.msg || "(메시지 내용 없음)"), line("학생", k.sPhone), line(k.pRel || "보호자", k.pPhone)); }));
+        el("p",{className:"smsmsg"}, k.msg || "(메시지 내용 없음)"), line("학생", k.sPhone), line("학부모님", k.pPhone)); }));
 }
 // 2. 서류 관리 (+ 휴지통)
 function attDocs(){
@@ -3354,14 +3360,18 @@ async function uploadKidPhotos(files, only){
 // 학생 한 명: 누르면 그때 사진을 불러옴
 function openKid(no){
   const s = students.find(x => x.no === no); if(!s) return;
-  const box = el("div",{}, el("p",{className:"note"}, s.photo ? "사진 불러오는 중…" : "아직 사진이 없어요."));
-  if(s.photo) call("getStudentPhoto", s.photo).then(src => { if(typeof src === "string" && src.startsWith("data:image/")) box.replaceChildren(el("img",{className:"kidphoto",src,alt:s.name + " 사진"})); })
-    .catch(e => box.replaceChildren(el("p",{className:"note"}, e?.message || "사진을 불러오지 못했어요.")));
+  // 사진은 [사진 보기]를 누를 때만 불러옴
+  const box = el("div",{});
+  const showPic = () => { box.replaceChildren(el("p",{className:"note"}, "사진 불러오는 중…"));
+    call("getStudentPhoto", s.photo).then(src => { if(typeof src === "string" && src.startsWith("data:image/")) box.replaceChildren(el("img",{className:"kidphoto",src,alt:s.name + " 사진"})); })
+      .catch(e => box.replaceChildren(el("p",{className:"note"}, e?.message || "사진을 불러오지 못했어요."))); };
+  if(s.photo) box.append(navBtn("📷 사진 보기", showPic, s.name + " 사진 보기"));
   // 연락처: 누르면 전화·문자 (휴대폰에서)
-  const num = p => String(p || "").replace(/[^\d+]/g, ""), call1 = (label, p) => num(p) ? el("div",{className:"kidtel"}, el("span",{}, label),
-    el("a",{href:"tel:" + num(p)}, "📞 " + p), el("a",{href:"sms:" + num(p)}, "💬 문자")) : null;
-  const tels = [call1("학생", s.phone), ...(s.parents || []).map(p => call1(p.rel || "보호자", p.phone))].filter(Boolean);
-  const kids = [box, tels.length ? el("div",{className:"kidtels"}, ...tels) : el("p",{className:"hint"}, "연락처가 없어요. (명단 설정에서 넣을 수 있어요)")];
+  const num = p => String(p || "").replace(/[^\d+]/g, ""), call1 = (label, p) => el("div",{className:"kidtel"}, el("span",{}, label),
+    num(p) ? el("a",{href:"tel:" + num(p)}, "📞 " + p) : el("span",{className:"hint"}, "번호 없음"), num(p) ? el("a",{href:"sms:" + num(p)}, "💬 문자") : el("span",{}));
+  // 학생 줄과 학부모 줄은 같은 모양·같은 폭 (번호는 명단 보기 → 연락처 고치기에서)
+  const pp = (s.parents || []).filter(p => num(p.phone));
+  const kids = [box, el("div",{className:"kidtels"}, call1("학생", s.phone), ...(pp.length ? pp.map(p => call1("학부모님", p.phone)) : [call1("학부모님", "")]))];
   if(window.fbCall) kids.push(el("div",{className:"actions"}, navBtn("🔔 개별 알림 보내기", () => { $("dayDlg").close(); openStudentMsg(null, { nos:[s.no] }); }, s.name + "에게 알림 앱 개별 알림")));
   if(canWrite()){
     const file = el("input",{type:"file",accept:"image/*",hidden:true});
@@ -4107,20 +4117,49 @@ setTimeout(() => {
 }, 0);
 function openRosterView(){
   if(!students.length) return modal("학생 명단", el("p",{className:"note"}, "아직 학생 명단이 없어요. 설정 → 학기 초 세팅에서 올리거나 입력해 주세요."));
-  let q = "";
-  const body = el("tbody");
+  let q = "", editing = false;
+  const body = el("tbody"), head = el("tr"), err = el("div",{className:"err"});
   const tel = p => p ? el("a",{href:"tel:" + p.replace(/[^\d+]/g, "")}, p) : "";
-  const draw = () => body.replaceChildren(...students.filter(s => !q || (s.name + " " + s.no + " " + (s.note || "")).includes(q)).map(s => el("tr",{},
-    el("td",{className:"c"}, String(s.no)), el("td",{}, (() => { const b = el("button",{type:"button",className:"linkbtn",title:"특이사항·파일 적기"}, s.name); b.onclick = () => openKid(s.no); return b; })()), el("td",{}, tel(s.phone || "")),
-    el("td",{}, ...(s.parents || []).flatMap((p, i) => [i ? el("br") : "", p.rel || "보호자"])),
-    el("td",{}, ...(s.parents || []).flatMap((p, i) => [i ? el("br") : "", tel(p.phone)])),
-    el("td",{}, [s.note, s.memo].filter(Boolean).join(" · ").slice(0, 80), s.files?.length ? el("small",{className:"hint"}, " · 파일 " + s.files.length) : ""))));
+  const telIn = (v, label) => el("input",{type:"tel",className:"field",value:v || "",placeholder:"010-0000-0000","aria-label":label});
+  const edits = {}; // 번호 → [학생, 학부모1, 학부모2] 입력 칸
+  const draw = () => {
+    head.replaceChildren(...["번호","이름","학생 연락처","학부모 연락처", editing ? "학부모 연락처 2" : "비고"].map((h, i) => el("th",{className:i === 2 || i === 3 || (editing && i === 4) ? "telcol" : ""}, h)));
+    body.replaceChildren(...students.filter(s => !q || (s.name + " " + s.no + " " + (s.note || "")).includes(q)).map(s => {
+      const ps = s.parents || [], name = (() => { const b = el("button",{type:"button",className:"linkbtn",title:"특이사항·파일 적기"}, s.name); b.onclick = () => openKid(s.no); return b; })();
+      if(editing){ const e = edits[s.no] ||= [telIn(s.phone, s.name + " 학생 연락처"), telIn(ps[0]?.phone, s.name + " 학부모 연락처"), telIn(ps[1]?.phone, s.name + " 학부모 연락처 2")];
+        return el("tr",{}, el("td",{className:"c"}, String(s.no)), el("td",{}, s.name), ...e.map(i => el("td",{className:"telcol"}, i))); }
+      return el("tr",{}, el("td",{className:"c"}, String(s.no)), el("td",{}, name), el("td",{className:"telcol"}, tel(s.phone || "")),
+        el("td",{className:"telcol"}, ...ps.filter(p => p.phone).flatMap((p, i) => [i ? el("br") : "", tel(p.phone)])),
+        el("td",{}, [s.note, s.memo].filter(Boolean).join(" · ").slice(0, 80), s.files?.length ? el("small",{className:"hint"}, " · 파일 " + s.files.length) : "")); }));
+  };
   const find = el("input",{type:"search",className:"field",id:"rosterFind",placeholder:"이름·번호 찾기"});
   find.oninput = () => { q = find.value.trim(); draw(); };
+  // 연락처 고치기: 교무수첩에 저장하고, 새 교무수첩이면 구글 시트 '입력_학생명단' 탭에도 똑같이 적음 (시트에서 고친 것은 열 때 교무수첩으로 들어옴)
+  const editBtn = navBtn("✎ 연락처 고치기", () => { editing = true; editBtn.hidden = true; saveBtn.hidden = cancelBtn.hidden = false; draw(); }, "학생·학부모 연락처 고치기", !canWrite());
+  const cancelBtn = navBtn("취소", () => { editing = false; Object.keys(edits).forEach(k => delete edits[k]); editBtn.hidden = false; saveBtn.hidden = cancelBtn.hidden = true; err.textContent = ""; draw(); }, "고치기 취소");
+  const saveBtn = el("button",{type:"button",className:"btn"}, "저장"); saveBtn.hidden = cancelBtn.hidden = true;
+  saveBtn.onclick = async () => {
+    saveBtn.disabled = true; err.textContent = "";
+    const next = students.map(s => { const e = edits[s.no]; if(!e) return s;
+      const ps = [...(s.parents || [])], setP = (i, v) => { v = phoneOf(v); if(v) ps[i] = { rel:ps[i]?.rel || "학부모", phone:v }; else if(ps[i]) ps[i] = { ...ps[i], phone:"" }; };
+      setP(0, e[1].value); setP(1, e[2].value);
+      return { ...s, phone:phoneOf(e[0].value), parents:ps.filter(p => p && (p.phone || p.rel)) }; });
+    try{
+      await store.saveStudents(next);
+      let sheetMsg = "";
+      if(window.fbCall) try{ await call("writeInputTab", "students", [["※ 한 줄에 학생 한 명. 쓰지 않는 칸은 비워 두세요. 이 탭은 나만 볼 수 있어요."], [], ["번호", "이름", "학생 연락처", "보호자1 관계", "보호자1 연락처", "보호자2 관계", "보호자2 연락처", "비고"],
+          ...next.map(s => [String(s.no), s.name, s.phone || "", s.parents?.[0]?.rel || "", s.parents?.[0]?.phone || "", s.parents?.[1]?.rel || "", s.parents?.[1]?.phone || "", s.note || ""])]); sheetMsg = " 구글 시트에도 적었어요."; }
+        catch(e){ sheetMsg = " (구글 시트에는 못 적었어요: " + (e?.message || "") + ")"; }
+      say("연락처를 저장했어요." + sheetMsg); $("dayDlg").close(); openRosterView();
+    }catch(e){ saveBtn.disabled = false; err.textContent = e?.message && !e.code ? e.message : "저장하지 못했어요. 잠시 뒤 다시 시도해 주세요."; }
+  };
+  const stSetup = SETUP.find(x => x.key === "students");
+  const sheetBtn = window.fbCall && stSetup ? navBtn("구글 시트 열기", () => openInputTab(stSetup), "학생 명단 구글 시트(입력_학생명단 탭) 열기") : null;
   draw();
   modal((config.homeroomClass ? config.homeroomClass + " " : "") + "학생 명단",
-    el("p",{className:"hint"}, "학생과 보호자 연락처는 내 구글 시트에만 있어요. 화면을 띄워 둔 채 자리를 비우지 마세요."), find,
-    el("div",{className:"tt-wrap"}, el("table",{className:"plan"}, el("thead",{}, el("tr",{}, ...["번호","이름","학생 연락처","보호자","보호자 연락처","비고"].map(h => el("th",{}, h)))), body)));
+    el("p",{className:"hint"}, "학생과 학부모 연락처는 내 교무수첩과 내 구글 시트에만 있어요. 화면을 띄워 둔 채 자리를 비우지 마세요."),
+    el("div",{className:"tt-tools rostertools"}, find, editBtn, sheetBtn, cancelBtn, saveBtn), err,
+    el("div",{className:"tt-wrap"}, el("table",{className:"plan rostertbl"}, el("thead",{}, head), body)));
   setTimeout(() => find.focus(), 0);
 }
 
