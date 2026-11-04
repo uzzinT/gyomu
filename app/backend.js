@@ -902,7 +902,7 @@
   async function publishNotice() {
     if (!uid || !DB) return;
     const c = cfgGet("config") || {}, ad = n => ymd(new Date(Date.now() + n * 864e5)), since = Date.now() - 60 * 864e5;
-    const problems = await provisionAccounts();
+    const problems = []; // 학생 계정은 이제 Firebase 에 만들지 않음 (창구가 시트의 비밀번호 해시로 확인)
     const classCats = (Array.isArray(c.evCats) ? c.evCats : [{ id: "class", name: "학급" }]).filter(x => x.id === "class" || x.name === "학급").map(x => x.id);
     const notes = get("notes").filter(n => n.share !== false && n.text && n.date >= ad(-21) && n.date <= ad(14))
       .sort((a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : (a.createdAt || 0) - (b.createdAt || 0)).slice(0, 120).map(n => ({ date: n.date, type: n.type || "", text: n.text, detail: n.detail || "" }));
@@ -912,17 +912,6 @@
     const checks = chk.map(x => ({ id: x.id, title: x.title, due: x.due || "", closed: !!x.closed, memo: x.memo && x.memoShare !== false ? x.memo : "" }))
       .sort((a, b) => a.closed !== b.closed ? (a.closed ? 1 : -1) : a.closed ? (recent(chk.find(x => x.id === b.id)) > recent(chk.find(x => x.id === a.id)) ? 1 : -1) : (a.due || "9999") < (b.due || "9999") ? -1 : 1);
     const tt = cfgGet("classTT"), bells = Array.isArray(c.bells) ? c.bells.map(b => ({ s: String(b && b.s || ""), e: String(b && b.e || "") })) : [];
-    await noticeDoc().set({ v: JSON.stringify({ cls: c.homeroomClass || "", notes, events, checks, tt: tt && Array.isArray(tt.cells) ? { periods: Number(tt.periods) || tt.cells.length, cells: tt.cells } : null, bells }), at: Date.now() }, { merge: true }); // 학생 앱 화면 설정(ui)은 그대로
-    await fs.collection("classes").doc("main").set({ tid: uid, cls: c.homeroomClass || "", at: Date.now() });
-    // 학생 한 명 몫: 이름 · 개인 시간표 · 개별 알림 · 낸 제출물
-    const acct = cfgGet("stuAcct") || {}, stt = cfgGet("studentTT") || {}, kids = cfgGet("students") || [], old = Date.now() - 90 * 864e5;
-    for (const no of Object.keys(acct)) {
-      const a = acct[no], n = Number(no), s = kids.find(k => k.no === n);
-      const my = { no: n, name: (s && s.name) || (stt[no] && stt[no].name) || "", cells: stt[no] && Array.isArray(stt[no].cells) ? stt[no].cells : null,
-        msgs: get("pmsg").filter(m => m.no === n && m.at > old).sort((x, y) => y.at - x.at).slice(0, 50).map(m => ({ text: m.text, at: m.at })),
-        done: chk.filter(x => (x.done || []).includes(n)).map(x => x.id) };
-      await noticeDoc().collection("students").doc(a.hb).set({ v: JSON.stringify(my), at: Date.now() }, { merge: true });
-    }
     await publishDrive({ cls: c.homeroomClass || "", notes, events, checks, tt: tt && Array.isArray(tt.cells) ? { periods: Number(tt.periods) || tt.cells.length, cells: tt.cells } : null, bells, ui: cfgGet("noticeUi") || null }, chk);
     if (problems.length) console.warn("학생 계정을 만들지 못한 번호:", problems.join(", "));
     return problems;
@@ -967,14 +956,14 @@
     for (const no of new Set([...Object.keys(acct), ...Object.keys(pwAll)])) {
       const list = recs.filter(r => Number(r[2]) === Number(no)).map(r => { const s = normD(r[0]), e = normD(r[1]) || s; return { s, e, type: r[4] || "", period: r[5] || "", days: days(s, e) }; }).sort((a, b) => b.s.localeCompare(a.s));
       if (hakbunOf(no)) pubAtt[hakbunOf(no)] = list;
-      if (acct[no]) await noticeDoc().collection("students").doc(acct[no].hb).set({ att: JSON.stringify(list), attAt: Date.now() }, { merge: true });
     }
     await cfgPut({ pubAtt }); schedulePublish(); // 드라이브 알림 자료에도 (출결을 안 연 날에도 남게 교무수첩 자료에 둠)
   }
   // 휴대폰 알림 (FCM): 그 학생들 기기로. 선생님 구글 로그인 열쇠로 바로 보냄
   async function pushTo(nos, title, body) {
     const hbs = new Set(nos.map(n => hakbunOf(n)).filter(Boolean)); if (!hbs.size) return 0;
-    const snap = await noticeDoc().collection("push").get(), targets = []; snap.forEach(d => { const x = d.data(); if (x.token && hbs.has(x.hakbun)) targets.push({ id: d.id, token: x.token }); });
+    const targets = []; // 예전(Firebase) 등록 기기도 남아 있으면 보냄, 못 읽어도 시트 쪽은 보냄
+    try { (await noticeDoc().collection("push").get()).forEach(d => { const x = d.data(); if (x.token && hbs.has(x.hakbun)) targets.push({ id: d.id, token: x.token }); }); } catch (e) {}
     // 창구(앱스 스크립트)가 드라이브 시트 '기기' 탭에 적어 둔 휴대폰도 (같은 열쇠는 한 번만)
     try { ((await batchGet(NOTICE_BOOK, ["'기기'!A2:B2000"], "FORMATTED_VALUE"))[0] || []).forEach(r => { if (r[1] && hbs.has(String(r[0])) && !targets.some(x => x.token === r[1])) targets.push({ id: "", token: String(r[1]) }); }); } catch (e) {}
     let sent = 0, why = "";
