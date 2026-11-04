@@ -135,8 +135,6 @@ nav button[aria-selected="true"]{color:var(--navy)}nav button[aria-selected="tru
 .setrow b{flex:1}.setrow .small-btn{min-width:2.4em}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js"></script>
 </head>
 <body>
@@ -173,23 +171,31 @@ nav button[aria-selected="true"]{color:var(--navy)}nav button[aria-selected="tru
 </div>
 
 <script>
-// 우리 반 알림: 교무수첩(Firebase)이 내보낸 것만 읽음. 학생·학부모는 학번+비밀번호, 선생님은 구글 로그인
-const FB = { apiKey:"AIzaSyCO4Mc-lGPDZWddX1E5WwAVFBh5ofc2cvc", authDomain:"gyomu-7e9e1.firebaseapp.com", projectId:"gyomu-7e9e1", storageBucket:"gyomu-7e9e1.firebasestorage.app", messagingSenderId:"778560026907", appId:"1:778560026907:web:82f4dab5fcbe9fcc86fbbe" };
-const STU_DOMAIN = "@s.gyomu-7e9e1.app", PW_SUFFIX = "#gyomu";
+// 우리 반 알림: 교무수첩이 선생님 구글 드라이브에 올린 것을 앱스 스크립트 창구에서 받아 옴 (Firebase 에는 자료가 없음)
+// 학생·학부모는 학번+비밀번호, 선생님은 [담임 선생님 로그인] + 교무수첩에서 정한 선생님 비밀번호
+const GW = "https://script.google.com/macros/s/AKfycbxQQ2Ey6iabBG6gF4itZKU_Uph_3B-iw7UMFVr70scykko7nUcSEB-UkwtooN1v2ED-Jw/exec";
+// 휴대폰 알림만 Firebase(구글 알림 서버)를 거침: 알림 열쇠를 받는 데만 씀
+const FB = { apiKey:"AIzaSyCO4Mc-lGPDZWddX1E5WwAVFBh5ofc2cvc", projectId:"gyomu-7e9e1", messagingSenderId:"778560026907", appId:"1:778560026907:web:82f4dab5fcbe9fcc86fbbe" };
 // 휴대폰 알림 열쇠 (Firebase 프로젝트 설정 → 클라우드 메시징 → 웹 푸시 인증서). 비어 있으면 '알림 받기' 단추를 숨김
 const VAPID = "BBDEneVG6KJ7Xoy6shrLKrAKKjA7Y8qJPVCCsmbu2yQZWH18Qh83lWXtPi4AWAiakSj4PoEbyShAJapsIVIEKRg";
 firebase.initializeApp(FB);
-const auth = firebase.auth(), db = firebase.firestore();
+// 창구 부르기 (글자로 보내야 구글이 막지 않음)
+async function api(body){
+  const r = await fetch(GW, { method:"POST", headers:{ "Content-Type":"text/plain;charset=utf-8" }, body:JSON.stringify(body) });
+  if(!r.ok) throw new Error("인터넷 연결을 확인해 주세요."); return r.json();
+}
+// 들어온 표: '기억하기'면 이 기기에, 아니면 이 창에만
+const sess = { get:() => store.get("gwToken"), set:(t, keep) => { store.del("gwToken"); store.set("gwToken", t, keep); }, del:() => store.del("gwToken") };
 const $ = id => document.getElementById(id);
 const el = (tag, props = {}, ...kids) => { const e = document.createElement(tag); Object.assign(e, props); kids.flat(2).forEach(k => k != null && k !== "" && k !== false && e.append(k)); return e; };
 // 저장소는 막혀 있을 수 있음 (비공개 창 등)
 const store = { get(k){ try{ return localStorage.getItem(k) ?? sessionStorage.getItem(k); }catch{ return null; } },
   set(k, v, keep){ try{ (keep ? localStorage : sessionStorage).setItem(k, v); }catch{} }, del(k){ try{ localStorage.removeItem(k); sessionStorage.removeItem(k); }catch{} } };
-let data = null, view = store.get("classView") || "notes", lastFetch = 0, tid = null, preview = "", ttKid = "";
+let data = null, view = store.get("classView") || "notes", lastFetch = 0, preview = "", ttKid = "";
 // 탭 순서·보이기: 선생님이 이 앱(구글 로그인)에서 정함 → notice 문서의 ui
 const TABS = { notes:"공지", events:"일정", checks:"제출물", tt:"시간표", att:"출결" };
 const uiOf = () => { const u = data?.ui || {}, order = (u.order || []).filter(k => TABS[k]); Object.keys(TABS).forEach(k => { if(!order.includes(k)) order.push(k); }); return { order, hide:new Set(u.hide || []) }; };
-const isTeacher = () => !!auth.currentUser && auth.currentUser.uid === tid;
+const isTeacher = () => String(sess.get() || "").startsWith("T.");
 // 미리 보기 중이면 학생 몫(출결 탭 등)도 보이게: applyTabs 는 data.my 로 판단
 const WD = ["일","월","화","수","목","금","토"], DAYS = ["월","화","수","목","금"];
 const parse = k => { const [y, m, d] = k.split("-").map(Number); return new Date(y, m - 1, d); };
@@ -202,33 +208,33 @@ const ddTag = k => { const n = dday(k); return el("span",{className:"dd" + (n < 
 const HOLI = /(공휴일|대체공휴일|휴업|방학|추석|설날|한글날|개천절|성탄절|어린이날|현충일|광복절|삼일절)/;
 // 글 속 주소는 눌러서 열 수 있게 (글은 글자로만 넣음)
 const linkify = t => String(t).split(/(https?:\/\/[^\s]+)/g).map((p, i) => i % 2 ? el("a",{href:p,target:"_blank",rel:"noopener noreferrer",textContent:p}) : p);
-const isStudent = u => !!u && String(u.email || "").endsWith(STU_DOMAIN);
-const readJ = (doc, f = "v") => { try{ return doc.exists ? JSON.parse(doc.data()[f] || "null") : null; }catch{ return null; } };
+let teacherMode = false; // 로그인 화면: [담임 선생님 로그인]을 누르면 학번 칸 대신 선생님 비밀번호만
 
 function showLogin(msg){
   $("appView").hidden = true; $("loginView").hidden = false; $("loginErr").textContent = msg || "";
   setTimeout(() => $("no").focus(), 0);
 }
-const ERR = { "auth/invalid-credential":"학번이나 비밀번호가 맞지 않아요.", "auth/wrong-password":"학번이나 비밀번호가 맞지 않아요.", "auth/user-not-found":"이 학번은 아직 비밀번호가 없어요. 담임 선생님께 여쭤 보세요.",
-  "auth/too-many-requests":"비밀번호를 너무 많이 틀렸어요. 잠시 뒤 다시 해 주세요.", "auth/network-request-failed":"인터넷 연결을 확인해 주세요.", "auth/popup-blocked":"로그인 창이 막혔어요. 팝업을 허용해 주세요." };
 $("loginForm").onsubmit = async e => {
   e.preventDefault();
-  const b = $("loginBtn"); b.disabled = true; $("loginErr").textContent = "";
+  const b = $("loginBtn"); b.disabled = true; b.textContent = "확인하는 중…"; $("loginErr").textContent = "";
   try{
-    const no = $("no").value.replace(/\D/g, "");
-    if(no.length !== 5) throw new Error("학번 5자리로 넣어 주세요. (예: 30301)");
-    await auth.setPersistence($("remember").checked ? firebase.auth.Auth.Persistence.LOCAL : firebase.auth.Auth.Persistence.SESSION);
-    await auth.signInWithEmailAndPassword(no + STU_DOMAIN, $("pw").value.trim() + PW_SUFFIX);
-    $("pw").value = "";
-  }catch(x){ $("loginErr").textContent = ERR[x.code] || x.message || "들어가지 못했어요. 잠시 뒤 다시 해 주세요."; }
-  b.disabled = false;
+    const no = teacherMode ? "선생님" : $("no").value.replace(/\D/g, "");
+    if(!teacherMode && no.length !== 5) throw new Error("학번 5자리로 넣어 주세요. (예: 30301)");
+    const r = await api({ no, pw:$("pw").value.trim() });
+    if(r.error) throw new Error(r.error);
+    sess.set(r.token, $("remember").checked); $("pw").value = ""; preview = ""; got(shape(r.data));
+  }catch(x){ $("loginErr").textContent = x.message || "들어가지 못했어요. 잠시 뒤 다시 해 주세요."; }
+  b.disabled = false; b.textContent = "들어가기";
 };
-$("teacherBtn").onclick = async () => { try{ await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }catch(x){ $("loginErr").textContent = ERR[x.code] || "로그인하지 못했어요."; } };
-$("logout").onclick = async () => { if(!confirm("이 기기에서 나갈까요? 다시 보려면 비밀번호를 넣어야 해요.")) return; store.del("classData"); store.del("msgSeen"); data = null; await auth.signOut(); showLogin(); };
+$("teacherBtn").onclick = () => { teacherMode = !teacherMode; $("no").hidden = teacherMode; $("no").required = !teacherMode;
+  $("pw").placeholder = teacherMode ? "선생님 비밀번호 (교무수첩 설정에서 정함)" : "비밀번호"; $("teacherBtn").textContent = teacherMode ? "학생·학부모로 들어가기" : "담임 선생님 로그인"; $("loginErr").textContent = ""; $("pw").focus(); };
+$("logout").onclick = async () => { if(!confirm("이 기기에서 나갈까요? 다시 보려면 비밀번호를 넣어야 해요.")) return;
+  if(store.get("pushOn")) await disablePush(true);
+  store.del("classData"); store.del("msgSeen"); sess.del(); data = null; showLogin(); };
 $("refresh").onclick = () => load(true);
 document.querySelectorAll("nav button").forEach(b => b.onclick = () => { view = b.dataset.v; store.set("classView", view, true); draw(); window.scrollTo(0, 0); });
 // 처음 열 때(기억해 둔 내용) 탭 정리는 got() 이 함
-document.addEventListener("visibilitychange", () => { if(!document.hidden && Date.now() - lastFetch > 5 * 60e3 && auth.currentUser) load(); });
+document.addEventListener("visibilitychange", () => { if(!document.hidden && Date.now() - lastFetch > 5 * 60e3 && sess.get()) load(); });
 
 // 정한 순서대로 아래 탭을 놓고, 숨긴 탭은 뺌 (출결은 학생·학부모만)
 function applyTabs(){
@@ -241,7 +247,7 @@ function applyTabs(){
 // 선생님 설정: 탭 순서 바꾸기·보이기
 function drawSet(){
   const U = uiOf(), save = async order => { const ui = { order, hide:[...U.hide] }; data.ui = ui; applyTabs(); draw();
-    try{ await db.collection("notice").doc(tid).set({ ui:ui }, { merge:true }); }catch(x){ alert("저장하지 못했어요: " + (x.message || x.code)); } };
+    try{ const r = await api({ act:"ui", token:sess.get(), ui }); if(r.error) throw new Error(r.error); }catch(x){ alert("저장하지 못했어요: " + x.message); } };
   return el("section",{}, el("h2",{}, "알림 앱 설정", el("small",{textContent:"선생님만 보여요"})),
     el("div",{className:"card"}, el("p",{className:"hint",textContent:"아래 탭의 순서와 보이기를 정해요. 학생·학부모 앱에도 그대로 적용돼요."}),
       ...U.order.map((k, i) => { const cb = el("input",{type:"checkbox",checked:!U.hide.has(k),"aria-label":TABS[k] + " 보이기"});
@@ -251,14 +257,14 @@ function drawSet(){
         return el("div",{className:"setrow"}, el("label",{className:"inline"}, cb), el("b",{textContent:TABS[k] + (k === "att" ? " (학생·학부모만)" : "")}), up, dn); })),
     data.kids?.length ? el("div",{className:"card"}, el("b",{textContent:"학생 화면 미리 보기"}), el("p",{className:"hint",textContent:"학생·학부모가 그 학번으로 들어왔을 때와 똑같이 보여요. 보기만 하고 아무것도 바뀌지 않아요."}),
       (() => { const sel = el("select",{className:"field","aria-label":"미리 볼 학생"}, ...data.kids.map(k => el("option",{value:k.hb,textContent:k.hb + " " + (k.name || "")})));
-        const b = el("button",{className:"btn",type:"button",textContent:"이 학생 화면으로 보기"}); b.onclick = () => { preview = sel.value; view = "notes"; load(true); };
+        const b = el("button",{className:"btn",type:"button",textContent:"이 학생 화면으로 보기"}); b.onclick = () => { preview = sel.value; view = "notes"; got(shape(data.raw)); };
         return [sel, b]; })()) : el("p",{className:"hint",textContent:"학생 화면 미리 보기는 교무수첩에서 학생별 비밀번호를 정하면 쓸 수 있어요."}),
     el("p",{className:"hint",textContent:"공지·일정·제출물·시간표 내용은 교무수첩에서 고쳐요."}));
 }
 // 미리 보기 중 띠
 function previewBar(){
   if(!preview || !data.my) return null;
-  const b = el("button",{className:"small-btn",type:"button",textContent:"미리 보기 끝내기"}); b.onclick = () => { preview = ""; view = "set"; load(true); };
+  const b = el("button",{className:"small-btn",type:"button",textContent:"미리 보기 끝내기"}); b.onclick = () => { preview = ""; view = "set"; got(shape(data.raw)); };
   return el("div",{className:"push"}, el("span",{textContent:"👀 " + hakbun(data.my.no) + " " + (data.my.name || "") + " 학생 화면 미리 보기"}), b);
 }
 $("setBtn").onclick = () => { view = view === "set" ? (uiOf().order.find(k => !uiOf().hide.has(k)) || "notes") : "set"; draw(); window.scrollTo(0, 0); };
@@ -269,28 +275,27 @@ function got(d){
   applyTabs();
   draw();
 }
+// 창구가 준 것 → 화면에 쓰는 모양 (선생님 미리 보기면 그 학생 몫으로)
+function shape(raw){
+  let my = raw.my || null; if(preview && raw.kids){ const k = raw.kids.find(x => x.hb === preview); if(k) my = k; }
+  const done = new Set(my?.done || []);
+  return { ...raw, raw, today:today(), checks:(raw.checks || []).map(c => ({ ...c, mine:my ? done.has(c.id) : undefined })), my, kids:raw.kids || null };
+}
 async function load(manual){
-  const u = auth.currentUser; if(!u) return showLogin();
+  const t = sess.get(); if(!t) return showLogin();
   if(manual) $("refresh").textContent = "…";
   try{
-    if(!tid){ const c = await db.collection("classes").doc("main").get(); tid = c.exists ? c.data().tid : null; if(!tid) throw new Error("선생님이 아직 알림 앱을 열지 않았어요."); }
-    const nd = await db.collection("notice").doc(tid).get(), shared = readJ(nd); if(shared) shared.ui = readJ(nd, "ui") || (nd.exists && typeof nd.data().ui === "object" ? nd.data().ui : null);
-    if(!shared) throw new Error(isStudent(u) || u.uid === tid ? "아직 받은 내용이 없어요." : "이 계정은 우리 반 알림을 볼 수 없어요.");
-    let my = null;
-    if(isStudent(u)){ const hb = u.email.split("@")[0], sd = await db.collection("notice").doc(tid).collection("students").doc(hb).get(); my = readJ(sd) || { no:Number(hb.slice(3)), name:"" }; my.att = readJ(sd, "att") || []; }
-    let kids = null;
-    if(u.uid === tid){ const ss = await db.collection("notice").doc(tid).collection("students").get();
-      kids = ss.docs.map(d => ({ hb:d.id, ...(readJ(d) || {}), att:readJ(d, "att") || [] })).sort((a, b) => a.hb.localeCompare(b.hb)); }
-    if(preview && kids){ const k = kids.find(x => x.hb === preview); if(k) my = k; }
-    const done = new Set(my?.done || []);
-    got({ ...shared, today:today(), checks:shared.checks.map(c => ({ ...c, mine:my ? done.has(c.id) : undefined })), my, kids });
+    const r = await api({ token:t });
+    if(r.relogin){ sess.del(); store.del("classData"); data = null; $("refresh").textContent = "↻"; return showLogin(r.error); }
+    if(r.error) throw new Error(r.error);
+    got(shape(r.data));
   }catch(x){
-    if(x.code === "permission-denied"){ await auth.signOut(); return showLogin("이 계정은 들어올 수 없어요. 담임 선생님께 비밀번호를 다시 받아 주세요."); }
     if(!data) showLogin(x.message || "인터넷 연결을 확인해 주세요."); else { const s = $("view").querySelector(".stale"); if(s) s.textContent = "새 내용을 받지 못했어요. 마지막으로 받은 내용이에요."; }
   }
   $("refresh").textContent = "↻";
 }
-auth.onAuthStateChanged(u => { if(u) load(); else if(!data) showLogin(); });
+// 처음: 기억해 둔 표가 있으면 바로 새로 받고, 없으면 로그인 화면
+setTimeout(() => { if(sess.get()) load(); else if(!data) showLogin(); }, 0);
 
 // 휴대폰 알림 받기: 이 기기를 등록 (선생님이 개별 알림을 보내면 울림)
 async function enablePush(btn){
@@ -299,14 +304,14 @@ async function enablePush(btn){
     if(await Notification.requestPermission() !== "granted") throw new Error("알림을 허용해야 받을 수 있어요. 휴대폰 설정에서 이 앱 알림을 켜 주세요.");
     const reg = await navigator.serviceWorker.ready;
     const token = await firebase.messaging().getToken({ vapidKey:VAPID, serviceWorkerRegistration:reg });
-    const u = auth.currentUser; await db.collection("notice").doc(tid).collection("push").doc(u.uid).set({ token, hakbun:isStudent(u) ? u.email.split("@")[0] : "", at:Date.now() });
-    store.set("pushOn", "1", true); draw();
+    const r = await api({ act:"push", token:sess.get(), fcm:token }); if(r.error) throw new Error(r.error);
+    store.set("pushOn", token, true); draw();
   }catch(x){ alert(x.message || "알림을 켜지 못했어요."); }
 }
 // 알림 그만 받기: 이 기기 등록을 지움 (선생님이 보내도 안 울림)
-async function disablePush(){
-  try{ await firebase.messaging().deleteToken().catch(() => {}); await db.collection("notice").doc(tid).collection("push").doc(auth.currentUser.uid).delete(); }
-  catch(x){ alert("알림을 끄지 못했어요: " + (x.message || x.code)); return; }
+async function disablePush(quiet){
+  try{ const fcm = store.get("pushOn"); if(fcm && fcm !== "1") await api({ act:"unpush", token:sess.get(), fcm }); await firebase.messaging().deleteToken().catch(() => {}); }
+  catch(x){ if(!quiet){ alert("알림을 끄지 못했어요: " + x.message); return; } }
   store.del("pushOn"); store.set("pushTipOff", "1", true); draw();
 }
 // 머리띠 🔔/🔕: 언제든 알림 받기 ↔ 받지 않기
@@ -314,7 +319,7 @@ $("pushBtn").onclick = () => { if(store.get("pushOn")){ if(confirm("휴대폰 �
 
 function draw(){
   if(!data) return;
-  const pb = $("pushBtn"), on = !!store.get("pushOn"); pb.hidden = !VAPID || !auth.currentUser; pb.textContent = on ? "🔔" : "🔕";
+  const pb = $("pushBtn"), on = !!store.get("pushOn"); pb.hidden = !VAPID || !sess.get(); pb.textContent = on ? "🔔" : "🔕";
   pb.setAttribute("aria-label", on ? "알림 받는 중 (누르면 받지 않기)" : "알림 받지 않는 중 (누르면 받기)"); pb.title = pb.getAttribute("aria-label");
   $("title").firstChild.textContent = (data.cls ? data.cls + " " : "") + "우리 반 ";
   const t = new Date(), my = data.my;

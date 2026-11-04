@@ -987,7 +987,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="backend.js?v=38724f2f"></script>
+<script src="backend.js?v=5e612f75"></script>
 <style>
 #fbGate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--desk)}
 #fbGate .fbbox{background:var(--paper);border-radius:22px;padding:36px 32px;text-align:center;box-shadow:0 18px 40px -24px rgba(20,40,25,.35);max-width:340px}
@@ -2692,18 +2692,18 @@ function renderNoticeBox(){
   let info = null;
   const stuState = el("span",{className:"hint"});
   const showStu = r => { info = r; const p = Object.keys(r?.pw || {}).length, t = Object.keys(r?.tt || {}).length; stuState.textContent = "학생별 비밀번호 " + p + "명 · 개인 시간표 " + t + "명"; };
-  call("noticeInfo").then(r => { showStu(r); state.textContent = r?.set ? "반 전체 비밀번호를 정해 두었어요" + (r.at ? " (" + new Date(r.at).toLocaleDateString("ko-KR") + ")" : "") + "." : "반 전체 비밀번호는 없어요 (학생별 비밀번호로만 들어와요)."; }).catch(() => { state.textContent = ""; });
+  call("noticeInfo").then(r => { showStu(r); state.textContent = r?.set ? "선생님 비밀번호를 정해 두었어요" + (r.at ? " (" + new Date(r.at).toLocaleDateString("ko-KR") + ")" : "") + "." : "선생님 비밀번호가 아직 없어요. 알림 앱의 [담임 선생님 로그인]에 써요."; }).catch(() => { state.textContent = ""; });
   const ttFile = el("input",{type:"file",accept:".xlsx,.xls",hidden:true});
   ttFile.onchange = async () => { const f = ttFile.files[0]; ttFile.value = ""; if(!f) return; try{ showStu(await uploadStudentTT(f)); }catch(e){ say(e?.message || "시간표 파일을 읽지 못했어요."); } };
   const stuRow = el("div",{className:"actions"}, ttFile,
     navBtn("학생별 비밀번호", () => openStudentPw(info), "학생·학부모 비밀번호 정하기", !canWrite()),
     navBtn("개인 시간표 올리기", () => ttFile.click(), "나이스 학생별 시간표 엑셀 올리기", !canWrite()),
     navBtn("개별 알림", () => openStudentMsg(), "학생별로 알림 보내기", !canWrite()));
-  const pw = el("input",{type:"text",className:"field",id:"noticePw",maxLength:30,placeholder:"새 비밀번호 (4자 이상)",autocomplete:"off","aria-label":"알림 앱 비밀번호"});
+  const pw = el("input",{type:"text",className:"field",id:"noticePw",maxLength:30,placeholder:"선생님 비밀번호 (4자 이상)",autocomplete:"off","aria-label":"알림 앱 선생님 비밀번호"});
   const setPw = navBtn("비밀번호 정하기", async () => {
-    try{ await call("setNoticePassword", pw.value); pw.value = ""; state.textContent = "비밀번호를 정했어요. 전에 들어온 기기는 새 비밀번호를 넣어야 해요."; }
+    try{ await call("setNoticePassword", pw.value); pw.value = ""; state.textContent = "선생님 비밀번호를 정했어요. 1분 안에 알림 앱에 반영돼요."; }
     catch(e){ say(e?.message || "정하지 못했어요."); }
-  }, "알림 앱 비밀번호 정하기", !canWrite());
+  }, "알림 앱 선생님 비밀번호 정하기", !canWrite());
   const qr = navBtn("QR 코드", async () => {
     const box = el("div",{className:"qrbox"});
     modal("우리 반 알림 QR", el("p",{className:"hint"}, "학생·학부모가 휴대폰 카메라로 찍으면 열려요. 비밀번호는 따로 알려 주세요."), box, el("p",{className:"c"}, NOTICE_URL));

@@ -979,7 +979,7 @@
     }
     return sent;
   }
-  const PUB_FNS = new Set(["addNote", "updateNote", "deleteNote", "saveEvents", "addCheck", "updateCheck", "deleteCheck", "saveConfig", "saveClassTT", "saveStudentTT", "setStudentPasswords", "sendStudentMessages", "deleteStudentMessage", "saveStudents", "importFromSheet", "importFromArchive", "restoreArchive", "archiveBefore"]);
+  const PUB_FNS = new Set(["addNote", "updateNote", "deleteNote", "saveEvents", "addCheck", "updateCheck", "deleteCheck", "saveConfig", "saveClassTT", "saveStudentTT", "setStudentPasswords", "setNoticePassword", "sendStudentMessages", "deleteStudentMessage", "saveStudents", "importFromSheet", "importFromArchive", "restoreArchive", "archiveBefore"]);
   const sendMsg = API.sendStudentMessages;
   API.sendStudentMessages = async (nos, text, show = true) => { const r = await sendMsg(nos, text); try { await publishNotice(); const n = await pushTo((Array.isArray(nos) ? nos : []).map(Number), "담임 선생님 알림", show === false ? "담임 선생님 새 알림이 있어요. 앱에서 확인해 주세요." : String(text || "")); if (n) r.pushed = n; } catch (e) { r.pushError = e.message; } return r; };
   API.publishNow = async () => ({ problems: await publishNotice() });
