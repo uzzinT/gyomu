@@ -1170,7 +1170,8 @@ function validConfig(c){
 function apply(data){
   config = validConfig(data?.config) ? data.config : DEFAULT_CONFIG;
   tt = normTT(data?.timetable);
-  events = Array.isArray(data?.events) ? data.events : [];
+  // 학사일정에서 'A · B' 로 묶여 온 행사는 따로따로 (각각 글·마감·파일을 넣도록)
+  events = (Array.isArray(data?.events) ? data.events : []).flatMap(e => { const ts = String(e.title || "").split(/\s+·\s+/).map(t => t.trim()).filter(Boolean); return ts.length > 1 ? ts.map(title => ({ ...e, title })) : [e]; });
   memos = data?.memos && typeof data.memos === "object" ? data.memos : {};
   notes = Array.isArray(data?.notes) ? data.notes : [];
   checks = Array.isArray(data?.checks) ? data.checks : [];
