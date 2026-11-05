@@ -285,6 +285,9 @@ nav{margin-bottom:14px}
 .now .cls{font-size:1.25rem;font-weight:700;margin:2px 0}
 .now .cls small{font-size:.8rem;font-weight:400;color:var(--muted);margin-left:8px}
 .now .prog{font-size:.85rem;margin:4px 0}
+.prevcls{display:block;width:100%;text-align:left;margin:4px 0 6px;padding:5px 10px;border:1px solid var(--line);border-radius:6px;background:var(--paper);font:inherit;font-size:.85rem;color:var(--ink);cursor:pointer}
+.prevcls:hover{border-color:var(--green)}
+.prevcls .nolog{color:var(--muted)}
 .now .lesson{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin:6px 0;padding:6px 10px;border-radius:6px;background:color-mix(in srgb,var(--sun) 10%,var(--paper));font-size:.95rem}
 .now .lesson b{font-size:1.05rem;color:var(--sun)}
 .now .lesson small{color:var(--muted)}
@@ -2556,6 +2559,22 @@ function nowSlot(d = new Date()){
   }
   return null;
 }
+// 오늘 방금 끝난 수업 (쉬는 시간에 진도 적기용). 없으면 null
+function prevSlot(d = new Date()){
+  const wd = d.getDay(); if(wd < 1 || wd > 5) return null;
+  const k = ymd(d), t = hm(d), B = bells();
+  for(let i = tt.periods - 1; i >= 0; i--) if(slotOn(k, i, wd - 1) && t >= B[i].e) return { k, i, j:wd - 1, b:B[i] };
+  return null;
+}
+// 이전 수업 한 줄: 몇 교시 · 반 과목 · 적은 차시. 누르면 시간표 그 교시 창
+function prevLine(){
+  const p = prevSlot(); if(!p) return null;
+  const [cls] = splitCell(slotOn(p.k, p.i, p.j)), lg = logOf(p.k, p.i), no = Number(lg?.lesson);
+  const b = el("button",{type:"button",className:"prevcls",title:"눌러서 크게 보기 (진도 적기)","aria-label":"이전 수업 " + (p.i + 1) + "교시 " + cls + " 수업 기록 열기"},
+    el("b",{}, "이전 수업"), " " + (p.i + 1) + "교시 · " + cls + " · ", no ? el("span",{}, no + "차시") : el("span",{className:"nolog"}, lg?.text ? "기록함" : "진도 안 적음"));
+  b.onclick = () => openSlot(p.k, p.i, tt.cells[p.i]?.[p.j] || "");
+  return b;
+}
 // 수업이 없을 때 한마디: 주말 · 아침 · 공강 · 쉬는 시간 · 점심 · 수업 끝 · 퇴근
 const offWork = () => /^\d{2}:\d{2}$/.test(config.offWork || "") ? config.offWork : "16:00";
 const onWork = () => /^\d{2}:\d{2}$/.test(config.onWork || "") ? config.onWork : "08:00";
@@ -2577,13 +2596,13 @@ function renderNow(){
   // 한마디는 '인사!' 와 '덧붙임' 두 줄로 나눠, 낱말 중간에서 끊기지 않게
   const md = n && n.now ? null : nowMood(), mm = md ? md[1].match(/^(.+?[!.])\s+(.+)$/) : null;
   const free = md ? el("p",{className:"free " + md[0]}, ...(mm ? [el("b",{}, mm[1]), el("span",{}, mm[2])] : [md[1]])) : null;
-  if(!n) return el("section",{className:"panel now",id:"nowPanel"}, head, free, el("p",{className:"rest"}, "오늘 남은 수업이 없어요."));
+  if(!n) return el("section",{className:"panel now",id:"nowPanel"}, ...[head, free, prevLine(), el("p",{className:"rest"}, "오늘 남은 수업이 없어요.")].filter(Boolean));
   // 수업 중이면 그 수업, 아니면 다음 수업 하나만
   const v = slotOn(n.k, n.i, n.j), [cls, room] = splitCell(v), m = cls.match(/^(\d+\s*-\s*\d+)\s+(.+)$/);
   const plan = planOf(cls), next = nextLesson(cls), last = logs.filter(l => l.cls === cls && l.date < n.k).sort((a, b) => b.date.localeCompare(a.date))[0];
   head.append(el("div",{className:"tt-tools"}, navBtn("수업 기록", () => openSlot(n.k, n.i, tt.cells[n.i]?.[n.j] || ""), (n.i + 1) + "교시 수업 기록")));
   return el("section",{className:"panel now" + (n.now ? "" : " later"),id:"nowPanel"}, ...[
-    head, free,
+    head, free, prevLine(),
     el("div",{className:"when"}, n.now ? el("b",{}, "수업 중 ") : el("b",{}, "다음 수업 · " + (n.left > 0 ? n.left + "분 뒤 " : "곧 ")), (n.i + 1) + "교시 · " + n.b.s + "~" + n.b.e),
     el("div",{className:"cls"}, m ? m[1] + " " + m[2] : cls, room ? el("small",{}, room) : ""),
     // 이번 시간 차시: 오늘 이 교시에 적은 차시가 있으면 그것, 아니면 마친 차시 다음
