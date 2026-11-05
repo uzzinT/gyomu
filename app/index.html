@@ -2582,7 +2582,7 @@ function prevLine(){
   const p = prevSlot(); if(!p) return null;
   const [cls] = splitCell(slotOn(p.k, p.i, p.j)), lg = logOf(p.k, p.i), no = Number(lg?.lesson) || (cls ? nextLesson(cls) : 0), what = no ? planOf(cls)[no - 1] || "" : "";
   const open = el("button",{type:"button",className:"prevopen",title:"눌러서 크게 보기 (진도·특이사항 적기)","aria-label":"이전 수업 " + cls + " 수업 기록 열기"},
-    el("span",{className:"pk"}, "이전 수업 · " + cls),
+    el("span",{className:"pk"}, "이전 수업 · " + cls + " · " + (p.i + 1) + "교시"),
     el("span",{className:"pl"}, no ? el("b",{}, no + "차시") : el("b",{}, "차시 없음"), what ? " " + what : ""));
   open.onclick = () => openSlot(p.k, p.i, tt.cells[p.i]?.[p.j] || "");
   const cb = el("input",{type:"checkbox",checked:!!lg?.done,disabled:!canWrite() || !no});
