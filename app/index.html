@@ -1036,7 +1036,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="backend.js?v=5dcb5098"></script>
+<script src="backend.js?v=56603d8a"></script>
 <style>
 #fbGate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--desk)}
 #fbGate .fbbox{background:var(--paper);border-radius:22px;padding:36px 32px;text-align:center;box-shadow:0 18px 40px -24px rgba(20,40,25,.35);max-width:340px}
@@ -1096,14 +1096,18 @@ const nextTerm = k => { const [y, s] = k.split("-").map(Number); return s === 1 
 const termName = k => { const [y, s] = k.split("-"); return `${y}학년도 ${s}학기`; };
 const itemTerm = it => /^\d{4}-[12]$/.test(it.term || "") ? it.term : termKey(new Date(it.createdAt || Date.now()));
 let viewTerm = null; // null이면 지금 학기
-const curTerm = () => /^\d{4}-[12]$/.test(config.term || "") ? config.term : null;
+// 학기는 날짜로 저절로: 3~7월 1학기, 9~2월 2학기, 8월은 학사일정의 2학기 개학일(없으면 8/17)부터 2학기
+const autoTerm = (d = new Date()) => { const k = termKey(d); if(d.getMonth() !== 7) return k; const y = k.slice(0, 4), s2 = findEv(/개학/, y + "-08-01", y + "-09-10") || y + "-08-17"; return ymd(d) >= s2 ? y + "-2" : y + "-1"; };
+// config.term 은 '어느 학년도 교무수첩인지'만. 그 학년도 안이면 날짜로 1·2학기, 새 학년도를 아직 시작 안 했으면 2학기로 둠
+const curTerm = () => { const t = config.term; if(!/^\d{4}-[12]$/.test(t || "")) return null; const a = autoTerm(); return a.slice(0, 4) === t.slice(0, 4) ? a : a > t ? t.slice(0, 4) + "-2" : t; };
+setTimeout(() => console.assert(autoTerm(new Date(2026, 9, 1)) === "2026-2" && autoTerm(new Date(2027, 0, 5)) === "2026-2" && autoTerm(new Date(2026, 3, 1)) === "2026-1"), 0);
 // 같은 학년도 안에서 '공통' 항목과 그 학기 전용 항목을 보여 줌
 function inView(it){
   const v = viewTerm || curTerm(); if(!v) return true;
   return itemTerm(it).slice(0, 4) === v.slice(0, 4) && (!scopeOk(it.scope) || it.scope === v.slice(-1));
 }
 function termRange(){
-  const ks = items.map(itemTerm).concat(curTerm() ? [curTerm()] : []).sort();
+  const ks = items.map(itemTerm).concat(curTerm() ? [curTerm(), curTerm().slice(0, 4) + "-1"] : []).sort();
   const out = [];
   for(let k = ks[0]; k && k <= ks[ks.length - 1] && out.length < 40; k = nextTerm(k)) out.push(k);
   return out;
@@ -1142,38 +1146,36 @@ function renderImportBox(){
 
 // 항목의 학기 범위: "" = 1·2학기 공통, "1" = 1학기만, "2" = 2학기만
 const scopeOk = s => s === "1" || s === "2";
-const defaultScope = () => curTerm()?.endsWith("-2") ? "2" : "";
+const defaultScope = () => "";
 function renderNewTerm(){
   const now = termKey(), cur = curTerm();
-  const opts = [...new Set([cur ? nextTerm(cur) : now, now, nextTerm(now)])];
-  const sel = el("select",{className:"field",id:"newTerm"}, ...opts.map(k => el("option",{value:k}, termName(k) + (k.endsWith("-1") ? " · 새 학년도" : ""))));
+  const ny = cur ? Number(cur.slice(0, 4)) + 1 : Number(now.slice(0, 4)), opts = cur ? [ny + "-1"] : [now.slice(0, 4) + "-1", nextTerm(now.slice(0, 4) + "-2")];
+  const sel = el("select",{className:"field",id:"newTerm"}, ...opts.map(k => el("option",{value:k}, k.slice(0, 4) + "학년도")));
   const clr = el("input",{type:"checkbox",id:"clearTT",checked:true});
   const clrBox = el("label",{className:"inline"}, clr, " 시간표 비우기");
   const note = el("p",{className:"note"});
   const draw = () => {
     const y = sel.value.endsWith("-1");
     clrBox.hidden = true;
-    note.textContent = y
-      ? NEW_YEAR_NOTE
-      : "1학기 자료와 시간표는 그대로 두고 이어 가요. 학기마다 다른 항목만 카드의 '편집'에서 1학기만·2학기만으로 표시하고, 달라진 시간표 칸만 고치거나 2학기 시간표를 올리기로 바꾸세요.";
+    note.textContent = NEW_YEAR_NOTE + " 학급 출결 시트도 같은 모양(출결 종류·알림 규칙·화면 설정)으로 새 학년도 것을 하나 만들어 이어요. 기록·명부는 비워요.";
   };
   const err = el("div",{className:"err"});
   const start = el("button",{className:"btn",type:"button",disabled:!canWrite()},"시작");
   sel.onchange = () => { start.dataset.armed = ""; start.textContent = "시작"; draw(); };
   start.onclick = async () => {
-    if(!start.dataset.armed){ start.dataset.armed = "1"; start.textContent = "한 번 더 누르면 " + termName(sel.value) + " 시작"; return; }
+    if(!start.dataset.armed){ start.dataset.armed = "1"; start.textContent = "한 번 더 누르면 " + sel.value.slice(0, 4) + "학년도 시작"; return; }
     start.disabled = true; err.textContent = "";
     try{
       await startTerm(sel.value, sel.value.endsWith("-1") && clr.checked);
       viewTerm = null; draft = null; render();
-      $("status").textContent = termName(sel.value) + "를 시작했어요. 지난 자료는 각 영역의 학기 선택에서 볼 수 있어요.";
+      $("status").textContent = sel.value.slice(0, 4) + "학년도를 시작했어요. 지난 학년도는 보관 시트에 있어요.";
     }catch(e){ err.textContent = e?.message && !e.code ? e.message : "시작하지 못했어요. 잠시 뒤 다시 시도해 주세요."; start.disabled = false; }
   };
   draw();
   const box = el("section",{className:"set-area"},
-    el("h3",{className:"nt-title"},"새 학년도 · 새 학기"),
-    el("p",{className:"note"}, "지금: " + (cur ? termName(cur) : "아직 정하지 않음") + ". 분류 설정은 그대로 남아요."),
-    el("div",{className:"set-head"}, el("label",{}, "시작할 학기", sel), clrBox),
+    el("h3",{className:"nt-title"},"새 학년도"),
+    el("p",{className:"note"}, "지금: " + (cur ? termName(cur) : "아직 정하지 않음") + ". 1·2학기는 날짜로 저절로 바뀌어요 (2학기 시작은 학사일정의 8월 개학일). 학기마다 다른 자료만 카드의 '편집'에서 1학기만·2학기만으로 표시하세요. 2학기에도 위쪽 학기 선택에서 1학기를 고르면 1학기 자료를 볼 수 있어요."),
+    el("div",{className:"set-head"}, el("label",{}, "시작할 학년도", sel), clrBox),
     note, start, err,
     ...extraTermInfo());
   box.style.setProperty("--c", "var(--sun)");
@@ -3204,8 +3206,9 @@ const SWAP_RE = /요일\s*변경\s*[(\[]?\s*([월화수목금])/, EXAM_RE = /(�
 const findEv = (re, from, to) => events.filter(e => !e.cat && re.test(e.title) && e.date >= from && e.date <= to).sort((a, b) => a.date.localeCompare(b.date))[0]?.date;
 // 학기 기간: 직접 정한 것 → 학사일정의 개학·방학식으로 짐작 → 기본 날짜
 function planRange(){
-  if(config.planRange?.s && config.planRange?.e) return { ...config.planRange, auto:false };
-  const [y, s] = (curTerm() || termKey()).split("-").map(Number);
+  const term = curTerm() || autoTerm();
+  if(config.planRange?.s && config.planRange?.e && autoTerm(parseYmd(config.planRange.s)) === term) return { ...config.planRange, auto:false };
+  const [y, s] = term.split("-").map(Number);
   if(s === 1) return { s:findEv(/개학|입학식|시업식/, y + "-02-20", y + "-03-10") || y + "-03-02", e:findEv(/방학식|여름\s*방학/, y + "-07-01", y + "-08-31") || y + "-07-20", auto:true };
   // 2학기 끝은 종업식 (겨울방학 뒤 2월 등교일까지), 없으면 방학식
   return { s:findEv(/개학/, y + "-08-01", y + "-09-10") || y + "-08-17", e:findEv(/종업식/, y + "-12-01", (y + 1) + "-02-28") || findEv(/방학식|겨울\s*방학/, y + "-12-01", (y + 1) + "-02-28") || (y + 1) + "-01-08", auto:true };

@@ -652,7 +652,18 @@
       await yearFolder(newYear);
       // 새 학년도는 영역·분류·수업 시간 설정만 남기고 처음부터
       for (const t of YEAR_TABLES) await put(t, t === "classRosters" ? {} : []);
-      const patch = { archives: { ...(cfgGet("archives") || {}), [prev]: archId }, inputBooks: {}, legacyMoved: true, config: { ...c, homeroomClass: "" } };
+      // 학급 출결 시트: 같은 모양으로 새 학년도 것을 복제 (출결 종류·알림 규칙·교시·화면 설정은 그대로, 기록·휴지통·명부·학사일정은 비움). 지난 시트는 그대로 남음
+      let attend = c.attend;
+      if (c.attend && c.attend.url) try {
+        const oldId = sheetId(c.attend.url), oldName = (await (await G(DRIVE + "/" + oldId + "?fields=name")).json()).name || "스마트 출결 관리 DB";
+        const name = /\(\d{4}\)/.test(oldName) ? oldName.replace(/\(\d{4}\)/, "(" + newYear + ")") : "(" + newYear + ") " + oldName;
+        const nid = (await (await G(DRIVE + "/" + oldId + "/copy?fields=id", { method: "POST", headers: JSONH, body: JSON.stringify({ name, parents: [await yearFolder(newYear)] }) })).json()).id;
+        const have = new Set((await tabsOf(nid)).map(t => t.title)), wipe = { 출결기록: "A2:K8000", 휴지통: "A2:L3000", 학생명부: "A2:H200", 학사일정: "A2:D800" };
+        const ranges = Object.keys(wipe).filter(t => have.has(t)).map(t => "'" + t + "'!" + wipe[t]);
+        if (ranges.length) await G(SHEETS + "/" + nid + "/values:batchClear", { method: "POST", headers: JSONH, body: JSON.stringify({ ranges }) });
+        attend = { ...c.attend, url: "https://docs.google.com/spreadsheets/d/" + nid + "/edit" };
+      } catch (e) { console.warn("출결 시트 복제", e); } // 못 하면 지난 시트를 그대로 이어 둠 (설정에서 바꿀 수 있음)
+      const patch = { archives: { ...(cfgGet("archives") || {}), [prev]: archId }, inputBooks: {}, legacyMoved: true, attBackupBook: undefined, config: { ...c, homeroomClass: "", attend } };
       YEAR_CFG.forEach(k => { patch[k] = undefined; });
       await cfgPut(patch);
       return getAll();
