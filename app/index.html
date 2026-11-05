@@ -2197,8 +2197,9 @@ function openDay(k){
   const evLi = e => { const tag = el("span",{className:"tag"}, evCatName(e)); if(evColor(e)) tag.style.setProperty("--c", evColor(e));
     const li = el("li",{className: isHoliday(e) ? "red" : ""}, tag, e.title);
     if(window.fbCall){ const n = evNoteOf(k, e), mark = n ? [n.due ? "⏰" : "", n.text ? "📝" : "", n.files?.length ? "📎" + n.files.length : ""].join("") : "";
-      const b = el("button",{type:"button",className:"evnotebtn" + (n ? " has" : ""),title:"이 행사의 글·마감·사진·파일","aria-label":e.title + " 글·마감·사진·파일"}, mark || "📎 자료");
-      b.onclick = () => openEvNote(k, e); li.append(b); }
+      // 빈 행사는 ✎ 로 열면 되니 단추 없음. 넣어 둔 게 있으면 표시(⏰📝📎n)만
+      if(mark){ const b = el("button",{type:"button",className:"evnotebtn has",title:"이 행사의 글·마감·사진·파일","aria-label":e.title + " 글·마감·사진·파일"}, mark);
+        b.onclick = () => openEvNote(k, e); li.append(b); } }
     if(edit){
       // ✎ 고치기: 이름·분류·날짜를 그 자리에서 바꿈 (학교 학사일정도)
       const fix = el("button",{className:"x",type:"button",title:"고치기","aria-label":e.title + " 고치기"}, "✎");
