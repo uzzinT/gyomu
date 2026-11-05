@@ -1390,7 +1390,8 @@ function attQuick(apply, fn, args, ok){
   apply(); renderAttend(); say("저장하는 중…");
   attDo(fn, args, ok || "저장했어요.").catch(() => { att.data = null; att.err = ""; renderAttend(); });
 }
-async function attDo(fn, args, ok){ try{ const r = await call(fn, ...args); attSet(r); if(ok) say(ok); renderAttend(); return r; }catch(e){ say(e?.message || "저장하지 못했어요."); throw e; } }
+// 누르자마자 "저장하는 중…"을 띄우고, 시트에 다 들어가면 "✓ …"로 바꿈
+async function attDo(fn, args, ok){ say("저장하는 중…"); try{ const r = await call(fn, ...args); attSet(r); if(ok) say("✓ " + ok); renderAttend(); return r; }catch(e){ say(e?.message || "저장하지 못했어요."); throw e; } }
 // ----- 화면 -----
 const chipBtn = (label, color, on, onclick, extra) => { const b = el("button",{type:"button",className:"tchip" + (on ? " on" : ""),...(extra || {})}, label); b.style.setProperty("--c", color); b.onclick = onclick; return b; };
 function renderAttend(){
@@ -4319,7 +4320,7 @@ async function openRosterView(){
     saveBtn.disabled = true; err.textContent = "";
     const list = students.filter(x => edits[x.no]).map(x => { const e = edits[x.no]; return { no:x.no, name:x.name, phone:phoneOf(e[0].value), parentPhone:phoneOf(e[1].value), rel:e[2].value.trim() }; });
     try{
-      if(linked){ attSet(await call("attSaveContacts", list)); say("연락처를 출결 시트 '학생명부'에 저장했어요."); }
+      if(linked){ say("저장하는 중…"); attSet(await call("attSaveContacts", list)); say("✓ 연락처를 출결 시트 '학생명부'에 저장했어요."); }
       else { await store.saveStudents(students.map(x => { const c = list.find(y => y.no === x.no); if(!c) return x; const ps = [...(x.parents || [])];
           ps[0] = { rel:c.rel || ps[0]?.rel || "", phone:c.parentPhone }; return { ...x, phone:c.phone, parents:ps.filter(p => p.phone || p.rel) }; }));
         say("연락처를 저장했어요."); }
