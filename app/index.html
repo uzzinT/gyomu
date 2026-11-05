@@ -2158,7 +2158,7 @@ function weekAdd(){
   // 늘 펼쳐 두지 않고 [+ 일정 추가] 단추로 창을 열어 넣음
   const form = el("div",{className:"wkadd"}, date, el("span",{className:"tilde"}, "~"), end, el("div",{className:"wkrow2"}, title, cat));
   go.onclick = async () => { if(await add()) $("dayDlg")?.close(); };
-  return el("div",{className:"wkaddbtn"}, navBtn("+ 일정 추가", () => { if(window.fbCall) return openEvNote(ymd(new Date()), null); modal("일정 추가", form, el("div",{className:"actions"}, navBtn("분류 고치기", () => openEvCats(), "일정 분류 고치기"), el("span",{className:"spacer"}), go)); setTimeout(() => title.focus(), 0); }, "내 일정 추가"));
+  return el("div",{className:"wkaddbtn"}, navBtn("+ 일정 추가", () => { if(window.fbCall) return openEvNote(ymd(new Date()), null); modal("일정 추가", form, el("div",{className:"actions"}, navBtn("분류 고치기", () => openEvCats(), "일정 분류 고치기"), el("span",{className:"spacer"}), go)); setTimeout(() => autoFocus(title), 0); }, "내 일정 추가"));
 }
 
 // 내 일정 분류 나누기: 이름·색을 고치고 더하고 지움 (지운 분류의 일정은 '기타'로 남음)
@@ -2286,7 +2286,7 @@ function openDay(k){
     memoView, prevs, dues[k] ? el("p",{className:"note"}, "⏰ 이날은 마감일로 표시돼 있어요.") : null,
     edit ? addWrap : null, edit ? memoWrap : null, err, edit ? pick : null,
     el("div",{className:"actions"}, edit ? addBtn : null, edit ? memoBtn : null, edit ? fileBtn : null, edit ? dueBtn : null, el("span",{className:"spacer"}), close, save)));
-  dlg.showModal();
+  dlg.showModal(); noKeyboard(dlg);
 }
 
 // 행사 하나의 창: 이름·분류·날짜 고치기 + 글 · 마감일 표시 · 사진·파일(미리 보기). 사진·파일은 드라이브 올해 폴더 › 학사일정 자료
@@ -2345,7 +2345,7 @@ function openEvNote(k, e0){
     el("h3",{className:"sub"}, "사진·파일"), edit ? el("div",{}, navBtn("📎 사진·파일 올리기", () => pick.click(), (e.title || "일정") + " 사진·파일 올리기")) : null, prevBox, err, edit ? pick : null,
     el("div",{className:"actions"}, el("span",{className:"spacer"}), edit ? ok : null));
   if(isNew) tIn.placeholder = "일정 이름";
-  if(edit && real) setTimeout(() => tIn.focus(), 0);
+  if(edit && real) setTimeout(() => autoFocus(tIn), 0);
 }
 const hrefOf = it => it.kind === "memo" ? null : safeUrl(it.url);
 // 바로 가기: 카드에서 ☆로 고정한 항목 (출결, 교과 진도표처럼 자주 쓰는 것)
@@ -2389,6 +2389,10 @@ let backTo = null; // { fn, at }: 다음에 여는 창에 '← 이전'을 달아
 const dlgHist = []; // 창 안에서 연 앞 화면들 (닫으면 비움)
 document.addEventListener("close", e => { if(e.target.id === "dayDlg") dlgHist.length = 0; }, true);
 const withBack = (fn, go) => () => { backTo = { fn, at:Date.now() }; go(); };
+// 휴대폰·태블릿(터치)에서는 창을 열 때 입력칸에 커서를 두지 않음 (키보드가 저절로 올라오지 않게)
+const touchUI = () => matchMedia("(hover:none) and (pointer:coarse)").matches;
+const autoFocus = (x, sel) => { if(!x || touchUI()) return; x.focus(); if(sel) x.select?.(); };
+const noKeyboard = d => { if(!touchUI()) return; const a = document.activeElement; if(a && d.contains(a) && a.matches("input:not([type=checkbox]):not([type=radio]),textarea,select")) a.blur(); };
 function modal(title, ...kids){
   let dlg = $("dayDlg");
   if(!dlg){ dlg = el("dialog",{id:"dayDlg"}); document.body.append(dlg); }
@@ -2416,7 +2420,7 @@ function modal(title, ...kids){
   const was = same ? { top:dlg.scrollTop, opened:[...dlg.querySelectorAll("details")].filter(d => d.open).map(keyOf), closed:[...dlg.querySelectorAll("details")].filter(d => !d.open).map(keyOf) } : null;
   dlg.replaceChildren(el("div",{className:"daybox"}, el("h2",{}, title), ...kids, foot));
   if(was){ dlg.querySelectorAll("details").forEach(d => { const k = keyOf(d); if(was.opened.includes(k)) d.open = true; else if(was.closed.includes(k)) d.open = false; }); dlg.scrollTop = was.top; }
-  if(!dlg.open) dlg.showModal();
+  if(!dlg.open){ dlg.showModal(); noKeyboard(dlg); }
   return dlg;
 }
 // 글 복사: 클립보드가 막혀 있으면 글을 골라 둔 상자를 보여 줌
@@ -2425,7 +2429,7 @@ async function copyText(text, label){
   catch{
     const ta = el("textarea",{id:"copyBox",rows:8,value:text,readOnly:true});
     modal("Ctrl+C 로 복사하세요", ta);
-    setTimeout(() => { ta.focus(); ta.select(); }, 0);
+    setTimeout(() => autoFocus(ta, true), 0);
   }
 }
 const notesText = (key, list) => "[" + dayLabel(parseYmd(key)) + " 조·종례]\n" + list.map((n, i) => (i + 1) + ". " + n.text).join("\n");
@@ -2742,7 +2746,7 @@ function openSlot(key, i, base){
     kids.push(el("div",{className:"actions"}, back, el("span",{className:"spacer"}), save));
   }
   modal(dayLabel(d) + " " + (i + 1) + "교시", ...kids);
-  if(edit) setTimeout(() => note.focus(), 0);
+  if(edit) setTimeout(() => autoFocus(note), 0);
 }
 
 // 담임 모드: 켜면 홈에 조·종례와 제출물을 보여 줌
@@ -3023,7 +3027,7 @@ function openPaste(){
   };
   make.onclick = () => { const p = parseMessage(ta.value); if(!p.text) return; store.addTodo(p); $("dayDlg").close(); say("할 일을 만들었어요: " + p.text); };
   modal("쿨메신저 글로 할 일 만들기", ta, prev, el("div",{className:"actions"}, el("span",{className:"spacer"}), make));
-  setTimeout(() => ta.focus(), 0);
+  setTimeout(() => autoFocus(ta), 0);
 }
 function openTodo(id){
   const t = todos.find(x => x.id === id); if(!t) return;
@@ -3075,7 +3079,7 @@ function findBox(label, placeholder, search, onPick, empty){
       }catch(e){ out.replaceChildren(el("p",{className:"err"}, "찾지 못했어요. 잠시 뒤 다시 시도해 주세요.")); }
     }, 300);
   };
-  setTimeout(() => q.focus(), 0);
+  setTimeout(() => autoFocus(q), 0);
   return [el("label",{className:"memo-label"}, "검색", q), out];
 }
 function openNoteFind(){
@@ -3765,7 +3769,7 @@ function teacherSearch(onPick, onType){
   };
   return q;
 }
-const refocusFind = () => setTimeout(() => $("tFind")?.focus(), 0);
+const refocusFind = () => setTimeout(() => autoFocus($("tFind")), 0);
 function openTeacherTT(mode, sel){
   const T = allTT?.teachers || [];
   if(!T.length) return modal("선생님 시간표", el("p",{className:"note"}, "설정 → 학기 초 세팅에서 전체 교사 시간표를 올리거나 구글 시트로 연결해 주세요."));
@@ -3971,7 +3975,7 @@ function openClassRoster(code, focusNo){
       el("span",{className:"spacer"}), ...(c.students.some(s => s.photo) ? [navBtn("사진 명렬표", () => openPhotoSheet(code), "학생 사진 명렬표 보기")] : []),
       navBtn("학생별 모아 보기", () => chain.then(() => openAttendSummary(code, recs)), "학생별 출결·특이사항 모아 보기")), msg,
     el("div",{className:"tt-wrap","data-autosave":"1"}, el("table",{className:"plan att"}, el("thead",{}, el("tr",{}, el("th",{}, "번호"), el("th",{}, "성명"), el("th",{}, "출결"), el("th",{}, "이날 특이사항"), el("th",{title:"날짜와 상관없이 늘 보이는 메모"}, "학생 메모"))), body)));
-  setTimeout(() => focusNo ? goFocus() : find.focus(), 0);
+  setTimeout(() => focusNo ? goFocus() : autoFocus(find), 0);
 }
 // 사진 명렬표: 나이스 사진 명렬표처럼 사진·번호·이름 카드로. 학생을 누르면 명렬표의 그 학생 칸(출결·특이사항·메모)으로
 function openPhotoSheet(code){
@@ -4315,7 +4319,7 @@ async function openRosterView(){
     el("p",{className:"hint"}, linked ? "연락처는 출결 시트 '학생명부' 한 곳에 있어요. 여기서 고치거나 시트에서 고치면 출결 연락·학생 창에 똑같이 보여요." : "학생과 학부모 연락처는 내 교무수첩에만 있어요. 설정 → 학급 출결에서 출결 시트를 이으면 그 시트의 '학생명부'와 하나로 써요."),
     el("div",{className:"tt-tools rostertools"}, find, editBtn, sheetBtn, cancelBtn, saveBtn), err,
     el("div",{className:"tt-wrap"}, el("table",{className:"plan rostertbl"}, cols, el("thead",{}, head), body)));
-  setTimeout(() => find.focus(), 0);
+  setTimeout(() => autoFocus(find), 0);
 }
 
 // 영역 탭 위쪽 핵심 기능 (오늘 탭은 이것들을 모아 보여 줌)
