@@ -867,11 +867,16 @@ button.dcard{cursor:pointer}
 .setrow{display:flex;gap:6px;align-items:center}.setrow .field{min-width:0;width:auto;flex:1;margin:0}.setrow select.field{flex:.6}
 .rulecard{display:grid;gap:6px;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--paper2)}
 .rulecard .field{width:auto;min-width:0;margin:0}.rulecard input[type="number"]{width:4.5em;flex:none}
-.ruleline{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-.ruleline .field{flex:0 0 auto;padding-top:5px;padding-bottom:5px}
-.ruleline .field.rname{flex:1 1 12em}
-.ruleline .hint{margin:0;white-space:nowrap}
+.rulecard{grid-template-columns:minmax(12em,15em) 1fr;gap:12px;align-items:start}
+.rleft{display:grid;gap:6px}
+.rleft .field{width:100%;padding-top:5px;padding-bottom:5px}
+.rtop{display:flex;gap:6px;align-items:center}.rtop .field{flex:1}
+.rdays{display:flex;align-items:center;gap:6px;font-size:.85rem;color:var(--muted)}
+.rtypes{display:grid;gap:6px}
+.rtrow{display:flex;gap:8px;align-items:baseline}
+.rtlbl{flex:none;width:3.2em;font-size:.75rem;color:var(--muted);font-weight:600}
 .rulecard .tgroup{gap:4px}.rulecard .tgroup .chip{padding:3px 10px;font-size:.78rem}
+@media (max-width:700px){.rulecard{grid-template-columns:1fr}}
 .colchip{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border:1px solid var(--line);border-radius:999px;font-size:.82rem;font-weight:600}
 .colchip input{width:24px;height:24px;border:0;padding:0;background:none;cursor:pointer}
 .orderlist{display:grid;gap:4px;margin-top:6px}
@@ -1719,9 +1724,12 @@ function attSettings(){
     const per = el("select",{className:"field"}, el("option",{value:"all"}, "이번 학년도"), el("option",{value:"month"}, "이번 달"), el("option",{value:"custom"}, "기간 지정")); per.value = r.period;
     const days = el("input",{type:"number",className:"field",min:1,value:r.days,"aria-label":"기준 일수"}), cs = el("input",{type:"date",className:"field",value:r.s || "",hidden:r.period !== "custom"}), ce = el("input",{type:"date",className:"field",value:r.e || "",hidden:r.period !== "custom"});
     n.oninput = () => { r.name = n.value; }; how.onchange = () => { r.how = how.value; }; per.onchange = () => { r.period = per.value; cs.hidden = ce.hidden = per.value !== "custom"; }; days.oninput = () => { r.days = parseInt(days.value) || 1; }; cs.onchange = () => { r.s = cs.value; }; ce.onchange = () => { r.e = ce.value; };
-    const tc = el("div",{className:"tgroup"}, ...D.types.map(t => chipBtn(t.name, typeColor(t.name), r.types.includes(t.name), function(){ r.types.includes(t.name) ? r.types.splice(r.types.indexOf(t.name), 1) : r.types.push(t.name); this.classList.toggle("on"); })));
-    n.classList.add("rname"); // 한 줄: 이름 · 누적/연속 · 기간 · N일 이상 · ×
-    return el("div",{className:"rulecard"}, el("div",{className:"ruleline"}, n, how, per, cs, ce, days, el("span",{className:"hint"}, "일 이상"), navBtn("×", () => { rRows.splice(i, 1); drawRules(); }, "규칙 지우기")), tc); }));
+    const chip = t => chipBtn(t.name, typeColor(t.name), r.types.includes(t.name), function(){ r.types.includes(t.name) ? r.types.splice(r.types.indexOf(t.name), 1) : r.types.push(t.name); this.classList.toggle("on"); });
+    // 오른쪽: 출결 종류를 미인정·질병·인정·생리… 줄로 나눠서
+    const tc = el("div",{className:"rtypes"}, ...[...new Set(D.types.map(typeRow))].map(g => el("div",{className:"rtrow"}, el("span",{className:"rtlbl"}, g || "기타"), el("div",{className:"tgroup"}, ...D.types.filter(t => typeRow(t) === g).map(chip)))));
+    // 왼쪽: 이름 / 누적·연속 / 기간 / N일 이상 을 위아래로
+    const left = el("div",{className:"rleft"}, el("div",{className:"rtop"}, n, navBtn("×", () => { rRows.splice(i, 1); drawRules(); }, "규칙 지우기")), how, per, cs, ce, el("label",{className:"rdays"}, days, " 일 이상"));
+    return el("div",{className:"rulecard"}, left, tc); }));
   drawRules();
   const saveRules = el("button",{type:"button",className:"btn",disabled:!canWrite()}, "알림 규칙 저장");
   saveRules.onclick = () => attDo("attSaveTab", ["출결알림", rRows.filter(r => r.name.trim()).map(r => [r.name.trim(), r.how, r.period, String(r.days), r.types.join(","), r.period === "custom" ? r.s || "" : "", r.period === "custom" ? r.e || "" : ""])], "알림 규칙을 저장했어요.").catch(() => {});
