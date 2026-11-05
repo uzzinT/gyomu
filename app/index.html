@@ -2246,7 +2246,7 @@ function openDay(k){
   const memoView = memos[k] ? el("div",{className:"memoview"}, el("b",{}, "글"), el("p",{}, memos[k])) : null;
   const addWrap = el("div",{className:"evadd",hidden:true}, evCat, evTitle, el("label",{className:"inline"}, "~ ", evEnd), navBtn("추가", addEv, "일정 추가"), navBtn("분류 고치기", () => openEvCats(), "일정 분류 고치기"));
   const memoBtn = navBtn(memos[k] ? "✎ 글 고치기" : "+ 글 쓰기", () => { memoWrap.hidden = false; save.hidden = false; memoBtn.hidden = true; if(memoView) memoView.hidden = true; setTimeout(() => ta.focus(), 0); }, "이날 메모");
-  const addBtn = navBtn("+ 일정 추가", () => { addWrap.hidden = false; addBtn.hidden = true; setTimeout(() => evTitle.focus(), 0); }, "이날 일정 추가");
+  const addBtn = navBtn("+ 일정 추가", () => { if(window.fbCall) return openEvNote(k, null); addWrap.hidden = false; addBtn.hidden = true; setTimeout(() => evTitle.focus(), 0); }, "이날 일정 추가");
   // 마감일 표시는 메모를 열지 않고 바로 (누르면 저장)
   const dueBtn = navBtn(dues[k] ? "⏰ 마감일 표시 빼기" : "⏰ 마감일로 표시", async () => {
     dueBtn.disabled = true;
@@ -2271,8 +2271,9 @@ function openDay(k){
 
 // 행사 하나의 창: 이름·분류·날짜 고치기 + 글 · 마감일 표시 · 사진·파일(미리 보기). 사진·파일은 드라이브 올해 폴더 › 학사일정 자료
 function openEvNote(k, e0){
-  const e = events.find(x => x === e0) || events.find(x => x.date === k && x.title === e0.title) || e0; // 홈 D-day 에서 열면 이름으로 찾음
-  const n = evNoteOf(k, e) || { text:"", due:false, files:[] }, edit = canWrite(), files = (n.files || []).slice(), real = events.includes(e);
+  const isNew = !e0; // 새 일정: 같은 창, [저장]을 눌러야 행사와 글·파일이 함께 저장됨
+  const e = isNew ? { date:k, title:"", cat:evCats()[0]?.id || "" } : events.find(x => x === e0) || events.find(x => x.date === k && x.title === e0.title) || e0; // 홈 D-day 에서 열면 이름으로 찾음
+  const n = evNoteOf(k, e) || { text:"", due:false, files:[] }, edit = canWrite(), files = (n.files || []).slice(), real = isNew || events.includes(e);
   const tIn = el("input",{className:"field",maxLength:40,value:e.title,readOnly:!edit || !real,"aria-label":"행사 이름"});
   const cIn = el("select",{className:"field",disabled:!edit || !real,"aria-label":"분류"}, ...evCats().map(x => el("option",{value:x.id,selected:x.id === e.cat}, x.name)), el("option",{value:"",selected:!e.cat}, "학교"));
   const dIn = el("input",{type:"date",className:"field",value:k,readOnly:!edit || !real,"aria-label":"날짜"});
@@ -2280,7 +2281,8 @@ function openEvNote(k, e0){
   const due = el("input",{type:"checkbox",checked:!!n.due,disabled:!edit});
   const err = el("div",{className:"err"}), prevBox = el("div",{});
   // 글·마감·파일 저장 (이름·날짜는 [저장]을 누를 때만 바뀜)
-  const saveNote = async msg => { await store.saveEvNote(k, e.title, ta.value, due.checked, files); if(msg) say(msg); };
+  const endIn = isNew ? el("input",{type:"date",className:"field",min:k,"aria-label":"끝나는 날 (여러 날이면)",title:"여러 날이면 끝나는 날"}) : null;
+  const saveNote = async msg => { if(isNew) return; await store.saveEvNote(k, e.title, ta.value, due.checked, files); if(msg) say(msg); };
   const drawFiles = () => prevBox.replaceChildren(files.length ? filePreviews(files, edit ? i => { if(confirm(files[i].name + "을(를) 이 행사에서 뺄까요? (드라이브 파일은 남아요)")){ files.splice(i, 1); drawFiles(); saveNote().catch(x => { err.textContent = x?.message || "저장하지 못했어요."; }); } } : null) : el("p",{className:"hint"}, "사진·파일이 없어요."));
   drawFiles();
   const pick = el("input",{type:"file",hidden:true,multiple:true});
@@ -2300,7 +2302,12 @@ function openEvNote(k, e0){
     const nt = tIn.value.trim(), nd = dIn.value; if(!nt) return tIn.focus(); if(!/^\d{4}-\d{2}-\d{2}$/.test(nd)) return dIn.focus();
     ok.disabled = true;
     try{
-      if(real && (nt !== e.title || cIn.value !== (e.cat || "") || nd !== k)){
+      if(isNew){
+        const end = endIn.value && endIn.value > nd ? endIn.value : nd, add = [];
+        for(let x = parseYmd(nd); ymd(x) <= end && add.length < 60; x = addDays(x, 1)) add.push({ date:ymd(x), title:nt, cat:cIn.value });
+        await store.saveEvents(events.concat(add));
+        if(ta.value.trim() || due.checked || files.length) await store.saveEvNote(nd, nt, ta.value, due.checked, files);
+      } else if(real && (nt !== e.title || cIn.value !== (e.cat || "") || nd !== k)){
         // 이름·날짜가 바뀌면 행사를 고치고, 글·파일도 새 이름·날짜로 옮김
         await store.saveEvents(events.map(x => x === e ? { ...x, title:nt, cat:cIn.value, date:nd } : x));
         if(evNoteOf(k, e)) await store.saveEvNote(k, e.title, "", false, []);
@@ -2310,12 +2317,13 @@ function openEvNote(k, e0){
     }catch(x){ ok.disabled = false; err.textContent = x?.message && !x.code ? x.message : "저장하지 못했어요. 잠시 뒤 다시 시도해 주세요."; }
   };
   const d = parseYmd(k);
-  modal(e.title + " · " + (d.getMonth() + 1) + "월 " + d.getDate() + "일",
-    el("div",{className:"evfix"}, cIn, tIn, dIn),
+  modal((isNew ? "일정 추가" : e.title) + " · " + (d.getMonth() + 1) + "월 " + d.getDate() + "일",
+    el("div",{className:"evfix"}, cIn, tIn, dIn, endIn ? el("label",{className:"inline"}, "~ ", endIn) : null),
     el("label",{className:"memo-label"}, "글", ta),
     el("label",{className:"inline"}, due, " 이 행사를 마감일로 표시 (홈에 D-day로 떠요)"),
     el("h3",{className:"sub"}, "사진·파일"), prevBox, err, edit ? pick : null,
-    el("div",{className:"actions"}, edit ? navBtn("📎 사진·파일 올리기", () => pick.click(), e.title + " 사진·파일 올리기") : null, navBtn("← 날짜로", () => openDay(k), "그날 일정으로"), el("span",{className:"spacer"}), edit ? ok : null));
+    el("div",{className:"actions"}, edit ? navBtn("📎 사진·파일 올리기", () => pick.click(), e.title + " 사진·파일 올리기") : null, navBtn("← 날짜로", () => openDay(k), "그날 일정으로"), isNew ? navBtn("분류 고치기", () => openEvCats(), "일정 분류 고치기") : null, el("span",{className:"spacer"}), edit ? ok : null));
+  if(isNew) tIn.placeholder = "일정 이름";
   if(edit && real) setTimeout(() => tIn.focus(), 0);
 }
 const hrefOf = it => it.kind === "memo" ? null : safeUrl(it.url);
