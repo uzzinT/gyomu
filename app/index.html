@@ -347,6 +347,9 @@ nav{margin-bottom:14px}
 .evfix{display:flex;flex-wrap:wrap;gap:4px;width:100%;font-size:.85rem;font-weight:400}
 .evfix .field{width:auto;padding:3px 6px;font-size:.85rem}
 .evfix #evFixTitle{flex:1;min-width:8em}
+.evfix.one{flex-wrap:nowrap;align-items:center}
+.evfix.one .field{flex:0 1 auto;min-width:0}
+.evfix.one input:not([type=date]){flex:1 1 auto;min-width:5em}
 .catlist{display:grid;gap:10px;margin:8px 0 4px}
 .catrow{display:flex;gap:10px;align-items:center}
 .catrow .field{width:auto}
@@ -2319,7 +2322,7 @@ function openEvNote(k, e0){
   };
   const d = parseYmd(k);
   modal((isNew ? "일정 추가" : e.title) + " · " + (d.getMonth() + 1) + "월 " + d.getDate() + "일",
-    el("div",{className:"evfix"}, cIn, tIn, dIn, endIn ? el("label",{className:"inline"}, "~ ", endIn) : null),
+    el("div",{className:"evfix one"}, cIn, tIn, dIn, endIn ? el("span",{"aria-hidden":"true"}, "~") : null, endIn),
     el("label",{className:"memo-label"}, "글", ta),
     el("label",{className:"inline"}, due, " 이 행사를 마감일로 표시 (홈에 D-day로 떠요)"),
     el("h3",{className:"sub"}, "사진·파일"), prevBox, err, edit ? pick : null,
