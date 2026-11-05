@@ -176,7 +176,7 @@
     get("memos").forEach(m => { if (!DATE_RE.test(m.date)) return; if (m.text || (m.files || []).length || m.due) { memos[m.date] = m.text || ""; if (m.due) dues[m.date] = true; if ((m.files || []).length) memoFiles[m.date] = m.files; } });
     const teachers = get("teachers");
     return structuredClone({
-      items: get("items"), config: cfgGet("config"), timetable: cfgGet("timetable"),
+      items: get("items"), config: cfgGet("config"), timetable: cfgGet("timetable"), kept: cfgGet("kept") || {}, ttTerm: cfgGet("ttTerm") || "",
       archives: Object.entries(cfgGet("archives") || {}).sort().reverse().map(([y, id]) => ({ year: Number(y), url: "https://docs.google.com/spreadsheets/d/" + id + "/edit" })),
       folder: (() => { const y = curYear(), id = ((cfgGet("drive") || {}).years || {})[y]; return id ? { year: y, url: "https://drive.google.com/drive/folders/" + id } : null; })(),
       links: driveLinks(),
@@ -235,6 +235,10 @@
       Object.keys(clean).forEach(k => { if (clean[k] === undefined) delete clean[k]; });
       await cfgPut({ config: clean }); return getAll();
     },
+    // 학기가 바뀌면: 지금 시간표를 지난 학기 것으로 보관하고, 그대로 새 학기 시간표의 바탕으로 씀
+    async rollTimetable(term) { term = termOf(term); if (!term) fail("학기가 올바르지 않아요."); const old = cfgGet("ttTerm"), kept = { ...(cfgGet("kept") || {}) };
+      if (old && old !== term && cfgGet("timetable")) kept[old] = cfgGet("timetable");
+      await cfgPut({ kept, ttTerm: term }); return getAll(); },
     async keepTimetable(term) { term = termOf(term); if (!term) fail("학기가 올바르지 않아요."); const kept = cfgGet("kept") || {}; if (cfgGet("timetable")) kept[term] = cfgGet("timetable"); await cfgPut({ kept }); return true; },
     async saveEvents(list) {
       if (!Array.isArray(list) || list.length > 1000) fail("학사일정이 너무 많아요.");
@@ -595,7 +599,7 @@
 
   // ---------- 새 학년도: 지난 학년도를 드라이브 'YYYY학년도' 폴더에 시트로 정리하고, Firebase 에도 한 부 보관 ----------
   const YEAR_TABLES = ["items", "events", "memos", "notes", "checks", "logs", "todos", "teachers", "classRosters", "attend", "pmsg"];
-  const YEAR_CFG = ["timetable", "kept", "plans", "rosters", "students", "classTT", "periods", "studentTT", "stuPw", "classPw", "inputHash"];
+  const YEAR_CFG = ["timetable", "kept", "ttTerm", "plans", "rosters", "students", "classTT", "periods", "studentTT", "stuPw", "classPw", "inputHash"];
   const J = v => JSON.stringify(v ?? null);
   // parseBook 이 다시 읽을 수 있는 모양 (예전 교무수첩 시트와 같은 탭·칸)
   function bookTabs(db, meta) {

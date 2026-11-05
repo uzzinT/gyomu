@@ -245,6 +245,7 @@ nav{margin-bottom:14px}
 .kids button.ph b::after{content:" ●";color:var(--green);font-size:.55rem}
 .kidphoto{display:block;max-width:100%;max-height:60vh;margin:6px auto;border-radius:8px}
 .fcol{display:grid;gap:16px;align-content:start}
+.ttterm{font-size:.7rem;font-weight:500;color:var(--muted);margin-left:6px}.ttterm.past{color:var(--wine)}
 .evnotebtn{margin-left:6px;border:1px solid var(--line);background:var(--paper);border-radius:999px;padding:1px 8px;font:inherit;font-size:.72rem;color:var(--muted);cursor:pointer}
 .evnotebtn.has{color:var(--ink);border-color:var(--green)}
 .fprevs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:8px 0}
@@ -1036,7 +1037,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="backend.js?v=56603d8a"></script>
+<script src="backend.js?v=b572f793"></script>
 <style>
 #fbGate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--desk)}
 #fbGate .fbbox{background:var(--paper);border-radius:22px;padding:36px 32px;text-align:center;box-shadow:0 18px 40px -24px rgba(20,40,25,.35);max-width:340px}
@@ -1201,6 +1202,8 @@ function validConfig(c){
 function apply(data){
   config = validConfig(data?.config) ? data.config : DEFAULT_CONFIG;
   tt = normTT(data?.timetable);
+  keptTT = data?.kept && typeof data.kept === "object" ? data.kept : {}; ttTerm = String(data?.ttTerm || "");
+  setTimeout(rollTT, 0);
   // 학사일정에서 'A · B' 로 묶여 온 행사는 따로따로 (각각 글·마감·파일을 넣도록)
   events = (Array.isArray(data?.events) ? data.events : []).flatMap(e => { const ts = String(e.title || "").split(/\s+·\s+/).map(t => t.trim()).filter(Boolean); return ts.length > 1 ? ts.map(title => ({ ...e, title })) : [e]; });
   memos = data?.memos && typeof data.memos === "object" ? data.memos : {};
@@ -1830,7 +1833,16 @@ function addTabBack(){
 // ---------- 시간표: 매주 기본 시간표 + 날짜별 수업 교체 ----------
 const DAYS = ["월","화","수","목","금"];
 const ymd = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
-let tt = normTT(null), weekOff = 0, ttCell = null;
+let tt = normTT(null), weekOff = 0, ttCell = null, keptTT = {}, ttTerm = "", rolling = false;
+// 학기별 시간표: tt 는 지금 학기 것. 지난 학기 것은 keptTT[학기]. 그 날짜가 속한 학기의 기본 시간표를 씀
+const cellsFor = k => { const t = autoTerm(parseYmd(k)); return t !== curTerm() && keptTT[t] ? normTT(keptTT[t]).cells : tt.cells; };
+// 학기가 바뀌면 (예: 2학기 개학) 지난 학기 시간표를 보관하고, 그것을 바탕으로 새 학기 시간표를 시작 (새 교무수첩에서만)
+async function rollTT(){
+  const cur = curTerm(); if(!window.fbCall || !canWrite() || !cur || ttTerm === cur || rolling) return;
+  rolling = true;
+  try{ const was = ttTerm; apply(await call("rollTimetable", cur)); if(was && was.slice(0, 4) === cur.slice(0, 4)) say(termName(cur) + " 시간표를 시작했어요. 1학기 시간표를 바탕으로 두었으니 바뀐 칸만 고치거나 새로 올려 주세요. 지난 학기 주로 넘기면 그때 시간표가 보여요."); }
+  catch(e){ console.warn("시간표 학기", e); } finally{ rolling = false; }
+}
 function normTT(t){
   const p = Math.min(10, Math.max(1, Number(t?.periods) || 7));
   const cells = Array.from({length:p}, (_, i) => Array.from({length:5}, (_, j) => String(t?.cells?.[i]?.[j] ?? "").slice(0, 50)));
@@ -1883,8 +1895,8 @@ function renderTT(){
   const dates = weekDates(weekOff), today = ymd(new Date()), edit = canWrite();
   const head = el("tr",{}, el("th",{}, "교시"), ...dates.map((d, j) =>
     el("th",{className: ymd(d) === today ? "on" : ""}, DAYS[j], el("small",{}, (d.getMonth() + 1) + "/" + d.getDate()))));
-  const B = bells(), M = weekOff === 0 ? ttMark() : null;
-  const rows = tt.cells.map((r, i) => el("tr",{}, el("th",{className:"per"}, (i + 1) + "교시", el("small",{}, B[i].s, el("span",{className:"te"}, "~" + B[i].e))), ...dates.map((d, j) => {
+  const B = bells(), M = weekOff === 0 ? ttMark() : null, wkTerm = autoTerm(dates[0]), wkCells = cellsFor(ymd(dates[0])), past = wkCells !== tt.cells;
+  const rows = wkCells.map((r, i) => el("tr",{}, el("th",{className:"per"}, (i + 1) + "교시", el("small",{}, B[i].s, el("span",{className:"te"}, "~" + B[i].e))), ...dates.map((d, j) => {
     const key = ymd(d), ov = tt.overrides[key]?.[i], has = ov !== undefined;
     const td = el("td",{className: (key === today ? "on " : "") + (has ? "swap " : "") + markCls(M, i, j),...(M && M.now && M.i === i && M.j === j ? {"aria-current":"time"} : {})});
     if(ttCell === key + ":" + i){
@@ -1930,7 +1942,7 @@ function renderTT(){
         el("div",{className:"tt-tools"}, navBtn("올리기", () => { $("dayDlg").close(); file.click(); }, "시간표 엑셀 올리기"), templateBtn("시간표 양식.xlsx")))), {title:"수업 시간 · 시간표 올리기 · 양식"});
   }
   return el("section",{className:"tt"},
-    el("div",{className:"tt-head"}, el("h2",{}, "시간표"), tools),
+    el("div",{className:"tt-head"}, el("h2",{}, "시간표", curTerm() ? el("small",{className:"ttterm" + (past ? " past" : "")}, " " + wkTerm.slice(-1) + "학기" + (past ? " (지난 학기)" : "")) : ""), tools),
     el("div",{className:"tt-wrap"}, el("table",{}, el("thead",{}, head), el("tbody",{}, ...rows))));
 }
 
@@ -2580,7 +2592,7 @@ const bells = () => DEFAULT_BELLS.map((d, i) => { const b = (config.bells || [])
 const hm = d => String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
 const minsOf = t => +t.slice(0, 2) * 60 + +t.slice(3);
 // 오늘 이 교시 칸 (교체한 날은 교체한 수업)
-const slotOn = (k, i, j) => { const ov = tt.overrides[k]?.[i]; return ov !== undefined ? ov : (tt.cells[i]?.[j] || ""); };
+const slotOn = (k, i, j) => { const ov = tt.overrides[k]?.[i]; return ov !== undefined ? ov : (cellsFor(k)[i]?.[j] || ""); };
 // 지금 수업 중이면 그 교시, 아니면 오늘 남은 다음 수업. 없으면 null
 function nowSlot(d = new Date()){
   const wd = d.getDay(); if(wd < 1 || wd > 5) return null;
