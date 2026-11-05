@@ -866,7 +866,12 @@ button.dcard{cursor:pointer}
 .setlist{display:grid;gap:6px}
 .setrow{display:flex;gap:6px;align-items:center}.setrow .field{min-width:0;width:auto;flex:1;margin:0}.setrow select.field{flex:.6}
 .rulecard{display:grid;gap:6px;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--paper2)}
-.rulecard .field{width:auto;min-width:0;margin:0}.rulecard input[type="number"]{width:5em;flex:none}
+.rulecard .field{width:auto;min-width:0;margin:0}.rulecard input[type="number"]{width:4.5em;flex:none}
+.ruleline{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.ruleline .field{flex:0 0 auto;padding-top:5px;padding-bottom:5px}
+.ruleline .field.rname{flex:1 1 12em}
+.ruleline .hint{margin:0;white-space:nowrap}
+.rulecard .tgroup{gap:4px}.rulecard .tgroup .chip{padding:3px 10px;font-size:.78rem}
 .colchip{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border:1px solid var(--line);border-radius:999px;font-size:.82rem;font-weight:600}
 .colchip input{width:24px;height:24px;border:0;padding:0;background:none;cursor:pointer}
 .orderlist{display:grid;gap:4px;margin-top:6px}
@@ -1715,7 +1720,8 @@ function attSettings(){
     const days = el("input",{type:"number",className:"field",min:1,value:r.days,"aria-label":"기준 일수"}), cs = el("input",{type:"date",className:"field",value:r.s || "",hidden:r.period !== "custom"}), ce = el("input",{type:"date",className:"field",value:r.e || "",hidden:r.period !== "custom"});
     n.oninput = () => { r.name = n.value; }; how.onchange = () => { r.how = how.value; }; per.onchange = () => { r.period = per.value; cs.hidden = ce.hidden = per.value !== "custom"; }; days.oninput = () => { r.days = parseInt(days.value) || 1; }; cs.onchange = () => { r.s = cs.value; }; ce.onchange = () => { r.e = ce.value; };
     const tc = el("div",{className:"tgroup"}, ...D.types.map(t => chipBtn(t.name, typeColor(t.name), r.types.includes(t.name), function(){ r.types.includes(t.name) ? r.types.splice(r.types.indexOf(t.name), 1) : r.types.push(t.name); this.classList.toggle("on"); })));
-    return el("div",{className:"rulecard"}, el("div",{className:"attrow"}, n, navBtn("규칙 지우기", () => { rRows.splice(i, 1); drawRules(); }, "규칙 지우기")), el("div",{className:"attrow"}, how, per, cs, ce, days, el("span",{className:"hint"}, "일 이상")), tc); }));
+    n.classList.add("rname"); // 한 줄: 이름 · 누적/연속 · 기간 · N일 이상 · ×
+    return el("div",{className:"rulecard"}, el("div",{className:"ruleline"}, n, how, per, cs, ce, days, el("span",{className:"hint"}, "일 이상"), navBtn("×", () => { rRows.splice(i, 1); drawRules(); }, "규칙 지우기")), tc); }));
   drawRules();
   const saveRules = el("button",{type:"button",className:"btn",disabled:!canWrite()}, "알림 규칙 저장");
   saveRules.onclick = () => attDo("attSaveTab", ["출결알림", rRows.filter(r => r.name.trim()).map(r => [r.name.trim(), r.how, r.period, String(r.days), r.types.join(","), r.period === "custom" ? r.s || "" : "", r.period === "custom" ? r.e || "" : ""])], "알림 규칙을 저장했어요.").catch(() => {});
