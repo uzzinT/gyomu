@@ -2322,11 +2322,12 @@ function openEvNote(k, e0){
   };
   const d = parseYmd(k);
   modal((isNew ? "일정 추가" : e.title) + " · " + (d.getMonth() + 1) + "월 " + d.getDate() + "일",
+    el("div",{className:"tt-tools"}, navBtn("← 날짜로", () => openDay(k), "그날 일정으로"), edit ? navBtn("분류 고치기", () => openEvCats(), "일정 분류 고치기") : null),
     el("div",{className:"evfix one"}, cIn, tIn, dIn, endIn ? el("span",{"aria-hidden":"true"}, "~") : null, endIn),
     el("label",{className:"memo-label"}, "글", ta),
     el("label",{className:"inline"}, due, " 이 행사를 마감일로 표시 (홈에 D-day로 떠요)"),
-    el("h3",{className:"sub"}, "사진·파일"), prevBox, err, edit ? pick : null,
-    el("div",{className:"actions"}, edit ? navBtn("📎 사진·파일 올리기", () => pick.click(), e.title + " 사진·파일 올리기") : null, navBtn("← 날짜로", () => openDay(k), "그날 일정으로"), isNew ? navBtn("분류 고치기", () => openEvCats(), "일정 분류 고치기") : null, el("span",{className:"spacer"}), edit ? ok : null));
+    el("h3",{className:"sub"}, "사진·파일"), edit ? el("div",{}, navBtn("📎 사진·파일 올리기", () => pick.click(), (e.title || "일정") + " 사진·파일 올리기")) : null, prevBox, err, edit ? pick : null,
+    el("div",{className:"actions"}, el("span",{className:"spacer"}), edit ? ok : null));
   if(isNew) tIn.placeholder = "일정 이름";
   if(edit && real) setTimeout(() => tIn.focus(), 0);
 }
