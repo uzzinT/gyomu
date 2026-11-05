@@ -285,11 +285,20 @@ nav{margin-bottom:14px}
 .now .cls{font-size:1.25rem;font-weight:700;margin:2px 0}
 .now .cls small{font-size:.8rem;font-weight:400;color:var(--muted);margin-left:8px}
 .now .prog{font-size:.85rem;margin:4px 0}
-.prevcls{display:flex;align-items:center;gap:8px;margin:0 0 10px;padding:5px 10px;border:1px solid var(--line);border-radius:6px;background:var(--paper);font-size:.85rem}
-.prevcls.done{border-color:var(--green)}
-.prevopen{flex:1;min-width:0;text-align:left;border:0;background:none;padding:0;font:inherit;color:var(--ink);cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.prevopen:hover{text-decoration:underline}
-.prevcls label{white-space:nowrap;font-size:.8rem}
+/* 이전 수업 카드 */
+.prevcls{display:flex;align-items:center;gap:10px;margin:0 0 14px;padding:10px 12px;border-radius:12px;background:var(--paper);border:1px solid var(--line)}
+.prevcls.done{background:color-mix(in srgb,var(--green) 8%,var(--paper));border-color:color-mix(in srgb,var(--green) 40%,var(--line))}
+.prevopen{flex:1;min-width:0;display:grid;gap:2px;text-align:left;border:0;background:none;padding:0;font:inherit;color:var(--ink);cursor:pointer}
+.prevopen .pk{font-size:.72rem;color:var(--muted)}
+.prevopen .pl{font-size:.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prevopen .pl b{color:var(--sun);margin-right:2px}
+.prevcls.done .prevopen .pl b{color:var(--green)}
+.prevopen:hover .pl{text-decoration:underline;text-underline-offset:3px}
+.pchip{flex:none;display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border:1px solid var(--line);border-radius:999px;background:var(--paper);font-size:.78rem;color:var(--muted);cursor:pointer;white-space:nowrap}
+.pchip input{margin:0;accent-color:var(--green)}
+.prevcls.done .pchip{background:var(--green);border-color:var(--green);color:#fff;font-weight:600}
+.prevcls.done .pchip input{accent-color:#fff}
+.pchip:has(input:focus-visible){outline:2px solid var(--green);outline-offset:2px}
 .now .lesson{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin:6px 0;padding:6px 10px;border-radius:6px;background:color-mix(in srgb,var(--sun) 10%,var(--paper));font-size:.95rem}
 .now .lesson b{font-size:1.05rem;color:var(--sun)}
 .now .lesson small{color:var(--muted)}
@@ -2568,21 +2577,24 @@ function prevSlot(d = new Date()){
   for(let i = tt.periods - 1; i >= 0; i--) if(slotOn(k, i, wd - 1) && t >= B[i].e) return { k, i, j:wd - 1, b:B[i] };
   return null;
 }
-// 이전 수업 한 줄: 몇 교시 · 반 과목 · 차시 + [수업 했어요] 체크 (창을 안 열고 바로 저장). 글자를 누르면 그 교시 수업 기록 창
+// 이전 수업 카드: 위 '이전 수업 · 반 과목', 아래 'N차시 계획 내용' + 오른쪽 [수업 했어요] 칩 (바로 저장). 왼쪽 글자를 누르면 그 교시 수업 기록 창
 function prevLine(){
   const p = prevSlot(); if(!p) return null;
-  const [cls] = splitCell(slotOn(p.k, p.i, p.j)), lg = logOf(p.k, p.i), no = Number(lg?.lesson) || (cls ? nextLesson(cls) : 0);
-  const open = el("button",{type:"button",className:"prevopen",title:"눌러서 크게 보기 (진도·특이사항 적기)","aria-label":"이전 수업 " + (p.i + 1) + "교시 " + cls + " 수업 기록 열기"},
-    el("b",{}, "이전 수업"), " " + (p.i + 1) + "교시 · " + cls + (no ? " · " + no + "차시" : ""));
+  const [cls] = splitCell(slotOn(p.k, p.i, p.j)), lg = logOf(p.k, p.i), no = Number(lg?.lesson) || (cls ? nextLesson(cls) : 0), what = no ? planOf(cls)[no - 1] || "" : "";
+  const open = el("button",{type:"button",className:"prevopen",title:"눌러서 크게 보기 (진도·특이사항 적기)","aria-label":"이전 수업 " + cls + " 수업 기록 열기"},
+    el("span",{className:"pk"}, "이전 수업 · " + cls),
+    el("span",{className:"pl"}, no ? el("b",{}, no + "차시") : el("b",{}, "차시 없음"), what ? " " + what : ""));
   open.onclick = () => openSlot(p.k, p.i, tt.cells[p.i]?.[p.j] || "");
   const cb = el("input",{type:"checkbox",checked:!!lg?.done,disabled:!canWrite() || !no});
+  const chip = el("label",{className:"pchip"}, cb, el("span",{}, "수업 했어요"));
+  const box = el("div",{className:"prevcls" + (lg?.done ? " done" : "")}, open, chip);
   cb.onchange = async () => {
-    cb.disabled = true;
+    cb.disabled = true; box.classList.toggle("done", cb.checked);
     try{ await store.saveLog(p.k, p.i, lg?.cls || cls, lg?.text || "", no, cb.checked, lg?.files || []); say(cb.checked ? cls + " " + no + "차시를 했다고 적었어요." : "체크를 뺐어요."); }
-    catch(e){ cb.checked = !cb.checked; say(e?.message && !e.code ? e.message : "저장하지 못했어요. 잠시 뒤 다시 시도해 주세요."); }
+    catch(e){ cb.checked = !cb.checked; box.classList.toggle("done", cb.checked); say(e?.message && !e.code ? e.message : "저장하지 못했어요. 잠시 뒤 다시 시도해 주세요."); }
     cb.disabled = false;
   };
-  return el("div",{className:"prevcls" + (lg?.done ? " done" : "")}, open, el("label",{className:"inline"}, cb, " 수업 했어요"));
+  return box;
 }
 // 수업이 없을 때 한마디: 주말 · 아침 · 공강 · 쉬는 시간 · 점심 · 수업 끝 · 퇴근
 const offWork = () => /^\d{2}:\d{2}$/.test(config.offWork || "") ? config.offWork : "16:00";
