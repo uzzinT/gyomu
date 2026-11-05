@@ -2138,7 +2138,7 @@ function weekAdd(){
   // 늘 펼쳐 두지 않고 [+ 일정 추가] 단추로 창을 열어 넣음
   const form = el("div",{className:"wkadd"}, date, el("span",{className:"tilde"}, "~"), end, el("div",{className:"wkrow2"}, title, cat));
   go.onclick = async () => { if(await add()) $("dayDlg")?.close(); };
-  return el("div",{className:"wkaddbtn"}, navBtn("+ 일정 추가", () => { modal("일정 추가", form, el("div",{className:"actions"}, navBtn("분류 고치기", () => openEvCats(), "일정 분류 고치기"), el("span",{className:"spacer"}), go)); setTimeout(() => title.focus(), 0); }, "내 일정 추가"));
+  return el("div",{className:"wkaddbtn"}, navBtn("+ 일정 추가", () => { if(window.fbCall) return openEvNote(ymd(new Date()), null); modal("일정 추가", form, el("div",{className:"actions"}, navBtn("분류 고치기", () => openEvCats(), "일정 분류 고치기"), el("span",{className:"spacer"}), go)); setTimeout(() => title.focus(), 0); }, "내 일정 추가"));
 }
 
 // 내 일정 분류 나누기: 이름·색을 고치고 더하고 지움 (지운 분류의 일정은 '기타'로 남음)
