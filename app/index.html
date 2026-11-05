@@ -347,7 +347,7 @@ nav{margin-bottom:14px}
 .evfix{display:flex;flex-wrap:wrap;gap:4px;width:100%;font-size:.85rem;font-weight:400}
 .evfix .field{width:auto;padding:3px 6px;font-size:.85rem}
 .evfix #evFixTitle{flex:1;min-width:8em}
-/* 행사 창: 1줄 분류·이름, 2줄 날짜 ~ 끝날 */
+/* 행사 창: 1줄 분류·날짜 ~ 끝날, 2줄 이름 */
 .evrows{display:grid;gap:6px}
 .evrow{display:flex;gap:6px;align-items:center}
 .evrow .field{width:auto;flex:0 1 auto;min-width:0}
@@ -2325,7 +2325,7 @@ function openEvNote(k, e0){
   const d = parseYmd(k);
   modal((isNew ? "일정 추가" : e.title) + " · " + (d.getMonth() + 1) + "월 " + d.getDate() + "일",
     el("div",{className:"tt-tools"}, navBtn("← 날짜로", () => openDay(k), "그날 일정으로"), edit ? navBtn("분류 고치기", () => openEvCats(), "일정 분류 고치기") : null),
-    el("div",{className:"evrows"}, el("div",{className:"evrow"}, cIn, tIn), el("div",{className:"evrow"}, dIn, endIn ? el("span",{"aria-hidden":"true"}, "~") : null, endIn)),
+    el("div",{className:"evrows"}, el("div",{className:"evrow"}, cIn, dIn, endIn ? el("span",{"aria-hidden":"true"}, "~") : null, endIn), el("div",{className:"evrow"}, tIn)),
     el("label",{className:"memo-label"}, "글", ta),
     el("label",{className:"inline"}, due, " 이 행사를 마감일로 표시 (홈에 D-day로 떠요)"),
     el("h3",{className:"sub"}, "사진·파일"), edit ? el("div",{}, navBtn("📎 사진·파일 올리기", () => pick.click(), (e.title || "일정") + " 사진·파일 올리기")) : null, prevBox, err, edit ? pick : null,
