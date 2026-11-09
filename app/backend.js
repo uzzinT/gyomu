@@ -171,6 +171,11 @@
   }
   // 다른 기기에서 고친 것: 이 창으로 돌아올 때 확인. 창을 떠날 때는 남은 것을 저장
   document.addEventListener("visibilitychange", () => { if (!uid) return; if (document.visibilityState === "visible") refreshFromDrive().catch(() => {}); else if (dirty) flush().catch(() => {}); });
+  // 열어 둔 동안에도 15초마다 다른 기기에서 고친 것 확인 (창을 열었거나 입력 중이면 다음에)
+  const busy = () => document.querySelector("dialog[open]") || /^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || "");
+  setInterval(() => { if (uid && readyDone && document.visibilityState === "visible" && !dirty && !saving && !busy()) refreshFromDrive().catch(() => {}); }, 15000);
+  // 새로고침 단추: 이 기기에서 고친 것을 먼저 저장하고, 드라이브에서 새로 받아 화면을 다시 그림
+  window.fbRefresh = async () => { await flush(); fileVer = -1; await refreshFromDrive(); };
   addEventListener("beforeunload", e => { if (dirty || saving) { flush().catch(() => {}); e.preventDefault(); e.returnValue = ""; } });
   // 이 기기에 둔 것이 없고 구글 확인도 끝났을 때: 단추를 눌러 드라이브에서 불러옴
   function needGoogle() {

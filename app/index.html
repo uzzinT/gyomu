@@ -939,6 +939,8 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 /* 머리띠: 제목 왼쪽, 바로 가기 오른쪽 */
 .hdr-top{display:flex;align-items:center;gap:12px 24px;flex-wrap:wrap}
 .hdr-title{flex:none}
+.hdrrefresh{margin-top:4px;border:1px solid rgba(255,255,255,.35);background:transparent;color:rgba(255,255,255,.85);border-radius:999px;padding:2px 10px;font:inherit;font-size:.72rem;cursor:pointer}
+.hdrrefresh:hover{background:rgba(255,255,255,.12)}.hdrrefresh:disabled{opacity:.6;cursor:wait}
 .hdr-pins{flex:1 1 280px;display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;align-items:center;min-width:0}
 .hdr-label{font-size:.72rem;font-weight:700;letter-spacing:.06em;color:rgba(255,255,255,.6);margin-right:2px}
 .hdrpin{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.1);color:#fff;
@@ -987,7 +989,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
   <div class="inner">
     <header>
       <div class="hdr-top">
-        <div class="hdr-title"><h1>나의 교무수첩</h1><div class="term" id="term"></div></div>
+        <div class="hdr-title"><h1>나의 교무수첩</h1><div class="term" id="term"></div><button type="button" class="hdrrefresh" id="refreshBtn" title="다른 기기에서 고친 것까지 새로 불러오기" aria-label="새로고침">⟳ 새로고침</button></div>
         <div class="hdr-pins" id="hdrPins" aria-label="바로 가기"></div>
       </div>
       <nav id="tabs" role="tablist"></nav>
@@ -1038,7 +1040,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="backend.js?v=c884582e"></script>
+<script src="backend.js?v=11158087"></script>
 <style>
 #fbGate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--desk)}
 #fbGate .fbbox{background:var(--paper);border-radius:22px;padding:36px 32px;text-align:center;box-shadow:0 18px 40px -24px rgba(20,40,25,.35);max-width:340px}
@@ -1398,6 +1400,15 @@ function attNeedsSync(p){
 const attSet = r => { att.data = attParse(r.tabs); att.url = r.url; try{ localStorage.setItem(ATT_CACHE, JSON.stringify({ url:attCfg().url, r:{ url:r.url, tabs:r.tabs }, at:Date.now() })); }catch{} return r; };
 async function attSyncNow(quiet){ const r = await call("attSync", attPayload()); attSet(r.data); if(!quiet) say("출결 시트를 교무수첩과 맞췄어요" + (r.done.length ? ": " + r.done.join(", ") : "")); }
 const ATT_CACHE = "attCache";
+// 머리띠 [⟳ 새로고침]: 교무수첩 자료와 (열어 봤으면) 출결 시트를 새로 받음
+document.addEventListener("click", async e => {
+  const b = e.target.closest?.("#refreshBtn"); if(!b) return;
+  if(!window.fbRefresh) return location.reload();
+  b.disabled = true; say("새로 불러오는 중…");
+  try{ await window.fbRefresh(); if(att.data){ await loadAtt(); if(tab === "attend") renderAttend(); } say("✓ 최신 내용으로 불러왔어요."); }
+  catch(x){ say(x?.message || "불러오지 못했어요. 인터넷 연결을 확인해 주세요."); }
+  b.disabled = false;
+});
 async function loadAtt(){
   att.loading = true; att.err = "";
   if(!att.data){ try{ const c = JSON.parse(localStorage.getItem(ATT_CACHE) || "null"); if(c && c.url === attCfg().url){ attSet(c.r); att.stale = true; if(tab === "attend") renderAttend(); } }catch{} }
