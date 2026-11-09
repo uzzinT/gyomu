@@ -246,6 +246,7 @@ nav{margin-bottom:14px}
 .kidphoto{display:block;max-width:100%;max-height:60vh;margin:6px auto;border-radius:8px}
 .fcol{display:grid;gap:16px;align-content:start}
 .ttterm{font-size:.7rem;font-weight:500;color:var(--muted);margin-left:6px}.ttterm.past{color:var(--wine)}
+.lostrow{display:flex;gap:4px;align-items:baseline;margin:2px 0;font-size:.85rem}
 .evnotebtn{margin-left:6px;border:1px solid var(--line);background:var(--paper);border-radius:999px;padding:1px 8px;font:inherit;font-size:.72rem;color:var(--muted);cursor:pointer}
 .evnotebtn.has{color:var(--ink);border-color:var(--green)}
 .fprevs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:8px 0}
@@ -1037,7 +1038,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="backend.js?v=b572f793"></script>
+<script src="backend.js?v=c884582e"></script>
 <style>
 #fbGate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--desk)}
 #fbGate .fbbox{background:var(--paper);border-radius:22px;padding:36px 32px;text-align:center;box-shadow:0 18px 40px -24px rgba(20,40,25,.35);max-width:340px}
@@ -1148,6 +1149,29 @@ function renderImportBox(){
 // 항목의 학기 범위: "" = 1·2학기 공통, "1" = 1학기만, "2" = 2학기만
 const scopeOk = s => s === "1" || s === "2";
 const defaultScope = () => "";
+// 사라진 조·종례·할 일 되살리기 (드라이브에 남은 지난 버전에서 찾아 골라서 되살림, 새 교무수첩에서만)
+function renderLost(){
+  if(!window.fbCall) return null;
+  const NAMES = { notes:"조·종례", todos:"할 일", checks:"제출물", items:"자료" }, box = el("div",{}), err = el("div",{className:"err"});
+  const find = navBtn("사라진 것 찾기", async () => {
+    find.disabled = true; err.textContent = "드라이브 버전 기록에서 찾는 중… (조금 걸려요)";
+    try{
+      const lost = await call("findLost", 30); err.textContent = "";
+      if(!lost.length){ box.replaceChildren(el("p",{className:"note"}, "최근 30일 동안 사라진 것이 없어요.")); find.disabled = false; return; }
+      const picks = lost.map(x => { const c = el("input",{type:"checkbox",checked:true}), r = x.rec;
+        const what = r.text || r.title || r.name || "(내용 없음)", when = r.date || r.due || "";
+        return [x, c, el("label",{className:"inline lostrow"}, c, " ", el("b",{}, NAMES[x.table]), " " + (when ? when + " · " : "") + String(what).slice(0, 60))]; });
+      const go = el("button",{type:"button",className:"btn"}, "고른 것 되살리기");
+      go.onclick = async () => { go.disabled = true; try{ apply(await call("restoreLost", picks.filter(p => p[1].checked).map(p => p[0]))); render(); say("✓ 되살렸어요."); }catch(e){ go.disabled = false; err.textContent = e?.message || "되살리지 못했어요."; } };
+      box.replaceChildren(el("p",{className:"hint"}, "지금은 없지만 지난 30일 안에 있던 것이에요. 일부러 지운 것은 체크를 빼세요."), ...picks.map(p => p[2]), el("div",{className:"actions"}, go));
+    }catch(e){ err.textContent = e?.message || "찾지 못했어요."; }
+    find.disabled = false;
+  }, "드라이브 버전 기록에서 사라진 조·종례·할 일 찾기");
+  const sec = el("section",{className:"set-area"}, el("h3",{className:"nt-title"}, "사라진 것 되살리기"),
+    el("p",{className:"note"}, "조·종례, 할 일, 제출물, 자료가 갑자기 사라졌다면 여기서 찾아 되살릴 수 있어요. 드라이브에 남은 최근 30일 버전에서 찾아요."), el("div",{className:"actions"}, find), err, box);
+  sec.style.setProperty("--c", "var(--wine)");
+  return sec;
+}
 function renderNewTerm(){
   const now = termKey(), cur = curTerm();
   const ny = cur ? Number(cur.slice(0, 4)) + 1 : Number(now.slice(0, 4)), opts = cur ? [ny + "-1"] : [now.slice(0, 4) + "-1", nextTerm(now.slice(0, 4) + "-2")];
@@ -4650,7 +4674,7 @@ function renderSettings(){
   const reset = el("button",{className:"btn ghost",type:"button"},"되돌리기");
   reset.onclick = () => { draft = null; renderSettings(); };
   save.onclick = () => saveSettings(save, err);
-  parts.push(el("div",{className:"set-foot"}, save, reset), err, renderNewTerm());
+  parts.push(el("div",{className:"set-foot"}, save, reset), err, renderNewTerm()); const lostBox = renderLost(); if(lostBox) parts.push(lostBox);
   $("view").replaceChildren(...parts);
 }
 function checkDraft(d){

@@ -17,20 +17,61 @@
   const col = () => fs.collection("users").doc(uid).collection("data"); // 예전 저장 자리 (드라이브로 옮길 때 한 번 읽음)
   const get = t => DB[t] ?? (EMPTY[t] !== undefined ? structuredClone(EMPTY[t]) : []);
   // 표를 바꾸면 이 기기에 바로 두고, 드라이브 파일에는 잠시 모았다가 한 번에 씀
-  // shortcut: 두 기기에서 동시에 고치면 나중에 저장한 쪽이 남음 (선생님 혼자 쓰니 괜찮음), 여럿이 쓰게 되면 표마다 합치기
-  async function put(t, v) { DB[t] = v; dirty = true; keepLocal(); saveSoon(); }
+  // 두 기기(휴대폰·PC)에서 따로 고쳐도 사라지지 않게: 이 기기에서 바꾼 것만 기록해 두었다가, 저장할 때 드라이브의 최신본에 그것만 얹음
+  // 표마다 줄을 찾는 열쇠 (열쇠가 없는 표는 표 통째로)
+  const KEY = { items: r => r.id, notes: r => r.id, checks: r => r.id, todos: r => r.id, logs: r => r.date + "|" + r.period, evnotes: r => r.key, pmsg: r => r.id + "|" + r.no,
+    memos: r => r.date, events: r => r.date + "|" + r.title + "|" + (r.cat || ""), attend: r => r.date + "|" + r.code + "|" + r.no };
+  const freshPend = () => ({ t: {}, cfg: {} });
+  let pend = freshPend(); // t[표] = true(통째로) 또는 { ch: {열쇠:1}, gone: {열쇠:1} }, cfg[설정 이름] = 1
+  function track(p, t, old, v) {
+    const J = x => JSON.stringify(x);
+    if (t === "cfg") { const a = old || {}, b = v || {}; new Set([...Object.keys(a), ...Object.keys(b)]).forEach(k => { if (J(a[k]) !== J(b[k])) p.cfg[k] = 1; }); return; }
+    if (p.t[t] === true) return;
+    if (!KEY[t] || !Array.isArray(v) || !Array.isArray(old)) { p.t[t] = true; return; }
+    const m = p.t[t] || (p.t[t] = { ch: {}, gone: {} }), om = new Map(old.map(r => [KEY[t](r), J(r)])), nk = new Set();
+    v.forEach(r => { const k = KEY[t](r); nk.add(k); if (om.get(k) !== J(r)) { m.ch[k] = 1; delete m.gone[k]; } });
+    om.forEach((_, k) => { if (!nk.has(k)) { m.gone[k] = 1; delete m.ch[k]; } });
+  }
+  // 드라이브 최신본(remote)에 이 기기에서 바꾼 것(p)만 얹은 새 자료
+  function mergeTables(remote, local, p) {
+    const out = { ...remote };
+    Object.entries(p.t).forEach(([t, m]) => {
+      if (m === true || !Array.isArray(remote[t])) { if (local[t] !== undefined) out[t] = local[t]; return; }
+      const loc = new Map((local[t] || []).map(r => [KEY[t](r), r])), seen = new Set(), res = [];
+      remote[t].forEach(r => { const k = KEY[t](r); seen.add(k); if (m.gone[k]) return; res.push(m.ch[k] && loc.has(k) ? loc.get(k) : r); });
+      (local[t] || []).forEach(r => { const k = KEY[t](r); if (m.ch[k] && !seen.has(k)) res.push(r); });
+      out[t] = res;
+    });
+    if (Object.keys(p.cfg).length) { const c = { ...(remote.cfg || {}) }, lc = local.cfg || {}; Object.keys(p.cfg).forEach(k => { if (k in lc) c[k] = lc[k]; else delete c[k]; }); out.cfg = c; }
+    return out;
+  }
+  const joinPend = (a, b) => { const o = structuredClone(a); Object.entries(b.t).forEach(([t, m]) => { if (m === true || o.t[t] === true) o.t[t] = true; else { const x = o.t[t] || (o.t[t] = { ch: {}, gone: {} }); Object.assign(x.ch, m.ch); Object.assign(x.gone, m.gone); Object.keys(m.ch).forEach(k => delete x.gone[k]); Object.keys(m.gone).forEach(k => delete x.ch[k]); } }); Object.assign(o.cfg, b.cfg); return o; };
+  window.__gyomuMerge = { mergeTables, track, freshPend, joinPend }; // 시험용
+  async function put(t, v) { track(pend, t, DB[t], v); DB[t] = v; dirty = true; keepLocal(); saveSoon(); }
   const UP = "https://www.googleapis.com/upload/drive/v3/files";
   let fileId = null, fileVer = 0, dirty = false, saving = null, saveTimer = 0;
   const CACHE = () => "gyomuDB:" + uid;
-  const keepLocal = () => { try { localStorage.setItem(CACHE(), JSON.stringify({ db: DB, ver: fileVer, dirty })); } catch (e) {} };
+  const keepLocal = () => { try { localStorage.setItem(CACHE(), JSON.stringify({ db: DB, ver: fileVer, dirty, pend })); } catch (e) {} };
   function saveSoon(ms = 600) { clearTimeout(saveTimer); saveTimer = setTimeout(() => flush().catch(e => {
     if (!/구글 확인/.test(e.message || "")) { window.say && window.say("구글 드라이브에 저장하지 못했어요. 30초 뒤 다시 저장해요."); saveSoon(30e3); } }), ms); }
   async function flush() {
     while (saving) await saving.catch(() => {});
     if (!dirty) return;
-    saving = (async () => { dirty = false; try { await writeData(JSON.stringify({ app: "gyomu", v: 1, at: Date.now(), tables: DB })); } catch (e) { dirty = true; throw e; } finally { keepLocal(); } })();
+    saving = (async () => {
+      const p = pend; pend = freshPend(); dirty = false;
+      try {
+        // 다른 기기가 그사이 저장했으면, 그 최신본에 이 기기에서 바꾼 것만 얹어서 저장 (덮어써서 지우지 않게)
+        const id = await dataFile();
+        if (id) { const ver = Number((await (await G(DRIVE + "/" + id + "?fields=version")).json()).version) || 0;
+          if (ver !== fileVer) { const remote = ((await (await G(DRIVE + "/" + id + "?alt=media")).json()) || {}).tables || {};
+            DB = mergeTables(remote, DB, joinPend(p, pend)); fileVer = ver; merged = true; } }
+        await writeData(JSON.stringify({ app: "gyomu", v: 1, at: Date.now(), tables: DB }));
+      } catch (e) { pend = joinPend(p, pend); dirty = true; throw e; } finally { keepLocal(); }
+    })();
     try { await saving; } finally { saving = null; }
+    if (merged) { merged = false; if (window.apply && readyDone) window.apply(getAll()); } // 다른 기기에서 넣은 것도 화면에
   }
+  let merged = false, readyDone = false;
   // 드라이브의 자료 파일은 이름이 아니라 표시(appProperties)로 찾음 (이름을 바꿔도 됨)
   async function dataFile() { if (fileId) return fileId; const f = (await findOne("appProperties has { key='gyomu' and value='data' }"))[0]; return f ? (fileId = f.id) : null; }
   async function rootFolder() { const d = (DB.cfg || {}).drive || {}; if (d.root) return d.root; return ((await findOne("name='교무수첩' and mimeType='" + FOLDER + "' and 'root' in parents"))[0] || await makeFolder("교무수첩")).id; }
@@ -85,7 +126,7 @@
     uid = u.uid; gate(false);
     try { await load(); } catch (e) { await needGoogle(); }
     if (!DB.cfg) importBanner(); else if (!DB.cfg.archives) archiveBanner();
-    readyRes();
+    readyRes(); readyDone = true;
     setTimeout(() => ensureFolders().then(autoSync), 2500); // 화면이 다 그려진 뒤 폴더 확인, 시트에서 고친 것 반영
   });
   // 이미 가져왔지만 지난 학년도 보관 시트를 아직 안 찾았을 때
@@ -113,7 +154,7 @@
   // 이 기기에 둔 것을 먼저 보여 주고, 드라이브에서 새로 받아 바뀌었으면 화면을 고침
   async function load() {
     let c = null; try { c = JSON.parse(localStorage.getItem(CACHE()) || "null"); } catch (e) {}
-    if (c && c.db) { DB = c.db; fileVer = c.ver || 0; dirty = !!c.dirty; if (dirty) saveSoon(); refreshFromDrive().catch(() => {}); return; }
+    if (c && c.db) { DB = c.db; fileVer = c.ver || 0; dirty = !!c.dirty; pend = c.pend && c.pend.t ? c.pend : freshPend(); if (dirty && !c.pend) TABLES.forEach(t => { pend.t[t] = true; }); if (dirty) saveSoon(); refreshFromDrive().catch(() => {}); return; }
     DB = {}; await refreshFromDrive(true);
   }
   async function refreshFromDrive(first) {
@@ -123,8 +164,9 @@
       if (Object.keys(old).length) { DB = { ...old, ...DB }; dirty = true; await flush(); window.say && window.say("교무수첩 자료를 구글 드라이브로 옮겼어요."); if (!first && window.apply) window.apply(getAll()); }
       return;
     }
-    if (d.same || dirty) return;
-    DB = d.tables; fileVer = d.ver; keepLocal();
+    if (d.same) return;
+    if (dirty || saving) { saveSoon(0); return; } // 이 기기에서 아직 저장 안 한 것이 있으면, 저장할 때 드라이브 최신본과 합침
+    DB = d.tables; fileVer = d.ver; pend = freshPend(); keepLocal();
     if (!first && window.apply) window.apply(getAll());
   }
   // 다른 기기에서 고친 것: 이 창으로 돌아올 때 확인. 창을 떠날 때는 남은 것을 저장
@@ -234,6 +276,26 @@
         }) };
       Object.keys(clean).forEach(k => { if (clean[k] === undefined) delete clean[k]; });
       await cfgPut({ config: clean }); return getAll();
+    },
+    // 사라진 것 찾기: 자료 파일의 지난 버전(드라이브 버전 기록, 최근 것부터 25개)에 있었는데 지금은 없는 것
+    async findLost(days) {
+      const id = await dataFile(); if (!id) return [];
+      const since = Date.now() - (Number(days) || 14) * 864e5;
+      const revs = ((await (await G(DRIVE + "/" + id + "/revisions?fields=revisions(id,modifiedTime)&pageSize=200")).json()).revisions || [])
+        .filter(r => Date.parse(r.modifiedTime) >= since).reverse().slice(0, 25); if (!revs.length) return [];
+      const T = ["notes", "todos", "checks", "items"], now = {}, found = new Map();
+      T.forEach(t => { now[t] = new Set(get(t).map(r => r.id)); });
+      const out = await GM(revs.map(r => [DRIVE + "/" + id + "/revisions/" + r.id + "?alt=media", {}]), true, true);
+      for (let i = 0; i < out.length; i++) {
+        let tb = {}; try { if (out[i].ok) tb = ((await out[i].json()) || {}).tables || {}; } catch (e) {}
+        T.forEach(t => (Array.isArray(tb[t]) ? tb[t] : []).forEach(r => { if (r && r.id && !now[t].has(r.id) && !found.has(t + r.id)) found.set(t + r.id, { table: t, rec: r, at: revs[i].modifiedTime }); }));
+      }
+      return [...found.values()];
+    },
+    async restoreLost(list) {
+      const by = {}; (Array.isArray(list) ? list : []).forEach(x => { if (x && ["notes", "todos", "checks", "items"].includes(x.table) && x.rec && x.rec.id) (by[x.table] ||= []).push(x.rec); });
+      for (const [t, recs] of Object.entries(by)) { const have = new Set(get(t).map(r => r.id)); await put(t, get(t).concat(recs.filter(r => !have.has(r.id)))); }
+      return getAll();
     },
     // 학기가 바뀌면: 지금 시간표를 지난 학기 것으로 보관하고, 그대로 새 학기 시간표의 바탕으로 씀
     async rollTimetable(term) { term = termOf(term); if (!term) fail("학기가 올바르지 않아요."); const old = cfgGet("ttTerm"), kept = { ...(cfgGet("kept") || {}) };
