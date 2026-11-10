@@ -246,6 +246,9 @@ nav{margin-bottom:14px}
 .kidphoto{display:block;max-width:100%;max-height:60vh;margin:6px auto;border-radius:8px}
 .fcol{display:grid;gap:16px;align-content:start}
 .ttterm{font-size:.7rem;font-weight:500;color:var(--muted);margin-left:6px}.ttterm.past{color:var(--wine)}
+.alltools{flex-wrap:wrap}.alltools input[type=search]{flex:1 1 10em}
+.alltodos{display:grid;gap:2px;max-height:60vh;overflow:auto}
+.alltodos .nrow small{margin-left:auto;white-space:nowrap}
 .lostrow{display:flex;gap:4px;align-items:baseline;margin:2px 0;font-size:.85rem}
 .evnotebtn{margin-left:6px;border:1px solid var(--line);background:var(--paper);border-radius:999px;padding:1px 8px;font:inherit;font-size:.72rem;color:var(--muted);cursor:pointer}
 .evnotebtn.has{color:var(--ink);border-color:var(--green)}
@@ -1040,7 +1043,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="backend.js?v=11158087"></script>
+<script src="backend.js?v=fdf4c5af"></script>
 <style>
 #fbGate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--desk)}
 #fbGate .fbbox{background:var(--paper);border-radius:22px;padding:36px 32px;text-align:center;box-shadow:0 18px 40px -24px rgba(20,40,25,.35);max-width:340px}
@@ -2699,7 +2702,7 @@ function renderNow(){
       return el("div",{className:"lesson"}, el("b",{}, (n.now ? "이번 시간 " : "다음 시간 ") + no + "차시"), plan[no - 1] ? " · " + plan[no - 1] : "",
         el("small",{}, plan.length ? " (전체 " + plan.length + "차시)" : " · 진도표에 계획을 넣으면 내용도 보여요"),
         navBtn("진도표", () => openPlan(cls), cls + " 진도표")); })(),
-    last ? el("div",{className:"prog"}, "지난 시간 (" + dayLabel(parseYmd(last.date)) + "): " + (Number(last.lesson) ? last.lesson + "차시 " : "") + last.text) : null,
+    last ? el("div",{className:"prog"}, "지난 시간 (" + dayLabel(parseYmd(last.date)) + "): " + logDesc(last)) : null,
   ].filter(Boolean));
 }
 // 지금 몇 교시인지 (수업 시간 안이면 그 교시, 아니면 -1) — 시간표에서 굵은 테두리로 표시
@@ -2757,6 +2760,8 @@ function openBells(){
 setTimeout(() => { const n = nowSlot(new Date(2026, 9, 31)); console.assert(n === null); }, 0); // 토요일은 수업 없음
 
 // 수업 기록: 시간표 칸을 누르면 이날 수업·교실(교체)과 진도·특이사항을 함께 적음
+// 수업 기록 한 줄: "3차시 진도표 내용 · 내가 적은 글" (글을 안 적어도 차시 내용은 보임)
+const logDesc = l => { const n = Number(l.lesson), p = n ? planOf(l.cls)[n - 1] || "" : ""; return [n ? n + "차시" + (p ? " " + p : "") : "", l.text || ""].filter(Boolean).join(" · "); };
 const logOf = (k, i) => logs.find(l => l.date === k && Number(l.period) === i);
 function openSlot(key, i, base){
   const d = parseYmd(key), ov = tt.overrides[key]?.[i], cur = ov !== undefined ? ov : base, lg = logOf(key, i), edit = canWrite();
@@ -2790,7 +2795,7 @@ function openSlot(key, i, base){
     el("div",{className:"two"}, el("label",{className:"memo-label"}, "진도표 차시", lessonSel), el("label",{className:"inline"}, doneCb, " 이 차시 내용을 했어요")),
     lessonInfo,
     att.node,
-    recent.length ? el("div",{className:"recent"}, el("h3",{}, curClass + " 최근 기록"), el("ul",{}, ...recent.map(l => el("li",{}, el("span",{className:"d"}, dayLabel(parseYmd(l.date)) + " " + (Number(l.period) + 1) + "교시"), " " + (Number(l.lesson) ? l.lesson + "차시 " : "") + l.text)))) : null,
+    recent.length ? el("div",{className:"recent"}, el("h3",{}, curClass + " 최근 기록"), el("ul",{}, ...recent.map(l => el("li",{}, el("span",{className:"d"}, dayLabel(parseYmd(l.date)) + " " + (Number(l.period) + 1) + "교시"), " " + logDesc(l))))) : null,
     err,
   ].filter(Boolean);
   if(edit){
@@ -3062,12 +3067,8 @@ function renderTodos(){
     return el("label",{className:"nrow" + (t.done ? " done" : "")}, cb, el("span",{className:"ntext"}, t.text), el("span",{className:"nact"}, badge, more));
   };
   const parts = [el("div",{className:"panel-head"}, el("h2",{}, "할 일"), el("small",{className:"ncount"}, open.length ? String(open.length) : ""),
-    el("div",{className:"tt-tools"}, ...(edit ? [navBtn("쿨메신저 붙여넣기", openPaste, "쿨메신저 글을 붙여 넣어 할 일 만들기")] : [])))];
+    el("div",{className:"tt-tools"}, navBtn("전체", openAllTodos, "끝낸 것까지 할 일 전체 · 찾기"), ...(edit ? [navBtn("쿨메신저 붙여넣기", openPaste, "쿨메신저 글을 붙여 넣어 할 일 만들기")] : [])))];
   parts.push(...(open.length ? open.map(row) : [el("div",{className:"empty"}, "할 일이 없어요")]));
-  if(done.length){
-    parts.push(navBtn(showDone ? "끝낸 것 숨기기" : "끝낸 것 " + done.length + "개 보기", () => { showDone = !showDone; renderHome(); }, "끝낸 할 일"));
-    if(showDone) parts.push(...done.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 20).map(row));
-  }
   if(edit){
     const inp = el("input",{className:"field",id:"todoText",maxLength:60,placeholder:"할 일을 쓰고 Enter"});
     inp.onkeyup = e => {
@@ -3092,6 +3093,33 @@ function openPaste(){
   make.onclick = () => { const p = parseMessage(ta.value); if(!p.text) return; store.addTodo(p); $("dayDlg").close(); say("할 일을 만들었어요: " + p.text); };
   modal("쿨메신저 글로 할 일 만들기", ta, prev, el("div",{className:"actions"}, el("span",{className:"spacer"}), make));
   setTimeout(() => autoFocus(ta), 0);
+}
+// 할 일 전체: 끝낸 것까지, 글자·날짜(마감일 또는 만든 날)로 찾기
+async function openAllTodos(){
+  let all = todos.slice();
+  if(window.fbCall) try{ all = await call("allTodos"); }catch(e){}
+  const q = el("input",{type:"search",className:"field",placeholder:"할 일 찾기","aria-label":"할 일 찾기"});
+  const day = el("input",{type:"date",className:"field","aria-label":"날짜로 찾기",title:"마감일이나 만든 날"});
+  const st = el("select",{className:"field","aria-label":"상태"}, el("option",{value:""}, "전체"), el("option",{value:"open"}, "안 끝낸 것"), el("option",{value:"done"}, "끝낸 것"));
+  const list = el("div",{className:"alltodos"}), count = el("p",{className:"hint"});
+  const made = t => t.createdAt ? ymd(new Date(t.createdAt)) : "";
+  const draw = () => {
+    const w = q.value.trim(), d = day.value;
+    const rows = all.filter(t => (!w || (t.text + " " + (t.detail || "")).includes(w)) && (!d || t.due === d || made(t) === d) && (!st.value || (st.value === "done") === !!t.done))
+      .sort((a, b) => (!!a.done - !!b.done) || (b.createdAt || 0) - (a.createdAt || 0));
+    count.textContent = rows.length + "개";
+    list.replaceChildren(...rows.slice(0, 200).map(t => {
+      const cb = el("input",{type:"checkbox",checked:!!t.done,disabled:!canWrite(),"aria-label":"끝냄"});
+      cb.onchange = async () => { t.done = cb.checked; try{ await store.updateTodo(t.id, { done:cb.checked }); }catch(e){ t.done = !cb.checked; cb.checked = t.done; } draw(); };
+      const name = el("button",{type:"button",className:"linkbtn"}, t.text); name.onclick = () => { if(!todos.some(x => x.id === t.id)) todos.push(t); openTodo(t.id); };
+      return el("div",{className:"nrow" + (t.done ? " done" : "")}, cb, el("span",{className:"ntext"}, name),
+        el("small",{className:"hint"}, [t.due ? "마감 " + t.due.slice(5).replace("-", "/") : "", made(t) ? "만든 날 " + made(t).slice(5).replace("-", "/") : ""].filter(Boolean).join(" · ")));
+    }));
+    if(!rows.length) list.append(el("p",{className:"note"}, "찾는 할 일이 없어요."));
+  };
+  q.oninput = draw; day.onchange = draw; st.onchange = draw;
+  draw();
+  modal("할 일 전체", el("div",{className:"tt-tools alltools"}, q, day, st, navBtn("날짜 지우기", () => { day.value = ""; draw(); }, "날짜 조건 지우기")), count, list);
 }
 function openTodo(id){
   const t = todos.find(x => x.id === id); if(!t) return;
@@ -3241,7 +3269,7 @@ function openClassHub(cls){
       el("small",{}, p.total ? " (진도 " + p.done + "/" + p.total + "차시)" : " · 진도표에 계획을 넣으면 내용도 보여요")),
     el("div",{className:"roster hubrow"}, navBtn("진도표", withBack(hub, () => openPlan(cls)), cls + " 진도표"), ...rosBtns),
     el("h3",{className:"sub"}, "최근 수업 기록"),
-    mine.length ? el("ul",{className:"hublogs"}, ...mine.slice(0, 6).map(l => { const li = el("li",{tabIndex:0}, el("span",{className:"d"}, dayLabel(parseYmd(l.date)) + " " + (Number(l.period) + 1) + "교시"), " " + (Number(l.lesson) ? l.lesson + "차시 " : "") + (l.text || ""));
+    mine.length ? el("ul",{className:"hublogs"}, ...mine.slice(0, 6).map(l => { const li = el("li",{tabIndex:0}, el("span",{className:"d"}, dayLabel(parseYmd(l.date)) + " " + (Number(l.period) + 1) + "교시"), " " + logDesc(l));
       li.onclick = () => open(l); li.onkeydown = e => { if(e.key === "Enter") open(l); }; return li; })) : el("p",{className:"note"}, "아직 기록이 없어요. 시간표 칸을 눌러 적어요."),
     ...(files.length ? [el("h3",{className:"sub"}, "수업 파일 (" + files.length + ")"), el("ul",{className:"hubfiles"}, ...files.slice(0, 20).map(f => el("li",{}, el("span",{className:"d"}, dayLabel(parseYmd(f.date))), " ", el("a",{href:safeUrl(f.url) || "#",target:"_blank",rel:"noopener noreferrer"}, f.name))))] : []));
 }

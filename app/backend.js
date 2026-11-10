@@ -126,6 +126,7 @@
     uid = u.uid; gate(false);
     try { await load(); } catch (e) { await needGoogle(); }
     if (!DB.cfg) importBanner(); else if (!DB.cfg.archives) archiveBanner();
+    await carryNotes().catch(() => {});
     readyRes(); readyDone = true;
     setTimeout(() => ensureFolders().then(autoSync), 2500); // 화면이 다 그려진 뒤 폴더 확인, 시트에서 고친 것 반영
   });
@@ -171,6 +172,15 @@
   }
   // 다른 기기에서 고친 것: 이 창으로 돌아올 때 확인. 창을 떠날 때는 남은 것을 저장
   document.addEventListener("visibilitychange", () => { if (!uid) return; if (document.visibilityState === "visible") refreshFromDrive().catch(() => {}); else if (dirty) flush().catch(() => {}); });
+  // 체크 안 한 조·종례는 다음 등교일로 (지난 날 것 → 오늘, 주말이면 다음 월요일)
+  async function carryNotes() {
+    const now = new Date(), today = ymd(now), d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+    const to = ymd(d), ns = get("notes");
+    if (!ns.some(n => !n.done && n.date < today)) return false;
+    await put("notes", ns.map(n => !n.done && n.date < today ? { ...n, date: to, from: n.from || n.date } : n)); return true;
+  }
+  setInterval(() => { if (readyDone && !busy()) carryNotes().then(ch => { if (ch && window.apply) window.apply(getAll()); }).catch(() => {}); }, 10 * 60e3); // 밤을 넘겨 열어 둔 때
   // 열어 둔 동안에도 15초마다 다른 기기에서 고친 것 확인 (창을 열었거나 입력 중이면 다음에)
   const busy = () => document.querySelector("dialog[open]") || /^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || "");
   setInterval(() => { if (uid && readyDone && document.visibilityState === "visible" && !dirty && !saving && !busy()) refreshFromDrive().catch(() => {}); }, 15000);
@@ -364,6 +374,8 @@
       const area = areaIds().indexOf(String(t.area)) >= 0 ? String(t.area) : "";
       await put("todos", get("todos").concat({ id: uuid(), text, detail: S(t.detail, 2000).trim(), due: DATE_RE.test(String(t.due)) ? t.due : "", done: false, createdAt: Date.now(), area, cat: area ? S(t.cat, 40) : "", files: cleanFiles(t.files) })); return getAll();
     },
+    // 할 일 전체 (끝낸 것·오래된 것까지)
+    async allTodos() { return get("todos"); },
     async updateTodo(id, p) { p = p || {}; await patchRow("todos", id, o => {
       if ("text" in p && String(p.text).trim()) o.text = S(p.text, 60).trim(); if ("detail" in p) o.detail = S(p.detail, 2000).trim();
       if ("due" in p) o.due = DATE_RE.test(String(p.due)) ? p.due : ""; if ("done" in p) o.done = !!p.done; if ("files" in p) o.files = cleanFiles(p.files); return o; }); return getAll(); },
