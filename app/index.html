@@ -580,7 +580,7 @@ dialog label.inline,.set-area label.inline{display:flex;flex-direction:row;gap:8
 .noticebox{display:flex;flex-direction:column;gap:10px}.noticebox>*{margin:0}.noticebox>.actions{gap:8px}
 /* 휴대폰: 입력칸을 누를 때 화면이 커지지 않게 (아이폰은 16px 보다 작은 글씨 칸을 확대함), 두 번 눌러 확대도 막음 */
 html{touch-action:manipulation;-webkit-text-size-adjust:100%}
-@media (max-width:700px){input,select,textarea{font-size:16px!important}select.catmini{font-size:.68rem!important}}
+@media (max-width:700px){input,select,textarea{font-size:16px!important}select.catmini{font-size:11px!important;height:18px!important;min-height:0!important;width:46px!important;padding:0 10px 0 3px!important;line-height:18px!important;-webkit-text-size-adjust:100%}}
 .photosheet{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
 .pscard{display:grid;justify-items:center;gap:2px;border:1px solid var(--line);border-radius:8px;background:var(--paper);padding:6px;font:inherit;color:var(--ink);cursor:pointer}
 .pscard:hover{background:var(--paper2)}
