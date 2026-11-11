@@ -184,7 +184,7 @@
   // 쿨메신저 비서(선생님 PC)가 드라이브에 올려 둔 '할 일' 목록을 교무수첩 할 일로 가져옴
   // 처음 보는 것: 안 끝낸 것만 할 일로 더함 / 이미 가져온 것: 비서에서 끝냄으로 바꾸면 여기서도 끝냄
   const COOL_FILE = "쿨메신저 할 일 (교무수첩이 읽음).json", COOL_WORDS = "쿨메신저 금칙어 (교무수첩).json";
-  let coolBox = null;
+  let coolBox = null, coolVer = "", coolCatSeen;
   const coolCfg = () => ({ auto: true, noDue: true, tcat: "", ...(((cfgGet("config") || {}).cool) || {}) });
   const coolFiles = i => [...(i.files || []).filter(f => f && f.url).map(f => ({ name: S("📎 " + f.name, 200), url: String(f.url), fileId: S(f.id, 200) })),
     ...(i.links || []).filter(l => /^https:\/\/\S+$/.test(String(l))).map(l => { let h = ""; try { h = new URL(l).hostname.replace(/^www\./, ""); } catch (e) {} return { name: S("🔗 " + (h || "링크"), 200), url: String(l), fileId: "" }; })].slice(0, 10);
@@ -215,7 +215,11 @@
   };
   async function coolSync() {
     const f = (await findOne("name='" + COOL_FILE + "'"))[0]; if (!f) return false;
+    // 목록이 커져도 가볍게: 파일 버전이 그대로면 다시 받지 않음
+    const ver = String(((await (await G(DRIVE + "/" + f.id + "?fields=version")).json()) || {}).version || "");
+    if (coolBox && ver && ver === coolVer && cfgGet("coolCat") === coolCatSeen) return false;
     const inbox = ((await (await G(DRIVE + "/" + f.id + "?alt=media")).json()) || {});
+    coolVer = ver; coolCatSeen = cfgGet("coolCat");
     const over = cfgGet("coolCat") || {}; // 선생님이 바꾼 분류 (할 일 ↔ 정보 제공)
     (inbox.items || []).forEach(i => { if (i && over[i.key]) i.category = over[i.key]; });
     coolBox = inbox; // 쿨메신저 창에서 씀 (메시지 전체·요약·원문·첨부)
