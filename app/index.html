@@ -251,7 +251,7 @@ nav{margin-bottom:14px}
 .alltools.one{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;margin:6px 0}.alltools.one .field{flex:1 1 0;min-width:0;width:auto;margin:0}.alltools.one>button{flex:none}
 .alltools.range{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;margin:6px 0}.alltools.range input[type=date]{flex:1 1 0;min-width:0;width:auto}.alltools.range>span,.alltools.range>button{flex:none}
 .tcat{display:inline-block;margin-right:5px;padding:0 6px;border-radius:999px;font-size:.72rem;line-height:1.5;color:#fff;background:var(--c,#667);vertical-align:1px}
-.nadd .tcatsel{flex:none;width:auto;max-width:7em}.nadd #todoText{flex:1;min-width:0}
+.nadd .tcatsel{flex:0 1 auto;width:auto;min-width:4.5em;max-width:7em}.nadd #todoText{flex:1 1 0;width:0;min-width:0}.nadd input{width:0}
 .alltodos{display:grid;gap:2px;max-height:60vh;overflow:auto}
 .alltodos .nrow small{margin-left:auto;white-space:nowrap}
 .lostrow{display:flex;gap:4px;align-items:baseline;margin:2px 0;font-size:.85rem}
@@ -994,6 +994,12 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
   body.onhome .home4{height:100%;align-items:stretch}
   body.onhome .home4 .col{overflow-y:auto;min-height:0;padding-right:4px;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
   body.onhome .home4 .col:last-child{grid-column:auto}
+  body.onhome .home4 .col:nth-child(2){overflow:hidden;display:flex;flex-direction:column}
+  body.onhome .home4 .col:nth-child(2)>*{flex:none}
+  body.onhome .home4 .col:nth-child(2)>.tt{flex:1 1 0;min-height:0;display:flex;flex-direction:column}
+  body.onhome .home4 .col:nth-child(2)>.tt>.tt-wrap{flex:1 1 0;min-height:0;overflow:hidden}
+  body.onhome .home4 .col:nth-child(2)>.tt table{height:100%}
+  body.onhome .home4 .col:nth-child(2)>.tt th,body.onhome .home4 .col:nth-child(2)>.tt td{height:auto!important;padding:1px 2px!important;line-height:1.15}
 }
 @media (min-width:1000px) and (max-width:1150px) and (min-height:620px){body.onhome .home4{grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr) minmax(0,1fr)}}
 </style>
@@ -3111,7 +3117,7 @@ function renderTodos(){
     return el("label",{className:"nrow" + (t.done ? " done" : "")}, cb, el("span",{className:"ntext"}, tcatChip(t), t.text), el("span",{className:"nact"}, badge, more));
   };
   const parts = [el("div",{className:"panel-head"}, el("h2",{}, "할 일"), el("small",{className:"ncount"}, open.length ? String(open.length) : ""),
-    el("div",{className:"tt-tools"}, navBtn("전체", openAllTodos, "끝낸 것까지 할 일 전체 · 찾기"), ...(edit ? [navBtn("쿨메신저 붙여넣기", openPaste, "쿨메신저 글을 붙여 넣어 할 일 만들기")] : [])))];
+    el("div",{className:"tt-tools"}, navBtn("전체", openAllTodos, "끝낸 것까지 할 일 전체 · 찾기")))];
   parts.push(...(open.length ? open.map(row) : [el("div",{className:"empty"}, "할 일이 없어요")]));
   if(edit){
     const inp = el("input",{className:"field",id:"todoText",maxLength:60,placeholder:"할 일을 쓰고 Enter"});
