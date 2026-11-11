@@ -3218,11 +3218,12 @@ async function openAllTodos(preset){
     el("div",{className:"alltools one"}, ...(window.fbCall ? [cs] : []), st, ...(window.fbCall && canWrite() ? [navBtn("분류 고치기", () => openTodoCats(openAllTodos), "할 일 분류 더하기·지우기")] : [])),
     el("div",{className:"alltools range"}, el("span",{className:"hint"}, "기간"), from, el("span",{}, "~"), to, el("button",{type:"button",className:"ttback",title:"기간 지우기","aria-label":"기간 지우기",onclick:() => { from.value = ""; to.value = ""; again(); }}, "✕")),
     el("p",{className:"hint"}, "마감일이나 만든 날이 기간 안에 있는 할 일이 나와요. 한쪽만 넣어도 돼요."), count, list);
+  $("dayDlg").querySelector(".daybox")?.setAttribute("data-autosave", "1"); // 찾기 칸·체크는 바로 저장되거나 저장할 게 없음 → 닫을 때 묻지 않음
 }
 // ---------- 쿨메신저: PC '쿨메신저 연결'이 드라이브에 올린 메시지 (분류·요약은 PC의 Claude) ----------
 let coolFilter = { q:"", cat:"" };
 async function openCool(){
-  const box = el("div",{className:"coollist"}, el("p",{className:"note"}, "불러오는 중…"));
+  const box = el("div",{className:"coollist","data-autosave":"1"}, el("p",{className:"note"}, "불러오는 중…"));
   modal("쿨메신저", box);
   let data; try{ data = await call("coolMessages"); }catch(e){ return box.replaceChildren(el("p",{className:"note"}, "불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.")); }
   const items = (data.items || []).slice().sort((a, b) => String(b.receivedAt).localeCompare(String(a.receivedAt)));
