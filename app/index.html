@@ -5359,6 +5359,19 @@ function render(){
   tab === "home" ? renderHome() : tab === "settings" ? renderSettings() : tab === "attend" ? renderAttend() : extOf(tab) ? renderExt(extOf(tab)) : renderArea();
   addTabBack();
 }
+// 체크·저장으로 화면을 다시 그려도 보던 자리 그대로 (탭을 바꿀 때만 맨 위로, 새로고침하면 처음부터)
+let scrollTab = null;
+const SCROLL_BOXES = "#view .home4 > .col, #view .feat .fcol, #view .tt-wrap, #view .attwrap .tt-wrap";
+const keepScroll = fn => function(...a){
+  const same = scrollTab === tab, win = window.scrollY, boxes = [...document.querySelectorAll(SCROLL_BOXES)].map(e => [e.scrollTop, e.scrollLeft]);
+  const r = fn.apply(this, a);
+  if(same){
+    document.querySelectorAll(SCROLL_BOXES).forEach((e, i) => { const b = boxes[i]; if(b){ if(b[0]) e.scrollTop = b[0]; if(b[1]) e.scrollLeft = b[1]; } });
+    if(win && window.scrollY !== win) window.scrollTo(0, win);
+  }
+  scrollTab = tab; return r;
+};
+render = keepScroll(render); renderHome = keepScroll(renderHome); renderAttend = keepScroll(renderAttend); renderArea = keepScroll(renderArea);
 
 // ---------- 추가/편집 ----------
 function setKind(k){
