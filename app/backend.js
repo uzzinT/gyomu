@@ -211,8 +211,8 @@
     const f = (await findOne("name='" + COOL_FILE + "'"))[0]; if (!f) return false;
     const inbox = ((await (await G(DRIVE + "/" + f.id + "?alt=media")).json()) || {});
     coolBox = inbox; // 쿨메신저 창에서 씀 (메시지 전체·요약·원문·첨부)
-    // 할 일로 넣는 것은 '할 일'로 분류된 것만 (분류 칸이 없는 예전 목록은 모두 할 일이었음), 금칙어(비공개)는 빼고
-    const list = (inbox.items || []).filter(i => i && i.key != null && i.title && !i.private && (!i.category || i.category === "할 일"));
+    // 할 일로 넣는 것은 PC의 Claude가 '할 일'로 분류한 것만. 정보 제공·아직 분류 전·금칙어(비공개)는 쿨메신저 창에만
+    const list = (inbox.items || []).filter(i => i && i.key != null && i.title && !i.private && i.category === "할 일");
     const seen = { ...(cfgGet("coolSeen") || {}) }; let ch = false;
     // 휴대폰·PC가 동시에 가져오면 겹쳤음 → 쿨메신저 할 일은 번호를 'cool-메시지키'로 고정 (두 기기가 같은 번호를 써서 합칠 때 하나로)
     // 예전에 겹쳐 들어간 것은 하나만 남김 (하나라도 끝냈으면 끝냄으로)
@@ -221,9 +221,10 @@
     const drop = new Set(), doneSig = new Set();
     dup.forEach((ts, s) => { if (ts.length > 1) { ts.slice(1).forEach(t => drop.add(t.id)); if (ts.some(t => t.done)) doneSig.add(s); } });
     const todos = get("todos").filter(t => !drop.has(t.id)).map(t => t.src === "cool" && !t.done && doneSig.has(t.text + "|" + t.createdAt) ? { ...t, done: true } : t);
-    // 새 목록으로 바뀌는 사이 '정보 제공'·비공개 메시지가 저절로 할 일로 들어갔으면 뺌 (직접 만든 것·끝낸 것은 둠)
+    // '할 일'이 아닌 메시지(정보 제공·분류 전·비공개)가 저절로 할 일로 들어가 있으면 뺌 (직접 만든 것·끝낸 것은 둠)
+    // 뺀 것은 '본 적 없음'으로 되돌려, 나중에 '할 일'로 분류되면 그때 넣음
     const notTodo = new Set();
-    (inbox.items || []).forEach(i => { if (i && (i.private || i.category === "정보 제공")) { notTodo.add("cool-" + i.key); if (seen[i.key] && seen[i.key] !== "-") notTodo.add(seen[i.key]); } });
+    (inbox.items || []).forEach(i => { if (i && i.key != null && (i.private || i.category !== "할 일")) { notTodo.add("cool-" + i.key); if (seen[i.key] && seen[i.key] !== "-" && !todos.some(t => t.id === seen[i.key] && t.manual)) { notTodo.add(seen[i.key]); delete seen[i.key]; ch = true; } } });
     for (let n = todos.length - 1; n >= 0; n--) { const t = todos[n]; if (t.src === "cool" && !t.manual && !t.done && notTodo.has(t.id)) { todos.splice(n, 1); ch = true; } }
     if (drop.size) ch = true;
     const cc = coolCfg();
