@@ -3293,7 +3293,10 @@ function openTodo(id){
   const att = attachBox(t.files, edit);
   const tc = el("select",{className:"field",id:"todoCatEdit",disabled:!edit}, el("option",{value:""}, "분류 없음"), ...todoCats().map(c => el("option",{value:c.id,selected:c.id === t.tcat}, c.name)), ...(edit ? [el("option",{value:"__edit"}, "✎ 분류 고치기…")] : []));
   tc.onchange = () => { if(tc.value === "__edit"){ tc.value = t.tcat || ""; openTodoCats(() => openTodo(t.id)); } };
-  const kids = [el("label",{className:"memo-label"}, "할 일", text), ...(window.fbCall ? [el("label",{className:"memo-label"}, "분류", tc)] : []), el("label",{className:"memo-label"}, "마감일", due), el("label",{className:"memo-label"}, "세부 내용", detail), att.node, err];
+  // 끝냄 체크는 누르면 바로 저장 (저장 단추와 상관없음)
+  const doneCb = el("input",{type:"checkbox",checked:!!t.done,disabled:!edit,"aria-label":"끝냄"});
+  doneCb.onchange = async () => { try{ await store.updateTodo(t.id, { done:doneCb.checked }); say(doneCb.checked ? "✓ 끝냄으로 바꿨어요." : "안 끝낸 것으로 바꿨어요."); }catch(e){ doneCb.checked = !doneCb.checked; say(e?.message || "바꾸지 못했어요."); } };
+  const kids = [el("label",{className:"inline tdone","data-autosave":"1"}, doneCb, " 끝냈어요"), el("label",{className:"memo-label"}, "할 일", text), ...(window.fbCall ? [el("label",{className:"memo-label"}, "분류", tc)] : []), el("label",{className:"memo-label"}, "마감일", due), el("label",{className:"memo-label"}, "세부 내용", detail), att.node, err];
   if(edit){
     const save = el("button",{className:"btn",type:"button"}, "저장");
     save.onclick = () => {
