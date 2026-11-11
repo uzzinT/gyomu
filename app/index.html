@@ -825,7 +825,15 @@ dialog::backdrop{background:rgba(16,32,21,.45);backdrop-filter:blur(2px)}
 /* 서류 관리: 붙어 있던 곳 띄우기 (거르기 줄↔표, 휴지통 제목↔목록, 목록↔단추) */
 .attwrap .notes>.attrow+div{margin-top:12px}.attwrap .trash>summary+.attlist{margin-top:8px}.attwrap .attlist>.attline+.actions{margin-top:12px}
 /* 행정 영역 학사일정: 달력 넓게, 이번 주 일정 좁게 */
-@media (min-width:900px){.feat:has(.panel.week){grid-template-columns:minmax(0,1.8fr) minmax(280px,1fr)}}
+@media (min-width:900px){.feat:has(.panel.week){grid-template-columns:minmax(0,1.8fr) minmax(280px,1fr)}
+  .feat:has(>.admintodo){grid-template-areas:"cal todo" "cal week";grid-template-rows:auto 1fr}
+  .feat>.admintodo{grid-area:todo}.feat:has(>.admintodo)>.bigcal{grid-area:cal}.feat:has(>.admintodo)>.week{grid-area:week}}
+.feat:has(>.admintodo)>*{min-width:0}
+.admintodo{border:1px solid var(--line);border-radius:8px;background:var(--paper);min-width:0}
+.admintodo>summary{cursor:pointer;padding:10px 14px;font:700 .8rem var(--body);letter-spacing:.25em;color:var(--muted);display:flex;gap:8px;align-items:baseline;list-style-position:inside}
+.admintodo>.panel{border:0;margin:0;box-shadow:none;width:auto;max-width:100%}.admintodo>.panel>.panel-head>h2{display:none}
+.featbox .bigcal .grid>*{min-height:66px}
+.tsort{width:auto;padding:2px 6px;font-size:.75rem;border-radius:999px}
 .tbadge{min-width:17px;height:17px;padding:0 5px;border-radius:9px;background:var(--sun);color:#fff;font-size:.66rem;line-height:17px;text-align:center}
 .attgrid{display:grid;gap:14px}
 .dcards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
@@ -1063,7 +1071,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="backend.js?v=0ee4a553"></script>
+<script src="backend.js?v=6a690ebd"></script>
 <style>
 #fbGate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--desk)}
 #fbGate .fbbox{background:var(--paper);border-radius:22px;padding:36px 32px;text-align:center;box-shadow:0 18px 40px -24px rgba(20,40,25,.35);max-width:340px}
@@ -3103,10 +3111,16 @@ function parseMessage(text){
 }
 console.assert(parseMessage("[교무부] 학부모 상담 신청서 취합\n10월 30일(금)까지 제출 바랍니다.").text === "학부모 상담 신청서 취합");
 console.assert(parseMessage("성적 확인 ~ 11.4").due.endsWith("-11-04") && parseMessage("회의 안내").due === "");
-let lastTcat = "";
+let lastTcat = "", todoSort = (() => { try{ return localStorage.getItem("todoSort") || "due"; }catch{ return "due"; } })();
 function renderTodos(){
   const edit = canWrite(), today = ymd(new Date());
-  const open = todos.filter(t => !t.done).sort((a, b) => (a.due || "9999").localeCompare(b.due || "9999") || (a.createdAt || 0) - (b.createdAt || 0));
+  const byDue = (a, b) => (a.due || "9999").localeCompare(b.due || "9999") || (a.createdAt || 0) - (b.createdAt || 0);
+  const catIdx = t => { const i = todoCats().findIndex(c => c.id === t.tcat); return i < 0 ? 999 : i; };
+  const SORTS = { due:byDue, cat:(a, b) => catIdx(a) - catIdx(b) || byDue(a, b), new:(a, b) => (b.createdAt || 0) - (a.createdAt || 0) };
+  const open = todos.filter(t => !t.done).sort(SORTS[todoSort] || byDue);
+  const sortSel = el("select",{className:"field tsort","aria-label":"할 일 정렬",title:"할 일 정렬"},
+    ...[["due","마감일 순"], ["cat","분류별"], ["new","최근 만든 순"]].map(([v, l]) => el("option",{value:v,selected:todoSort === v}, l)));
+  sortSel.onchange = () => { todoSort = sortSel.value; try{ localStorage.setItem("todoSort", todoSort); }catch{} renderHome(); };
   const done = todos.filter(t => t.done);
   const row = t => {
     const cb = el("input",{type:"checkbox",checked:!!t.done,disabled:!edit,"aria-label":"끝냄"});
@@ -3117,7 +3131,7 @@ function renderTodos(){
     return el("label",{className:"nrow" + (t.done ? " done" : "")}, cb, el("span",{className:"ntext"}, tcatChip(t), t.text), el("span",{className:"nact"}, badge, more));
   };
   const parts = [el("div",{className:"panel-head"}, el("h2",{}, "할 일"), el("small",{className:"ncount"}, open.length ? String(open.length) : ""),
-    el("div",{className:"tt-tools"}, navBtn("전체", openAllTodos, "끝낸 것까지 할 일 전체 · 찾기")))];
+    el("div",{className:"tt-tools"}, sortSel, navBtn("전체", openAllTodos, "끝낸 것까지 할 일 전체 · 찾기")))];
   parts.push(...(open.length ? open.map(row) : [el("div",{className:"empty"}, "할 일이 없어요")]));
   if(edit){
     const inp = el("input",{className:"field",id:"todoText",maxLength:60,placeholder:"할 일을 쓰고 Enter"});
@@ -4519,7 +4533,7 @@ async function openRosterView(){
 const FEATURES = {
   class: () => homeroom() ? [el("div",{className:"fcol"}, renderNotes(), renderChecks()), renderClassTT(), renderClassSetup()].filter(Boolean) : [], // 왼쪽 조·종례(아래 제출물), 가운데 시간표, 오른쪽 우리 반 명단
   subject: () => [el("div",{className:"subjwrap"}, renderMyClasses(), renderTT())], // 왼쪽 내 수업 카드, 오른쪽 시간표
-  admin: () => [renderCal(), el("div",{className:"fcol"}, renderTodos(), renderWeek())], // 왼쪽 달력, 오른쪽 할 일·이번 주 일정
+  admin: () => [adminTodos(), renderCal(), renderWeek()], // 넓으면 왼쪽 달력, 오른쪽 할 일(접힘)·이번 주 일정 / 좁으면 할 일 > 달력 > 이번 주
 };
 // 기능 칸이 바뀌면 지금 보고 있는 탭을 다시 그림
 function renderHome(){ if(tab === "home") renderToday(); else if(areaOf(tab)) renderArea(); addTabBack(); }
@@ -4616,6 +4630,12 @@ function openSpends(gid, iid){
     edit ? (() => { const x = navBtn("지우기", async () => { if(!x.dataset.armed){ x.dataset.armed = "1"; x.textContent = "한 번 더"; return; } if(await budCall("deleteSpend", s.id)) openSpends(gid, iid); }, "이 내역 지우기"); return x; })() : null))
     : [el("p",{className:"hint"}, "아직 쓴 내역이 없어요.")])));
   modal(g.name + " · " + it.name, ...kids);
+}
+function adminTodos(){
+  const n = todos.filter(t => !t.done).length;
+  const d = el("details",{className:"admintodo",open:!!featOpen.admintodo}, el("summary",{}, "할 일", el("small",{className:"ncount"}, n ? String(n) : "")), renderTodos());
+  d.ontoggle = () => { featOpen.admintodo = d.open; try{ localStorage.setItem("featOpen", JSON.stringify(featOpen)); }catch{} };
+  return d;
 }
 function featBox(a, feat){
   const d = el("details",{className:"featbox",open:!!featOpen[a.id]},

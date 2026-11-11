@@ -187,12 +187,21 @@
   async function coolSync() {
     const f = (await findOne("name='" + COOL_FILE + "'"))[0]; if (!f) return false;
     const list = (((await (await G(DRIVE + "/" + f.id + "?alt=media")).json()) || {}).items || []).filter(i => i && i.key != null && i.title);
-    const seen = { ...(cfgGet("coolSeen") || {}) }, todos = get("todos").slice(); let ch = false;
+    const seen = { ...(cfgGet("coolSeen") || {}) }; let ch = false;
+    // 휴대폰·PC가 동시에 가져오면 겹쳤음 → 쿨메신저 할 일은 번호를 'cool-메시지키'로 고정 (두 기기가 같은 번호를 써서 합칠 때 하나로)
+    // 예전에 겹쳐 들어간 것은 하나만 남김 (하나라도 끝냈으면 끝냄으로)
+    const dup = new Map();
+    get("todos").forEach(t => { if (t.src !== "cool") return; const s = t.text + "|" + t.createdAt; dup.set(s, (dup.get(s) || []).concat(t)); });
+    const drop = new Set(), doneSig = new Set();
+    dup.forEach((ts, s) => { if (ts.length > 1) { ts.slice(1).forEach(t => drop.add(t.id)); if (ts.some(t => t.done)) doneSig.add(s); } });
+    const todos = get("todos").filter(t => !drop.has(t.id)).map(t => t.src === "cool" && !t.done && doneSig.has(t.text + "|" + t.createdAt) ? { ...t, done: true } : t);
+    if (drop.size) ch = true;
     for (const i of list) {
-      const k = String(i.key), at = seen[k] ? todos.findIndex(x => x.id === seen[k]) : -1;
+      const k = String(i.key), mine = x => x.id === seen[k] || (x.src === "cool" && x.text === S(i.title, 60) && x.createdAt === Date.parse(i.receivedAt));
+      const at = seen[k] ? todos.findIndex(mine) : -1;
       if (!seen[k]) {
-        seen[k] = i.done ? "-" : uuid(); ch = true;
-        if (!i.done) todos.push({ id: seen[k], text: S(i.title, 60), due: DATE_RE.test(String(i.due)) ? i.due : "", done: false, createdAt: Date.parse(i.receivedAt) || Date.now(), area: "", cat: "", tcat: "", files: [], src: "cool",
+        seen[k] = i.done ? "-" : "cool-" + k; ch = true;
+        if (!i.done && !todos.some(x => x.id === seen[k])) todos.push({ id: seen[k], text: S(i.title, 60), due: DATE_RE.test(String(i.due)) ? i.due : "", done: false, createdAt: Date.parse(i.receivedAt) || Date.now(), area: "", cat: "", tcat: "", files: [], src: "cool",
           detail: S([i.summary, ...(i.links || [])].filter(Boolean).join("\n") + "\n\n(쿨메신저 · " + (i.sender || "") + " · " + String(i.receivedAt || "").slice(0, 10) + ")", 2000).trim() });
       } else if (i.done && at >= 0 && !todos[at].done) { todos[at] = { ...todos[at], done: true }; ch = true; }
     }
