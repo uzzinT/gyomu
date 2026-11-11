@@ -539,7 +539,16 @@
     },
     // 알림 앱 쪽 (학생 계정 만들기·보내기는 3단계에서 학생 앱과 함께)
     noticeInfo() { const tt = cfgGet("studentTT") || {}, ttNames = {}; Object.keys(tt).forEach(no => { ttNames[no] = tt[no].name; }); const c = cfgGet("classPw");
-      return { set: !!(c && c.hash), at: c ? c.at : 0, pw: { ...(cfgGet("stuPw") || {}) }, tt: ttNames, sheetUrl: "" }; },
+      const au = ((cfgGet("config") || {}).attend || {}).url || "";
+      return { set: !!(c && c.hash), at: c ? c.at : 0, pw: { ...(cfgGet("stuPw") || {}) }, tt: ttNames, sheetUrl: au ? au.replace(/[#?].*$/, "") + (cfgGet("rosterGid") != null ? "#gid=" + cfgGet("rosterGid") : "") : "" }; },
+    // 출결 시트 '학생명부'(학번·이름 … 비밀번호 H열)에서 읽어 교무수첩 비밀번호로 (시트가 기준: 빈칸이면 비밀번호 없음)
+    async pwFromSheet() {
+      const id = attId(), tabs = await tabsOf(id), t = tabs.find(x => x.title === "학생명부"); if (!t) fail("출결 시트에 '학생명부' 탭이 없어요.");
+      if (cfgGet("rosterGid") !== t.sheetId) await cfgPut({ rosterGid: t.sheetId });
+      const rows = (await batchGet(id, ["'학생명부'!A2:H200"], "FORMATTED_VALUE"))[0] || [], pw = {};
+      rows.forEach(r => { const no = Number(String(r[0] || "").replace(/\D/g, "").slice(-2)), v = String(r[7] || "").trim(); if (no >= 1 && no <= 99 && v) pw[no] = v.slice(0, 30); });
+      await cfgPut({ stuPw: pw }); return API.noticeInfo();
+    },
     async setNoticePassword(pw) {
       pw = String(pw || "").trim(); if (pw.length < 4 || pw.length > 30) fail("비밀번호는 4~30자로 정해 주세요.");
       const salt = uuid(), buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(salt + pw));
@@ -550,7 +559,11 @@
       const pw = { ...(cfgGet("stuPw") || {}) };
       list.forEach(x => { const no = Number(x && x.no), v = String(x && x.pw || "").trim(); if (!(no >= 1 && no <= 99)) return;
         if (v && (v.length < 4 || v.length > 30)) fail(no + "번 비밀번호는 4~30자로 정해 주세요."); if (v) pw[no] = v; else delete pw[no]; });
-      await cfgPut({ stuPw: pw }); return API.noticeInfo();
+      await cfgPut({ stuPw: pw });
+      try { const id = attId(), rows = (await batchGet(id, ["'학생명부'!A2:A200"], "FORMATTED_VALUE"))[0] || [];
+        if (rows.length) await putRange(id, "'학생명부'!H2:H" + (rows.length + 1), rows.map(r => { const no = Number(String(r[0] || "").replace(/\D/g, "").slice(-2)); return [no >= 1 && no <= 99 ? pw[no] || "" : ""]; }));
+      } catch (e) { console.warn("비밀번호 시트에 쓰기", e); } // 출결 시트가 없으면 교무수첩에만
+      return API.noticeInfo();
     },
     async saveStudentTT(map) {
       const clean = {}; Object.keys(map || {}).forEach(k => { const no = Number(k), o = map[k]; if (!(no >= 1 && no <= 99) || !o || !Array.isArray(o.cells)) return;
@@ -678,7 +691,10 @@
     async uploadFile(p) { const b = cleanBase(p), f = await driveUpload(p);
       await put("items", get("items").concat({ ...b, id: uuid(), kind: "file", term: termOf(p.term), url: f.url, fileId: f.fileId, fileName: f.name, size: f.size, createdAt: Date.now(), pinned: false, body: "" })); return getAll(); },
     async uploadNoteFile(p) { const f = await driveUpload(p); return { name: f.name, url: f.url, fileId: f.fileId }; },
-    async deleteItem(id) { const it = get("items").find(r => String(r.id) === String(id)); if (it && it.fileId) await trash(it.fileId); await dropRow("items", id); return getAll(); },
+    async deleteItem(id) { const it = get("items").find(r => String(r.id) === String(id));
+      // 학기 초 입력 시트·출결 시트처럼 교무수첩이 쓰는 시트는 카드를 지워도 휴지통에 넣지 않음
+      const keep = new Set([...Object.values(cfgGet("inputBooks") || {}), (String(((cfgGet("config") || {}).attend || {}).url || "").match(/\/d\/([\w-]{20,})/) || [])[1]].filter(Boolean));
+      if (it && it.fileId && !keep.has(it.fileId)) await trash(it.fileId); await dropRow("items", id); return getAll(); },
     async getStudentPhoto(id) {
       id = String(id || ""); const safe = id.replace(/[^\w-]/g, "");
       const ok = id && ((cfgGet("students") || []).some(s => s.photo === id) || JSON.stringify(get("classRosters")).indexOf('"photo":"' + safe + '"') >= 0);
