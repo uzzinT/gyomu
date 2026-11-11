@@ -271,6 +271,7 @@ nav{margin-bottom:14px}
 /* 할 일 이름은 한 줄 (넘치면 …), 쿨메신저 표시는 오른쪽 작게 */
 .todos .nrow .ntext,.alltodos .nrow .ntext{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .alltodos .nrow .ntext .linkbtn{white-space:nowrap}
+.alltodos{overflow-x:hidden}.alltodos .nrow small{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.alltodos .nrow .ntext{flex:1 1 auto}
 .nact .coolmark,.alltodos .coolmark{width:.95em;height:.95em;margin:0 2px 0 0;flex:none;opacity:.9}
 .tlater{margin-top:6px}.tlater .btn{width:100%}
 .alltools.one{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;margin:6px 0}.alltools.one .field{flex:1 1 0;min-width:0;width:auto;margin:0}.alltools.one>button{flex:none}
@@ -2339,7 +2340,7 @@ const catPick = (t, edit) => {
   const s = el("select",{className:"catmini" + (c ? "" : " none"),"aria-label":"할 일 분류",title:"분류 바꾸기"}, el("option",{value:""}, "분류"),
     ...todoCats().map(x => el("option",{value:x.id,selected:x.id === t.tcat}, x.name)), el("option",{value:"__edit"}, "✎ 분류 고치기…"));
   if(c) s.style.setProperty("--c", cloth(c.color));
-  s.onchange = () => { if(s.value === "__edit"){ s.value = t.tcat || ""; return openTodoCats(); } store.updateTodo(t.id, { tcat:s.value }); };
+  s.onchange = () => { if(s.value === "__edit"){ s.value = t.tcat || ""; return openTodoCats(); } t.tcat = s.value; if(c || s.value) s.classList.toggle("none", !s.value); const nc = todoCatOf(t); if(nc) s.style.setProperty("--c", cloth(nc.color)); store.updateTodo(t.id, { tcat:s.value }); };
   return s;
 };
 const tcatChip = t => { const c = todoCatOf(t); if(!c) return ""; const s = el("span",{className:"tcat"}, c.name); s.style.setProperty("--c", cloth(c.color)); return s; };
@@ -3263,7 +3264,7 @@ async function openAllTodos(preset){
       const cb = el("input",{type:"checkbox",checked:!!t.done,disabled:!canWrite(),"aria-label":"끝냄"});
       cb.onchange = async () => { t.done = cb.checked; try{ await store.updateTodo(t.id, { done:cb.checked }); }catch(e){ t.done = !cb.checked; cb.checked = t.done; } draw(); };
       const name = el("button",{type:"button",className:"linkbtn"}, t.text); name.onclick = () => { if(!todos.some(x => x.id === t.id)) todos.push(t); openTodo(t.id); };
-      return el("div",{className:"nrow" + (t.done ? " done" : "")}, cb, el("span",{className:"ntext",title:t.text}, tcatChip(t), name), coolMark(t),
+      return el("div",{className:"nrow" + (t.done ? " done" : "")}, cb, catPick(t, canWrite()), el("span",{className:"ntext",title:t.text}, name), coolMark(t),
         el("small",{className:"hint"}, [t.due ? "마감 " + t.due.slice(5).replace("-", "/") : "", made(t) ? "만든 날 " + made(t).slice(5).replace("-", "/") : ""].filter(Boolean).join(" · ")));
     }));
     if(!rows.length) list.append(el("p",{className:"note"}, "찾는 할 일이 없어요."));
