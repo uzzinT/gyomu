@@ -4108,7 +4108,7 @@ function openClassTTEdit(){
 }
 
 // 선생님 시간표: 전체 선생님 시간표(여러 요일·여러 선생님, 모두 비는 시간 표시) / 한 선생님 주간 시간표(내 시간표로 가져오기)
-let ttSelDays = null, ttSelTeachers = new Set(), ttTeacherQ = "";
+let ttSelDays = null, ttSelTeachers = new Set(), ttTeacherQ = "", ttHrOnly = false;
 let ttSort = (() => { try{ const v = localStorage.getItem("ttSort"); return ["name", "file", "homeroom"].includes(v) ? v : "name"; }catch{ return "name"; } })();
 // 가장 많이 맡은 과목 (교과별 보기에서 이름 옆에 표시)
 const mainSubject = t => { const c = {}; t.cells.flat().forEach(v => { const s = String(v || "").split("\n")[0]; if(s) c[s] = (c[s] || 0) + 1; }); return Object.entries(c).sort((a, b) => b[1] - a[1])[0]?.[0] || ""; };
@@ -4121,7 +4121,18 @@ function orderedTeachers(){
   return T;
 }
 const tagOf = t => ttSort === "homeroom" ? (t.homeroom ? t.homeroom : "") : ttSort === "file" ? mainSubject(t) : "";
-const teacherMatch = (t, q) => !q || t.name.includes(q) || tagOf(t).includes(q) || String(t.homeroom || "").includes(q);
+const roomOf = q => { const m = String(q).replace(/\s/g, "").match(/^(\d)(?:학년|-)?(\d{1,2})반?$/) || String(q).match(/^(\d)\s*-\s*(\d{1,2})$/); return m ? [Number(m[1]), Number(m[2])] : null; };
+const teachesIn = (t, g, c) => { const re = new RegExp("(^|[^0-9])" + g + "\\s*-\\s*0?" + c + "(?![0-9])"); return t.cells.flat().some(v => re.test(String(v || ""))); };
+const teacherMatch = (t, q) => {
+  if(ttHrOnly && !t.homeroom) return false;
+  if(!q) return true;
+  const r = roomOf(q);
+  if(r) return hrKey(t.homeroom) === r[0] * 100 + r[1] || teachesIn(t, r[0], r[1]);
+  return t.name.includes(q) || tagOf(t).includes(q) || String(t.homeroom || "").includes(q) || (q.length >= 2 && t.cells.flat().some(v => String(v || "").includes(q)));
+};
+console.assert(JSON.stringify(roomOf("3학년 3반")) === "[3,3]" && JSON.stringify(roomOf("3-10")) === "[3,10]" && JSON.stringify(roomOf("303")) === "[3,3]" && roomOf("김민수") === null);
+// 담임만 보기 체크
+const hrOnlyBox = mode => { const c = el("input",{type:"checkbox",checked:ttHrOnly}); c.onchange = () => { ttHrOnly = c.checked; openTeacherTT(mode); }; return el("label",{className:"inline hronly",title:"담임 선생님만 보기"}, c, " 담임만"); };
 function sortSelect(mode){
   const s = el("select",{className:"field",id:"tSort","aria-label":"선생님 순서"},
     ...[["name","이름순"],["file","교과별"],["homeroom","담임별"]].map(([v, n]) => el("option",{value:v,selected:v === ttSort}, n)));
@@ -4129,14 +4140,14 @@ function sortSelect(mode){
   return s;
 }
 // 찾기 칸: Enter 를 누르면 첫 번째로 맞는 선생님을 고르고 칸을 비움 (한글 입력이 끝난 뒤의 Enter 를 받으려고 keyup 사용)
-function teacherSearch(onPick, onType){
-  const q = el("input",{type:"search",className:"field",id:"tFind",placeholder:"선생님 이름 찾기 · Enter 로 고르기",value:ttTeacherQ});
+function teacherSearch(onPick, onType, onPickAll){
+  const q = el("input",{type:"search",className:"field",id:"tFind",placeholder:"이름·교실(예: 3-3) 찾기 · Enter 로 고르기",value:ttTeacherQ});
   q.oninput = () => { ttTeacherQ = q.value; onType && onType(); };
   q.onkeyup = e => {
     if(e.key !== "Enter" || e.isComposing) return;
     const s = q.value.trim(), list = orderedTeachers().filter(t => teacherMatch(t, s));
     if(!s || !list.length) return;
-    ttTeacherQ = ""; onPick(list.find(t => t.name === s) || list[0]);
+    ttTeacherQ = ""; if(roomOf(s) && onPickAll) return onPickAll(list); onPick(list.find(t => t.name === s) || list[0]);
   };
   return q;
 }
@@ -4166,7 +4177,7 @@ function openTeacherTT(mode, sel){
       $("dayDlg").close();
     }, "내 시간표로 가져오기") : "";
     return modal("선생님 시간표", tabs,
-      el("div",{className:"actions tfind"}, find, sortSelect("teacher")),
+      el("div",{className:"actions tfind"}, find, sortSelect("teacher"), hrOnlyBox("teacher")),
       el("div",{className:"actions"}, el("label",{className:"inline"}, "선생님 ", pick), t.homeroom ? el("span",{className:"hint"}, "담임 " + t.homeroom) : "", el("span",{className:"spacer"}), mine),
       el("div",{className:"tt-wrap"}, gridTable(cells)));
   }
@@ -4180,10 +4191,10 @@ function openTeacherTT(mode, sel){
   const tChips = el("div",{className:"chips tchips"});
   const drawTeacherChips = () => { const q = ttTeacherQ.trim(); tChips.replaceChildren(...sorted.filter(t => teacherMatch(t, q))
     .map(t => { const b = chip(t.name, ttSelTeachers.has(t.name), () => { ttSelTeachers.has(t.name) ? ttSelTeachers.delete(t.name) : ttSelTeachers.add(t.name); openTeacherTT("compare"); }); b.title = label(t); return b; })); }; // 버튼엔 이름만 (담임 반은 표에)
-  const find = teacherSearch(t => { ttSelTeachers.add(t.name); openTeacherTT("compare"); refocusFind(); }, drawTeacherChips);
+  const find = teacherSearch(t => { ttSelTeachers.add(t.name); openTeacherTT("compare"); refocusFind(); }, drawTeacherChips, list => { list.forEach(t => ttSelTeachers.add(t.name)); openTeacherTT("compare"); refocusFind(); });
   drawTeacherChips();
   const clear = navBtn("선택 해제 (모두 보기)", () => { ttSelTeachers.clear(); openTeacherTT("compare"); }, "선택 해제", !ttSelTeachers.size);
-  const rowsT = ttSelTeachers.size ? sorted.filter(t => ttSelTeachers.has(t.name)) : sorted;
+  const rowsT = ttSelTeachers.size ? sorted.filter(t => ttSelTeachers.has(t.name)) : sorted.filter(t => !ttHrOnly || t.homeroom);
   const days = [...ttSelDays].sort();
   const cols = days.flatMap(d => Array.from({length:P}, (_, p) => ({ d, p })));
   const allFree = cols.map(c => rowsT.every(t => !t.cells[c.d]?.[c.p]));
@@ -4198,7 +4209,7 @@ function openTeacherTT(mode, sel){
   const common = cols.filter((c, k) => allFree[k]).map(c => DAYS[c.d] + " " + (c.p + 1) + "교시");
   const kids = [tabs,
     el("div",{className:"pickrow"}, el("b",{}, "요일"), dayChips),
-    el("div",{className:"pickrow"}, el("b",{}, "선생님"), el("div",{className:"tpick"}, el("div",{className:"actions tfind"}, find, sortSelect("compare"), clear), tChips)),
+    el("div",{className:"pickrow"}, el("b",{}, "선생님"), el("div",{className:"tpick"}, el("div",{className:"actions tfind"}, find, sortSelect("compare"), hrOnlyBox("compare"), clear), tChips)),
     el("p",{className:"hint"}, (ttSelTeachers.size ? "고른 선생님 " + rowsT.length + "명" : "전체 " + rowsT.length + "명") + " · 초록 칸 = 공강 · 맨 아래 ✓ = " + (rowsT.length > 1 ? "모두 비는 시간" : "빈 시간"))];
   if(ttSelTeachers.size > 1) kids.push(el("p",{className:"common"}, "모두 비는 시간: " + (common.join(", ") || "없음")));
   // 표가 넓으면 위에도 가로 스크롤 막대 (아래 막대와 함께 움직임)
