@@ -181,11 +181,34 @@
     await put("notes", ns.map(n => !n.done && n.date < today ? { ...n, date: to, from: n.from || n.date } : n)); return true;
   }
   setInterval(() => { if (readyDone && !busy()) carryNotes().then(ch => { if (ch && window.apply) window.apply(getAll()); }).catch(() => {}); }, 10 * 60e3); // 밤을 넘겨 열어 둔 때
+  // 쿨메신저 비서(선생님 PC)가 드라이브에 올려 둔 '할 일' 목록을 교무수첩 할 일로 가져옴
+  // 처음 보는 것: 안 끝낸 것만 할 일로 더함 / 이미 가져온 것: 비서에서 끝냄으로 바꾸면 여기서도 끝냄
+  const COOL_FILE = "쿨메신저 할 일 (교무수첩이 읽음).json";
+  async function coolSync() {
+    const f = (await findOne("name='" + COOL_FILE + "'"))[0]; if (!f) return false;
+    const list = (((await (await G(DRIVE + "/" + f.id + "?alt=media")).json()) || {}).items || []).filter(i => i && i.key != null && i.title);
+    const seen = { ...(cfgGet("coolSeen") || {}) }, todos = get("todos").slice(); let ch = false;
+    for (const i of list) {
+      const k = String(i.key), at = seen[k] ? todos.findIndex(x => x.id === seen[k]) : -1;
+      if (!seen[k]) {
+        seen[k] = i.done ? "-" : uuid(); ch = true;
+        if (!i.done) todos.push({ id: seen[k], text: S(i.title, 60), due: DATE_RE.test(String(i.due)) ? i.due : "", done: false, createdAt: Date.parse(i.receivedAt) || Date.now(), area: "", cat: "", tcat: "", files: [], src: "cool",
+          detail: S([i.summary, ...(i.links || [])].filter(Boolean).join("\n") + "\n\n(쿨메신저 · " + (i.sender || "") + " · " + String(i.receivedAt || "").slice(0, 10) + ")", 2000).trim() });
+      } else if (i.done && at >= 0 && !todos[at].done) { todos[at] = { ...todos[at], done: true }; ch = true; }
+    }
+    if (!ch) return false;
+    const keep = new Set(list.map(i => String(i.key))); Object.keys(seen).forEach(k => { if (!keep.has(k)) delete seen[k]; }); // 비서가 지운 옛것은 잊음
+    await put("todos", todos); await cfgPut({ coolSeen: seen }); return true;
+  }
+  let coolBusy = false; // 두 번 겹쳐 돌면 같은 할 일이 두 번 생길 수 있어서
+  const coolRun = async () => { if (coolBusy) return; coolBusy = true; try { if (await coolSync() && window.apply) window.apply(getAll()); } catch (e) { console.warn("쿨메신저 할 일", e); } finally { coolBusy = false; } };
+  [4000, 20000].forEach(ms => setTimeout(() => { if (readyDone) coolRun(); }, ms));
+  setInterval(() => { if (readyDone && !busy()) coolRun(); }, 5 * 60e3);
   // 열어 둔 동안에도 15초마다 다른 기기에서 고친 것 확인 (창을 열었거나 입력 중이면 다음에)
   const busy = () => document.querySelector("dialog[open]") || /^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || "");
   setInterval(() => { if (uid && readyDone && document.visibilityState === "visible" && !dirty && !saving && !busy()) refreshFromDrive().catch(() => {}); }, 15000);
   // 새로고침 단추: 이 기기에서 고친 것을 먼저 저장하고, 드라이브에서 새로 받아 화면을 다시 그림
-  window.fbRefresh = async () => { await flush(); fileVer = -1; await refreshFromDrive(); };
+  window.fbRefresh = async () => { await flush(); fileVer = -1; await refreshFromDrive(); await coolRun(); };
   addEventListener("beforeunload", e => { if (dirty || saving) { flush().catch(() => {}); e.preventDefault(); e.returnValue = ""; } });
   // 이 기기에 둔 것이 없고 구글 확인도 끝났을 때: 단추를 눌러 드라이브에서 불러옴
   function needGoogle() {
@@ -281,6 +304,7 @@
         evCats: cleanEvCats(cfg.evCats), todoCats: cleanEvCats(cfg.todoCats), bells: cleanBells(cfg.bells), offWork: T.test(String(cfg.offWork)) ? cfg.offWork : undefined, onWork: T.test(String(cfg.onWork)) ? cfg.onWork : undefined,
         planRange: cfg.planRange && DATE_RE.test(String(cfg.planRange.s)) && DATE_RE.test(String(cfg.planRange.e)) ? { s: cfg.planRange.s, e: cfg.planRange.e } : undefined,
         planDays: cleanPlanDays(cfg.planDays),
+        subjGroups: cfg.subjGroups && typeof cfg.subjGroups === "object" ? Object.fromEntries(Object.entries(cfg.subjGroups).slice(0, 60).map(([k, v]) => [S(k, 30).trim(), S(v, 30).trim()]).filter(([k, v]) => k && v && k !== v)) : undefined,
         areas: cfg.areas.map(a => {
           if (!/^[A-Za-z][\w-]{0,30}$/.test(String(a.id)) || seen[a.id]) fail("영역 형식이 올바르지 않아요."); seen[a.id] = true;
           const name = S(a.name, 12).trim(); if (!name) fail("영역 이름이 비어 있어요.");

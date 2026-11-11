@@ -247,6 +247,8 @@ nav{margin-bottom:14px}
 .fcol{display:grid;gap:16px;align-content:start}
 .ttterm{font-size:.7rem;font-weight:500;color:var(--muted);margin-left:6px}.ttterm.past{color:var(--wine)}
 .alltools{flex-wrap:wrap}.alltools input[type=search]{flex:1 1 10em}
+.subjname{flex:0 0 7em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.alltools.one{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;margin:6px 0}.alltools.one .field{flex:1 1 0;min-width:0;width:auto;margin:0}.alltools.one>button{flex:none}
 .alltools.range{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;margin:6px 0}.alltools.range input[type=date]{flex:1 1 0;min-width:0;width:auto}.alltools.range>span,.alltools.range>button{flex:none}
 .tcat{display:inline-block;margin-right:5px;padding:0 6px;border-radius:999px;font-size:.72rem;line-height:1.5;color:#fff;background:var(--c,#667);vertical-align:1px}
 .nadd .tcatsel{flex:none;width:auto;max-width:7em}.nadd #todoText{flex:1;min-width:0}
@@ -327,7 +329,7 @@ nav{margin-bottom:14px}
 .notes .empty{border:0;padding:2px 0}
 .tapes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .tapes .tape{margin:0;padding:8px 14px;font-size:1.35rem}
-.bigcal .grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-top:1px solid var(--line);border-left:1px solid var(--line)}
+.bigcal .grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border-top:1px solid var(--line);border-left:1px solid var(--line)}
 .bigcal .grid>*{border:0;border-right:1px solid var(--line);border-bottom:1px solid var(--line);min-height:54px;padding:3px 4px;font:inherit;font-size:.76rem;background:var(--paper);min-width:0;text-align:left;color:var(--ink);position:relative;display:flex;flex-direction:column;gap:2px;align-items:stretch;justify-content:flex-start}
 .bigcal .grid>.h{min-height:0;text-align:center;font-weight:600;color:var(--muted);padding:3px 0;display:block}
 .bigcal .day{cursor:pointer}
@@ -1055,7 +1057,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="backend.js?v=cbe0d1e9"></script>
+<script src="backend.js?v=0ee4a553"></script>
 <style>
 #fbGate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--desk)}
 #fbGate .fbbox{background:var(--paper);border-radius:22px;padding:36px 32px;text-align:center;box-shadow:0 18px 40px -24px rgba(20,40,25,.35);max-width:340px}
@@ -2190,10 +2192,12 @@ function navBtn(label, fn, aria, disabled){ const b = el("button",{className:"bt
 function renderCal(){
   const base = new Date(); base.setDate(1); base.setMonth(base.getMonth() + calOff);
   const y = base.getFullYear(), m = base.getMonth(), first = base.getDay(), days = new Date(y, m + 1, 0).getDate(), today = ymd(new Date());
-  const cells = [...WD].map((w, i) => el("div",{className:"h s" + i}, w));
-  for(let i = 0; i < first; i++) cells.push(el("div",{className:"blank"}));
+  // 주말은 빼고 월~금만 (1일이 주말이면 첫 줄은 월요일부터)
+  const cells = [...WD].map((w, i) => el("div",{className:"h s" + i}, w)).slice(1, 6);
+  for(let i = 0; i < (first === 0 || first === 6 ? 0 : first - 1); i++) cells.push(el("div",{className:"blank"}));
   for(let n = 1; n <= days; n++){
     const d = new Date(y, m, n), k = ymd(d), evs = eventsOn(k);
+    if(d.getDay() === 0 || d.getDay() === 6) continue;
     const cell = el("button",{type:"button",className:"day s" + d.getDay() + (k === today ? " now" : "") + (evs.some(isHoliday) ? " hol" : ""),
       "aria-label": dayLabel(d) + (evs.length ? ", " + evs.map(e => e.title).join(", ") : "")}, el("span",{className:"n"}, String(n)));
     evs.slice(0, 2).forEach(e => { const c = el("span",{className:"ev" + (isHoliday(e) ? " red" : ""),title:evCatName(e) + " · " + e.title}, e.title); if(evColor(e)) c.style.setProperty("--c", evColor(e)); cell.append(c); });
@@ -2267,8 +2271,8 @@ const todoCats = () => Array.isArray(config.todoCats) ? config.todoCats : DEFAUL
 const todoCatOf = t => t && t.tcat ? todoCats().find(c => c.id === t.tcat) : null;
 const tcatChip = t => { const c = todoCatOf(t); if(!c) return ""; const s = el("span",{className:"tcat"}, c.name); s.style.setProperty("--c", cloth(c.color)); return s; };
 const openEvCats = () => openCats(evCats, "evCats", "내 일정 분류", "'학교'는 올린 학사일정이에요. 그 밖의 분류는 마음대로 나누세요 (예: 개인, 학급, 동아리). 분류를 지워도 그 일정은 '기타'로 남아요.", c => events.filter(e => e.cat === c.id).length, "일정 분류를 저장했어요.");
-const openTodoCats = () => openCats(todoCats, "todoCats", "할 일 분류", "할 일을 나눌 분류예요 (예: 업무, 담임, 동아리). 분류를 지워도 그 할 일은 '분류 없음'으로 남아요.", c => todos.filter(t => t.tcat === c.id).length, "할 일 분류를 저장했어요.");
-function openCats(list0, key, title, note, countOf, okMsg){
+const openTodoCats = back => openCats(todoCats, "todoCats", "할 일 분류", "할 일을 나눌 분류예요 (예: 업무, 담임, 동아리). 분류를 지워도 그 할 일은 '분류 없음'으로 남아요.", c => todos.filter(t => t.tcat === c.id).length, "할 일 분류를 저장했어요.", back);
+function openCats(list0, key, title, note, countOf, okMsg, back){
   const rows = list0().map(c => ({ ...c }));
   const list = el("div",{className:"catlist"}), err = el("div",{className:"err"});
   const draw = () => list.replaceChildren(...rows.map((c, i) => {
@@ -2291,7 +2295,7 @@ function openCats(list0, key, title, note, countOf, okMsg){
     const clean = rows.map(c => ({ ...c, name:c.name.trim() })).filter(c => c.name);
     if(new Set(clean.map(c => c.name)).size !== clean.length) return err.textContent = "같은 이름의 분류가 있어요.";
     save.disabled = true;
-    try{ await store.saveConfigPatch({ [key]:clean }); $("dayDlg").close(); say(okMsg); }
+    try{ await store.saveConfigPatch({ [key]:clean }); if(typeof back === "function") back(); else $("dayDlg").close(); say(okMsg); }
     catch(e){ save.disabled = false; err.textContent = e?.message && !e.code ? e.message : "저장하지 못했어요. 잠시 뒤 다시 시도해 주세요."; }
   };
   modal(title, el("p",{className:"note"}, note), list, add, err,
@@ -2832,6 +2836,7 @@ function openSlot(key, i, base){
     el("label",{className:"memo-label"}, "수업 기록 (진도·특이사항)", note),
     el("div",{className:"two"}, el("label",{className:"memo-label"}, "진도표 차시", lessonSel), el("label",{className:"inline"}, doneCb, " 이 차시 내용을 했어요")),
     lessonInfo,
+    ...(edit && /\d+\s*-\s*\d+/.test(curClass) ? [el("div",{className:"tt-tools"}, navBtn("진도표 쓰기", () => openPlan(curClass, true, () => openSlot(key, i, base)), curClass + " 진도표 계획 입력"))] : []),
     att.node,
     recent.length ? el("div",{className:"recent"}, el("h3",{}, curClass + " 최근 기록"), el("ul",{}, ...recent.map(l => el("li",{}, el("span",{className:"d"}, dayLabel(parseYmd(l.date)) + " " + (Number(l.period) + 1) + "교시"), " " + logDesc(l))))) : null,
     err,
@@ -3110,8 +3115,8 @@ function renderTodos(){
   parts.push(...(open.length ? open.map(row) : [el("div",{className:"empty"}, "할 일이 없어요")]));
   if(edit){
     const inp = el("input",{className:"field",id:"todoText",maxLength:60,placeholder:"할 일을 쓰고 Enter"});
-    const tc = window.fbCall ? el("select",{className:"field tcatsel",id:"todoCat","aria-label":"분류"}, el("option",{value:""}, "분류 없음"), ...todoCats().map(c => el("option",{value:c.id,selected:c.id === lastTcat}, c.name))) : null;
-    if(tc) tc.onchange = () => { lastTcat = tc.value; };
+    const tc = window.fbCall ? el("select",{className:"field tcatsel",id:"todoCat","aria-label":"분류"}, el("option",{value:""}, "분류 없음"), ...todoCats().map(c => el("option",{value:c.id,selected:c.id === lastTcat}, c.name)), el("option",{value:"__edit"}, "✎ 분류 고치기…")) : null;
+    if(tc) tc.onchange = () => { if(tc.value === "__edit"){ tc.value = lastTcat; return openTodoCats(); } lastTcat = tc.value; };
     inp.onkeyup = e => {
       if(e.key !== "Enter" || e.isComposing || !inp.value.trim()) return;
       const text = inp.value.trim(); inp.value = "";
@@ -3144,7 +3149,7 @@ async function openAllTodos(){
   const to = el("input",{type:"date",className:"field","aria-label":"기간 끝",title:"이날까지 (마감일이나 만든 날)"});
   const inRange = x => !!x && (!from.value || x >= from.value) && (!to.value || x <= to.value);
   const st = el("select",{className:"field","aria-label":"상태"}, el("option",{value:""}, "전체"), el("option",{value:"open"}, "안 끝낸 것"), el("option",{value:"done"}, "끝낸 것"));
-  const cs = el("select",{className:"field","aria-label":"분류"}, el("option",{value:""}, "모든 분류"), el("option",{value:"-"}, "분류 없음"), ...todoCats().map(c => el("option",{value:c.id}, c.name)));
+  const cs = el("select",{className:"field","aria-label":"분류"}, el("option",{value:""}, "모든 분류"), el("option",{value:"-"}, "분류 없음"), ...todoCats().map(c => el("option",{value:c.id}, c.name)), ...(canWrite() ? [el("option",{value:"__edit"}, "✎ 분류 고치기…")] : []));
   const list = el("div",{className:"alltodos"}), count = el("p",{className:"hint"});
   let shown = 30; // 처음엔 30개, [더 보기]로 30개씩
   const made = t => t.createdAt ? ymd(new Date(t.createdAt)) : "";
@@ -3167,9 +3172,11 @@ async function openAllTodos(){
   const again = () => { shown = 30; draw(); };
   const xl = navBtn("엑셀로 받기", () => downloadXlsx("할 일", [["할 일", [["분류", "할 일", "세부 내용", "마감일", "만든 날", "끝냄"],
     ...hits().map(t => [todoCatOf(t)?.name || "", t.text, t.detail || "", t.due || "", made(t), t.done ? "✓" : ""])]]]), "찾은 할 일을 엑셀로 받기");
-  q.oninput = again; from.onchange = again; to.onchange = again; st.onchange = again; cs.onchange = again;
+  q.oninput = again; from.onchange = again; to.onchange = again; st.onchange = again;
+  cs.onchange = () => { if(cs.value === "__edit"){ cs.value = ""; return openTodoCats(openAllTodos); } again(); };
   draw();
-  modal("할 일 전체", el("div",{className:"tt-tools alltools"}, q, ...(window.fbCall ? [cs] : []), st, ...(window.fbCall && canWrite() ? [navBtn("분류 고치기", openTodoCats, "할 일 분류 더하기·지우기")] : []), xl),
+  modal("할 일 전체", el("div",{className:"alltools one"}, q, xl),
+    el("div",{className:"alltools one"}, ...(window.fbCall ? [cs] : []), st, ...(window.fbCall && canWrite() ? [navBtn("분류 고치기", () => openTodoCats(openAllTodos), "할 일 분류 더하기·지우기")] : [])),
     el("div",{className:"alltools range"}, el("span",{className:"hint"}, "기간"), from, el("span",{}, "~"), to, el("button",{type:"button",className:"ttback",title:"기간 지우기","aria-label":"기간 지우기",onclick:() => { from.value = ""; to.value = ""; again(); }}, "✕")),
     el("p",{className:"hint"}, "마감일이나 만든 날이 기간 안에 있는 할 일이 나와요. 한쪽만 넣어도 돼요."), count, list);
 }
@@ -3181,7 +3188,8 @@ function openTodo(id){
   const detail = el("textarea",{id:"todoDetail",rows:6,maxLength:2000,value:t.detail || "",readOnly:!edit,placeholder:"세부 내용"});
   const err = el("div",{className:"err"});
   const att = attachBox(t.files, edit);
-  const tc = el("select",{className:"field",id:"todoCatEdit",disabled:!edit}, el("option",{value:""}, "분류 없음"), ...todoCats().map(c => el("option",{value:c.id,selected:c.id === t.tcat}, c.name)));
+  const tc = el("select",{className:"field",id:"todoCatEdit",disabled:!edit}, el("option",{value:""}, "분류 없음"), ...todoCats().map(c => el("option",{value:c.id,selected:c.id === t.tcat}, c.name)), ...(edit ? [el("option",{value:"__edit"}, "✎ 분류 고치기…")] : []));
+  tc.onchange = () => { if(tc.value === "__edit"){ tc.value = t.tcat || ""; openTodoCats(() => openTodo(t.id)); } };
   const kids = [el("label",{className:"memo-label"}, "할 일", text), ...(window.fbCall ? [el("label",{className:"memo-label"}, "분류", tc)] : []), el("label",{className:"memo-label"}, "마감일", due), el("label",{className:"memo-label"}, "세부 내용", detail), att.node, err];
   if(edit){
     const save = el("button",{className:"btn",type:"button"}, "저장");
@@ -3328,7 +3336,27 @@ function openClassHub(cls){
       li.onclick = () => open(l); li.onkeydown = e => { if(e.key === "Enter") open(l); }; return li; })) : el("p",{className:"note"}, "아직 기록이 없어요. 시간표 칸을 눌러 적어요."),
     ...(files.length ? [el("h3",{className:"sub"}, "수업 파일 (" + files.length + ")"), el("ul",{className:"hubfiles"}, ...files.slice(0, 20).map(f => el("li",{}, el("span",{className:"d"}, dayLabel(parseYmd(f.date))), " ", el("a",{href:safeUrl(f.url) || "#",target:"_blank",rel:"noopener noreferrer"}, f.name))))] : []));
 }
-const planOf = cls => Array.isArray(plans[subjectOf(cls)]) ? plans[subjectOf(cls)] : [];
+// 진도표를 같이 쓰는 교과 (예: B생과 → A생과). 설정의 subjGroups 로 선생님이 묶음
+const planSubj = cls => { let s = subjectOf(cls); const g = config.subjGroups || {}; for(let i = 0; i < 5 && g[s]; i++) s = g[s]; return s; };
+const planOf = cls => Array.isArray(plans[planSubj(cls)]) ? plans[planSubj(cls)] : [];
+function openSubjGroups(back){
+  const subs = [...new Set(classesKnown().map(subjectOf))].sort((a, b) => a.localeCompare(b, "ko")), g = { ...(config.subjGroups || {}) };
+  const rows = subs.map(s => {
+    const sel = el("select",{className:"field","aria-label":s + " 진도표"}, el("option",{value:""}, "따로 (자기 진도표)"), ...subs.filter(x => x !== s).map(x => el("option",{value:x,selected:g[s] === x}, x + "와 같이")));
+    sel.onchange = () => { if(sel.value) g[s] = sel.value; else delete g[s]; };
+    return el("div",{className:"setrow"}, el("b",{className:"subjname"}, s), sel);
+  });
+  const save = el("button",{className:"btn",type:"button"}, "저장");
+  save.onclick = async () => {
+    // 서로 가리키면(A→B, B→A) 끊음
+    Object.keys(g).forEach(k => { let s = g[k], n = 0; while(g[s] && n++ < 10) { if(g[s] === k){ delete g[s]; break; } s = g[s]; } });
+    save.disabled = true;
+    try{ await store.saveConfigPatch({ subjGroups:g }); say("✓ 같은 교과 묶음을 저장했어요."); back ? back() : $("dayDlg").close(); }catch(e){ save.disabled = false; say(e?.message || "저장하지 못했어요."); }
+  };
+  modal("같은 교과 묶기", el("p",{className:"note"}, "같은 교과(예: A생과·B생과)는 한 진도표를 같이 써요. 묶으면 고른 과목의 진도표를 보여 주고, 원래 따로 적어 둔 계획은 지우지 않고 남겨 둬요(묶음을 풀면 다시 보여요)."),
+    ...(rows.length ? rows : [el("p",{className:"note"}, "시간표에 '2-3 국어'처럼 반과 과목을 넣으면 여기 나와요.")]),
+    el("div",{className:"actions"}, back ? navBtn("← 진도표", back, "진도표로 돌아가기") : null, el("span",{className:"spacer"}), save));
+}
 const lessonLogs = cls => logs.filter(l => l.cls === cls && Number(l.lesson) > 0);
 const nextLesson = cls => { const d = lessonLogs(cls).filter(l => l.done).map(l => Number(l.lesson)); return d.length ? Math.max(...d) + 1 : 1; };
 // ---------- 학기 수업 차시 계산: 기본 시간표 + 그날 바꾼 수업 + 학사일정(휴일·재량휴업·시험·요일변경) ----------
@@ -3396,7 +3424,7 @@ setTimeout(() => { // 요일변경·휴일·시험 처리 점검
 }, 0);
 // 진도표 위 칸: 이 반 학기 차시, 같은 교과 다른 반, 점검할 날
 function planCalc(cls){
-  const subj = subjectOf(cls), plan = planOf(cls), { R, out, flags } = classSessions(cls), today = ymd(new Date());
+  const subj = planSubj(cls), plan = planOf(cls), { R, out, flags } = classSessions(cls), today = ymd(new Date());
   const past = out.filter(x => x.k < today).length, left = out.length - past, done = progressOf(cls).done;
   const warn = [];
   if(plan.length > out.length) warn.push("계획(" + plan.length + "차시)이 학기 수업(" + out.length + "번)보다 " + (plan.length - out.length) + "차시 많아요.");
@@ -3406,7 +3434,7 @@ function planCalc(cls){
   const mineL = logs.filter(l => l.cls === cls && l.date < today), first = mineL.map(l => l.date).sort()[0];
   const logged = new Set(mineL.map(l => l.date + ":" + l.period)), miss = first ? out.filter(x => x.k >= first && x.k < today && !logged.has(x.k + ":" + x.p)).length : 0;
   if(miss) warn.push("지난 수업 " + past + "번 중 " + miss + "번은 기록이 없어요. 시간표 칸을 눌러 적어 주세요.");
-  const same = classesKnown().filter(c => subjectOf(c) === subj);
+  const same = classesKnown().filter(c => planSubj(c) === subj);
   const rangeS = el("input",{type:"date",className:"field",id:"planS",value:R.s,"aria-label":"학기 시작"}), rangeE = el("input",{type:"date",className:"field",id:"planE",value:R.e,"aria-label":"학기 끝"});
   const saveRange = async () => { if(!rangeS.value || !rangeE.value || rangeS.value > rangeE.value) return say("학기 시작·끝 날짜를 확인해 주세요."); await store.saveConfigPatch({ planRange:{ s:rangeS.value, e:rangeE.value } }); openPlan(cls); };
   rangeS.onchange = saveRange; rangeE.onchange = saveRange;
@@ -3437,14 +3465,14 @@ const planAoa = cls => {
     return [no, plan[k] || "", rec.map(l => l.date + " " + (Number(l.period) + 1) + "교시").join(", "), done.has(no) ? "✓" : "", rec.map(l => l.text).filter(Boolean).join(" / ")];
   })];
 };
-function openPlan(sel){
+function openPlan(sel, editOpen, back){
   const list = classesKnown();
   if(!list.length) return modal("교과 진도표", el("p",{className:"note"}, "시간표에 '2-3 국어'처럼 반과 과목을 넣으면 반별 진도표가 생겨요."));
   const cls = list.includes(sel) ? sel : list.includes(planClass) ? planClass : list[0];
   planClass = cls;
   const pick = el("select",{className:"field",id:"planClass"}, ...list.map(c => el("option",{value:c,selected:c === cls}, c)));
   pick.onchange = () => openPlan(pick.value);
-  const subj = subjectOf(cls), plan = planOf(cls), ll = lessonLogs(cls);
+  const subj = planSubj(cls), plan = planOf(cls), ll = lessonLogs(cls);
   const total = Math.max(plan.length, 0, ...ll.map(l => Number(l.lesson)));
   const doneSet = new Set(ll.filter(l => l.done).map(l => Number(l.lesson)));
   const rows = Array.from({length:total}, (_, k) => {
@@ -3459,7 +3487,7 @@ function openPlan(sel){
     ? el("div",{className:"tt-wrap"}, el("table",{className:"plan planmain"}, el("thead",{}, el("tr",{}, ...["차시","내용","수업한 날","완료","기록"].map(h => el("th",{}, h)))), el("tbody",{}, ...rows)))
     : el("p",{className:"note"}, "아직 계획도 기록도 없어요. 아래 '계획 입력'에 차시별 내용을 붙여 넣거나, 시간표 칸을 눌러 차시를 골라 기록하세요.");
   const xl = navBtn("엑셀로 받기", () => downloadXlsx("교과 진도표", list.map(c => [c, planAoa(c)])), "모든 반 진도표를 엑셀로 받기 (반마다 한 시트)");
-  const kids = [el("div",{className:"actions"}, el("label",{className:"inline"}, "반 ", pick), el("span",{className:"spacer"}), el("b",{}, "진도 " + doneSet.size + "/" + total + "차시 (" + pct + "%)"), xl), planCalc(cls), rosterRow(cls), table].filter(Boolean);
+  const kids = [el("div",{className:"actions"}, el("label",{className:"inline"}, "반 ", pick), el("span",{className:"spacer"}), el("b",{}, "진도 " + doneSet.size + "/" + total + "차시 (" + pct + "%)"), canWrite() ? navBtn("같은 교과 묶기", () => openSubjGroups(() => openPlan(cls)), "진도표를 같이 쓸 교과 묶기") : null, xl), planCalc(cls), rosterRow(cls), table].filter(Boolean);
   if(canWrite()){
     // 차시마다 한 칸: 'N차시'는 미리 쓰여 있고, 추가·삭제 가능. 여러 줄을 붙여 넣으면 그 칸부터 나눠 들어감
     const vals = (plan.length ? plan : ["", ""]).map(p => p.replace(/^\s*\d+\s*차시[\s.:·-]*/, ""));
@@ -3479,11 +3507,12 @@ function openPlan(sel){
       while(vals.length && !vals[vals.length - 1].trim()) vals.pop(); // 끝의 빈 차시만 버림 (중간 빈 칸은 차시 번호 유지)
       const lines = vals.slice(0, 300).map(s => s.trim().slice(0, 80) || "-");
       save.disabled = true;
-      try{ await store.savePlan(subj, lines); openPlan(cls); }catch(e){ save.disabled = false; say("계획을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요."); }
+      try{ await store.savePlan(subj, lines); back ? back() : openPlan(cls); }catch(e){ save.disabled = false; say("계획을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요."); }
     };
-    kids.push(el("details",{className:"plan-edit",open:!plan.length && !ll.length}, el("summary",{}, "'" + subj + "' 계획 입력 (" + plan.length + "차시) · 같은 과목의 반들이 함께 써요"), ta,
+    kids.push(el("details",{className:"plan-edit",open:!!editOpen || (!plan.length && !ll.length)}, el("summary",{}, "'" + subj + "' 계획 입력 (" + plan.length + "차시) · 같은 과목의 반들이 함께 써요"), ta,
       el("div",{className:"actions"}, el("span",{className:"spacer"}), save)));
   }
+  if(back) kids.unshift(el("div",{className:"tt-tools"}, navBtn("← 수업 기록", back, "시간표 수업 창으로 돌아가기")));
   modal("교과 진도표", ...kids);
 }
 
@@ -4889,7 +4918,7 @@ function checkDraft(d){
   return problems;
 }
 async function saveSettings(btn, err){
-  const d = { ...structuredClone(draft), evCats:config.evCats, todoCats:config.todoCats, bells:config.bells, offWork:config.offWork, onWork:config.onWork, planRange:config.planRange, planDays:config.planDays }, problems = checkDraft(d); // 일정 분류·수업 시간은 설정 화면 밖에서 바뀜
+  const d = { ...structuredClone(draft), evCats:config.evCats, todoCats:config.todoCats, subjGroups:config.subjGroups, bells:config.bells, offWork:config.offWork, onWork:config.onWork, planRange:config.planRange, planDays:config.planDays }, problems = checkDraft(d); // 일정 분류·수업 시간은 설정 화면 밖에서 바뀜
   if(problems.length) return err.textContent = problems.join("\n");
   btn.disabled = true; err.textContent = "";
   try{ const data = await call("saveConfig", d); draft = null; apply(data); $("status").textContent = "설정을 저장했어요."; }
