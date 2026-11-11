@@ -199,7 +199,13 @@
       const i = ((coolBox || {}).items || []).find(x => String(x.key) === String(key)); if (!i) fail("메시지를 찾지 못했어요. 새로 고침 해 주세요.");
       const id = "cool-" + i.key, todos = get("todos");
       if (!todos.some(t => t.id === id)) await put("todos", todos.concat(coolTodo(i, true)));
-      await cfgPut({ coolSeen: { ...(cfgGet("coolSeen") || {}), [i.key]: id } }); return getAll();
+      await cfgPut({ coolSeen: { ...(cfgGet("coolSeen") || {}), [i.key]: id }, coolCat: { ...(cfgGet("coolCat") || {}), [i.key]: "할 일" } }); return getAll();
+    },
+    // 쿨메신저에서 온 할 일을 '정보 제공'으로: 할 일에서 빼고 쿨메신저 창에만 (다시 들어오지 않게 기억)
+    async coolToInfo(key) {
+      key = String(key); const seen = { ...(cfgGet("coolSeen") || {}) }, id = seen[key] && seen[key] !== "-" ? seen[key] : "cool-" + key;
+      await put("todos", get("todos").filter(t => t.id !== id && t.id !== "cool-" + key));
+      seen[key] = "-"; await cfgPut({ coolSeen: seen, coolCat: { ...(cfgGet("coolCat") || {}), [key]: "정보 제공" } }); return getAll();
     },
     async coolWords() { const f = (await findOne("name='" + COOL_WORDS + "'"))[0]; if (!f) return null; return ((await (await G(DRIVE + "/" + f.id + "?alt=media")).json()) || {}).words || []; },
     async saveCoolWords(list) {
@@ -210,6 +216,8 @@
   async function coolSync() {
     const f = (await findOne("name='" + COOL_FILE + "'"))[0]; if (!f) return false;
     const inbox = ((await (await G(DRIVE + "/" + f.id + "?alt=media")).json()) || {});
+    const over = cfgGet("coolCat") || {}; // 선생님이 바꾼 분류 (할 일 ↔ 정보 제공)
+    (inbox.items || []).forEach(i => { if (i && over[i.key]) i.category = over[i.key]; });
     coolBox = inbox; // 쿨메신저 창에서 씀 (메시지 전체·요약·원문·첨부)
     // 할 일로 넣는 것은 PC의 Claude가 '할 일'로 분류한 것만. 정보 제공·아직 분류 전·금칙어(비공개)는 쿨메신저 창에만
     const list = (inbox.items || []).filter(i => i && i.key != null && i.title && !i.private && i.category === "할 일");

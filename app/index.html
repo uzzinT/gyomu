@@ -254,6 +254,10 @@ nav{margin-bottom:14px}
 .coolsum{white-space:pre-line;background:var(--mint,#eef6ee);border-radius:8px;padding:8px 12px;margin:6px 0}
 .coollinks{display:grid;gap:3px;margin:6px 0;word-break:break-all}.coolbody>div{white-space:pre-wrap;font-size:.85rem;max-height:40vh;overflow:auto;padding:6px 0}
 .coolmark{display:inline-block;width:1.05em;height:1.05em;margin-right:5px;vertical-align:-2px;background:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAOUSURBVFhH7ZbdS1NxGMeFQuhvSDfNyk23tlrOahkkvUndJAV5EUYbZtObUrOrhAp6UUrNEoJehdJAaCZEKCV0oyFpCr6UaJB4kaZpmSK2b89zenY6tp1cZnd+4QPj+X2f73PO77wtYklLClfR0SsTicPETWKamCBeEFnECrH9P9GQ5UQPgRCMEAXEKrEvriiYhx8l9A5ASydxhIiU9n8TBTmIN0SoYX+im3BKzMJEAQeJKQlcCDNEhsT9nahxL/Fdgv4FzkiX2PBEDQbiqwQsBpwVK/Hzi8y+mBgDiorOoKurC5OTkxgaGsK9e3fhcKwPNUDBYklARcU19PX1YWJiAv39/SgrK4XJtJbX6yX+zyKj2WCIQn39E4TSyMgwUlO3Bw13uTZjcHBQXHPV2dmB+Pg17LPLGH2R6YLbfVRaAb/fj3fv3mJ8fFwqQHt7e9ABtLa2yiowNjam7IJWxcWX2VciY/RFppa6Op+0AQUF+cqAhAQTBgYGpIo5u7Bnz26p/jw4ozFaqXu92VIF2trauPZaxuiLTJ95ywLauHGDOqi2tlaqQEbGIbXu8bilCpSUlKh1qzVRqqDL84Fr32SMvrjx1asWaQMeParBpk1OZGYeVm6sgFJSXOqg9PT9UgVGR0eV+4FvvKqq+1IFmpubFa+M0ReZ/OfPn5O20GpqalKHM7zlvb29shpaeXkn2euXMfoiUz8/gjU11dI6V42NDbDbLEhONGCnI0aBf29L2YKOjjfi+qXZ2VlUVt4AP1mcLWP0RaYHfFYMb3129jHk5+chNzcHhRku1J+w4eNVJ75UJM9hmGpP82w469mJwsJTyjvE6z2OpCSHulOcLWP0RaYDmgaVWx6LOuxzuRN1ngQ05ljwPNcCn9uM4StJ6npVtjWoXzggY/RFpkjivaYJcTFRaniAlyesKN8Xp/D0WGLQuilO2XItnBneJ5qMQbtwN+vXDgT4VOrER82ZB3joDbkD85+9VtRwRxtgINw7VuNZvg3DNPj3oZ/KnGgosCNr1xrFq+0lbkts+KImvhR1mhCVWGMUtliNSEuKRZozFq51RqUWyktwxsL+HVHjMuKKBMFut+H06UL4fI+VryR/IRn+zTVeY0/AL73LJG7hopCtZrOphd+KMzMz8oQHa3p6GtXVD2E2x7dwj7QvnijUSd+GMnon9NDXber69Qowly5dnKJnvttuX1fKHrEvaUlhKCLiB2CN4F89YkvAAAAAAElFTkSuQmCC) center/contain no-repeat;border-radius:3px}
+.catmini{appearance:none;-webkit-appearance:none;flex:none;align-self:center;border:0;border-radius:999px;height:1.55em;padding:0 15px 0 7px;font:inherit;font-size:.68rem;font-weight:600;cursor:pointer;
+  color:#fff;background:var(--c,#667) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='white' stroke-width='1.6'/%3E%3C/svg%3E") no-repeat right 5px center/7px 5px;max-width:6.5em}
+.catmini.none{color:var(--muted);background-color:transparent;border:1px dashed var(--line);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23999' stroke-width='1.6'/%3E%3C/svg%3E")}
+.catmini option{color:var(--ink);background:var(--paper)}
 .coolset{display:grid;gap:8px}.coolset h3{margin:0}
 .wordlist{display:flex;flex-wrap:wrap;gap:6px}.wordchip{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:999px;padding:2px 4px 2px 10px;font-size:.85rem}
 .wordchip .x{border:0;background:none;cursor:pointer;color:var(--muted);font-size:.8rem;padding:0 4px}
@@ -1048,10 +1052,10 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
   body.onhome .home4 .col:last-child{grid-column:auto}
   body.onhome .home4 .col:nth-child(2){overflow-x:hidden;overflow-y:auto;display:flex;flex-direction:column}
   body.onhome .home4 .col:nth-child(2)>*{flex:none}
-  body.onhome .home4 .col:nth-child(2)>.tt{flex:1 1 auto;min-height:min-content;display:flex;flex-direction:column}
-  body.onhome .home4 .col:nth-child(2)>.tt>.tt-wrap{flex:1 1 auto;min-height:min-content;overflow:visible}
-  body.onhome .home4 .col:nth-child(2)>.tt table{height:100%;min-width:0;table-layout:fixed;width:100%}
-  body.onhome .home4 .col:nth-child(2)>.tt th,body.onhome .home4 .col:nth-child(2)>.tt td{height:auto!important;padding:1px 2px!important;line-height:1.15}
+  body.onhome .home4 .col:nth-child(2)>.tt{flex:none}
+  body.onhome .home4 .col:nth-child(2)>.tt>.tt-wrap{overflow:visible}
+  body.onhome .home4 .col:nth-child(2)>.tt table{min-width:0;table-layout:fixed;width:100%}
+  body.onhome .home4 .col:nth-child(2)>.tt th,body.onhome .home4 .col:nth-child(2)>.tt td{height:36px!important;padding:1px 2px!important;line-height:1.15}
 }
 @media (min-width:1000px) and (max-width:1150px) and (min-height:620px){body.onhome .home4{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)}}
 </style>
@@ -1115,7 +1119,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="backend.js?v=c7009e3a"></script>
+<script src="backend.js?v=c71fa1e0"></script>
 <style>
 #fbGate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--desk)}
 #fbGate .fbbox{background:var(--paper);border-radius:22px;padding:36px 32px;text-align:center;box-shadow:0 18px 40px -24px rgba(20,40,25,.35);max-width:340px}
@@ -2328,6 +2332,16 @@ const DEFAULT_TODO_CATS = [{ id:"work", name:"업무", color:"navy" }, { id:"hom
 const todoCats = () => Array.isArray(config.todoCats) ? config.todoCats : DEFAULT_TODO_CATS;
 const todoCatOf = t => t && t.tcat ? todoCats().find(c => c.id === t.tcat) : null;
 const coolMark = t => t && t.src === "cool" ? el("span",{className:"coolmark",title:"쿨메신저에서 온 할 일",role:"img","aria-label":"쿨메신저"}) : "";
+// 할 일 줄의 작은 분류 드롭다운: 고르면 바로 저장, 맨 아래 '분류 고치기…'
+const catPick = (t, edit) => {
+  const c = todoCatOf(t);
+  if(!edit || !window.fbCall) return tcatChip(t);
+  const s = el("select",{className:"catmini" + (c ? "" : " none"),"aria-label":"할 일 분류",title:"분류 바꾸기"}, el("option",{value:""}, "분류"),
+    ...todoCats().map(x => el("option",{value:x.id,selected:x.id === t.tcat}, x.name)), el("option",{value:"__edit"}, "✎ 분류 고치기…"));
+  if(c) s.style.setProperty("--c", cloth(c.color));
+  s.onchange = () => { if(s.value === "__edit"){ s.value = t.tcat || ""; return openTodoCats(); } store.updateTodo(t.id, { tcat:s.value }); };
+  return s;
+};
 const tcatChip = t => { const c = todoCatOf(t); if(!c) return ""; const s = el("span",{className:"tcat"}, c.name); s.style.setProperty("--c", cloth(c.color)); return s; };
 const openEvCats = () => openCats(evCats, "evCats", "내 일정 분류", "'학교'는 올린 학사일정이에요. 그 밖의 분류는 마음대로 나누세요 (예: 개인, 학급, 동아리). 분류를 지워도 그 일정은 '기타'로 남아요.", c => events.filter(e => e.cat === c.id).length, "일정 분류를 저장했어요.");
 const openTodoCats = back => openCats(todoCats, "todoCats", "할 일 분류", "할 일을 나눌 분류예요 (예: 업무, 담임, 동아리). 분류를 지워도 그 할 일은 '분류 없음'으로 남아요.", c => todos.filter(t => t.tcat === c.id).length, "할 일 분류를 저장했어요.", back);
@@ -3190,8 +3204,8 @@ function renderTodos(){
     more.onclick = e => { e.preventDefault(); openTodo(t.id); };
     const badge = t.due ? el("span",{className:"tdue" + (t.due <= today ? " soon" : "")}, dueLabel(t.due)) : "";
     // 글자를 눌러도 체크되지 않게 (label 대신 div): 글자는 자세히 열기, 체크는 상자를 눌렀을 때만
-    const tx = el("span",{className:"ntext",style:"cursor:pointer",title:t.text}, tcatChip(t), t.text); tx.onclick = () => openTodo(t.id);
-    return el("div",{className:"nrow" + (t.done ? " done" : "")}, cb, tx, el("span",{className:"nact"}, coolMark(t), badge, more));
+    const tx = el("span",{className:"ntext",style:"cursor:pointer",title:t.text}, t.text); tx.onclick = () => openTodo(t.id);
+    return el("div",{className:"nrow" + (t.done ? " done" : "")}, cb, catPick(t, edit), tx, el("span",{className:"nact"}, coolMark(t), badge, more));
   };
   const parts = [el("div",{className:"panel-head"}, el("h2",{}, "할 일"), el("small",{className:"ncount"}, open.length ? String(open.length) : ""),
     el("div",{className:"tt-tools"}, sortSel, navBtn("전체", openAllTodos, "끝낸 것까지 할 일 전체 · 찾기"), ...(window.fbCall ? [navBtn("쿨메신저", () => openCool(), "쿨메신저로 받은 메시지 모두 보기")] : [])))];
@@ -3317,7 +3331,8 @@ function openCoolMsg(i, seen){
   }
   const act = [navBtn("← 목록", () => openCool(), "목록으로")];
   act.push(el("span",{className:"spacer"}));
-  if(t) act.push(navBtn("할 일 보기", () => openTodo(t.id), "할 일로 가기"));
+  if(t){ act.push(navBtn("할 일 보기", () => openTodo(t.id), "할 일로 가기"));
+    if(canWrite()) act.push(navBtn("정보 제공으로", async () => { try{ apply(await call("coolToInfo", i.key)); say("✓ 정보 제공으로 옮겼어요."); openCool(); }catch(e){ say(e?.message || "옮기지 못했어요."); } }, "할 일에서 빼고 정보 제공으로")); }
   else if(!i.private && canWrite()){
     const mk = el("button",{className:"btn",type:"button"}, "할 일로 만들기");
     mk.onclick = async () => { mk.disabled = true; try{ apply(await call("coolToTodo", i.key)); say("✓ 할 일로 만들었어요: " + i.title); openCool(); }catch(e){ mk.disabled = false; say(e?.message || "만들지 못했어요."); } };
@@ -3380,7 +3395,8 @@ function openTodo(id){
   // 끝냄 체크는 누르면 바로 저장 (저장 단추와 상관없음)
   const doneCb = el("input",{type:"checkbox",checked:!!t.done,disabled:!edit,"aria-label":"끝냄"});
   doneCb.onchange = async () => { try{ await store.updateTodo(t.id, { done:doneCb.checked }); say(doneCb.checked ? "✓ 끝냄으로 바꿨어요." : "안 끝낸 것으로 바꿨어요."); }catch(e){ doneCb.checked = !doneCb.checked; say(e?.message || "바꾸지 못했어요."); } };
-  const kids = [el("div",{className:"tt-tools"}, el("label",{className:"inline tdone","data-autosave":"1"}, doneCb, " 끝냈어요"), t.src === "cool" && window.fbCall ? navBtn("💬 쿨메신저 원문", () => openCoolFor(t), "쿨메신저에서 온 원래 메시지 보기") : null), el("label",{className:"memo-label"}, "할 일", text), ...(window.fbCall ? [el("label",{className:"memo-label"}, "분류", tc)] : []), el("label",{className:"memo-label"}, "마감일", due), el("label",{className:"memo-label"}, "세부 내용", detail), att.node, err];
+  const kids = [el("div",{className:"tt-tools"}, el("label",{className:"inline tdone","data-autosave":"1"}, doneCb, " 끝냈어요"), t.src === "cool" && window.fbCall ? navBtn("💬 쿨메신저 원문", () => openCoolFor(t), "쿨메신저에서 온 원래 메시지 보기") : null,
+    t.src === "cool" && window.fbCall && edit ? navBtn("정보 제공으로", async () => { try{ apply(await call("coolToInfo", t.coolKey || String(t.id).replace(/^cool-/, ""))); $("dayDlg").close(); say("✓ 정보 제공으로 옮겼어요. [쿨메신저] 창에서 볼 수 있어요."); }catch(e){ say(e?.message || "옮기지 못했어요."); } }, "할 일에서 빼고 쿨메신저 창의 정보 제공으로") : null), el("label",{className:"memo-label"}, "할 일", text), ...(window.fbCall ? [el("label",{className:"memo-label"}, "분류", tc)] : []), el("label",{className:"memo-label"}, "마감일", due), el("label",{className:"memo-label"}, "세부 내용", detail), att.node, err];
   if(edit){
     const save = el("button",{className:"btn",type:"button"}, "저장");
     save.onclick = () => {
