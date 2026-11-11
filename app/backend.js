@@ -460,7 +460,7 @@
       const seen = {}, items = (Array.isArray(g.items) ? g.items : []).slice(0, 40)
         .map(i => ({ id: S(i && i.id, 40) || uuid(), name: S(i && i.name, 30).trim(), amount: won(i && i.amount) })).filter(i => i.name && !seen[i.id] && (seen[i.id] = true));
       const id = S(g.id, 40), rows = get("budgets").slice(), at = rows.findIndex(r => r.id === id);
-      const row = { id: at >= 0 ? id : uuid(), area, name, items, memo: S(g.memo, 2000).trim(), files: cleanFiles(g.files), createdAt: at >= 0 ? rows[at].createdAt : Date.now() };
+      const row = { id: at >= 0 ? id : (/^[\w-]{8,40}$/.test(id) ? id : uuid()), area, name, items, memo: S(g.memo, 2000).trim(), files: cleanFiles(g.files), createdAt: at >= 0 ? rows[at].createdAt : Date.now() };
       if (at >= 0) rows[at] = row; else rows.push(row);
       await put("budgets", rows);
       // 지운 세부 예산의 쓴 내역도 함께 지움 (화면에서 미리 알려 줌)
@@ -475,6 +475,7 @@
       await put("spends", get("spends").concat({ id: uuid(), group: g.id, item: s.item, date: DATE_RE.test(String(s.date)) ? s.date : ymd(new Date()), text: S(s.text, 80).trim(), memo: S(s.memo, 500).trim(), amount: Math.max(-1e11, Math.min(1e11, amount)), createdAt: Date.now() }));
       return getAll();
     },
+    async restoreSpends(list) { const have = new Set(get("spends").map(s => s.id)); await put("spends", get("spends").concat((Array.isArray(list) ? list : []).filter(s => s && s.id && !have.has(s.id)).map(s => ({ ...s })))); return getAll(); },
     async deleteSpend(id) { await dropRow("spends", id); return getAll(); },
     async savePlan(subject, lines) {
       subject = S(subject, 30).trim(); if (!subject) fail("과목 이름이 없어요.");

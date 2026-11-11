@@ -339,6 +339,7 @@ nav{margin-bottom:14px}
 .ngroup h3 small{font:400 .75rem var(--body);color:var(--muted)}
 .nrow{display:flex;align-items:flex-start;gap:8px;padding:4px 18px 4px 0;border-bottom:1px dashed var(--line);font-size:.9rem;position:relative;cursor:pointer}
 .nrow input{margin-top:4px;flex:none}
+.nrow>input[type=checkbox]{width:1.05em;height:1.05em;margin:calc((1lh - 1.05em) / 2) 0 0}
 .nrow span{overflow-wrap:anywhere;min-width:0}
 .nrow.done span{color:var(--muted);text-decoration:line-through}
 .nadd{display:flex;gap:6px;margin-top:10px}
@@ -1040,7 +1041,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
   <div class="inner">
     <header>
       <div class="hdr-top">
-        <div class="hdr-title"><h1>나의 교무수첩</h1><div class="term" id="term"></div><button type="button" class="hdrrefresh" id="refreshBtn" title="다른 기기에서 고친 것까지 새로 불러오기" aria-label="새로고침">⟳ 새로고침</button></div>
+        <div class="hdr-title"><h1>나의 교무수첩</h1><div class="term" id="term"></div><button type="button" class="hdrrefresh" id="refreshBtn" title="다른 기기에서 고친 것까지 새로 불러오기" aria-label="새로고침">⟳ 새로고침</button><button type="button" class="hdrrefresh" id="undoBtn" title="방금 한 것 되돌리기 (Ctrl+Z)" aria-label="되돌리기">↶ 되돌리기</button></div>
         <div class="hdr-pins" id="hdrPins" aria-label="바로 가기"></div>
       </div>
       <nav id="tabs" role="tablist"></nav>
@@ -1091,7 +1092,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="backend.js?v=766573bd"></script>
+<script src="backend.js?v=19051e9d"></script>
 <style>
 #fbGate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--desk)}
 #fbGate .fbbox{background:var(--paper);border-radius:22px;padding:36px 32px;text-align:center;box-shadow:0 18px 40px -24px rgba(20,40,25,.35);max-width:340px}
@@ -3241,10 +3242,12 @@ async function openCool(){
     : "아직 PC에서 받은 메시지가 없어요. PC의 '쿨메신저 연결'이 켜져 있는지 확인해 주세요.");
   const q = el("input",{type:"search",className:"field",placeholder:"찾기 (제목·보낸 사람·내용)",value:coolFilter.q,"aria-label":"쿨메신저 찾기"});
   const cs = el("select",{className:"field","aria-label":"분류"}, ...[["","전체"], ["할 일","할 일"], ["정보 제공","정보 제공"]].map(([v, l]) => el("option",{value:v,selected:coolFilter.cat === v}, l)));
+  const from = el("input",{type:"date",className:"field","aria-label":"기간 시작",value:coolFilter.from || ""}), to = el("input",{type:"date",className:"field","aria-label":"기간 끝",value:coolFilter.to || ""});
   const list = el("div",{className:"alltodos"}), count = el("p",{className:"hint"}); let shown = 30;
   const draw = () => {
-    const w = q.value.trim().toLowerCase(); coolFilter = { q:q.value, cat:cs.value };
-    const rows = items.filter(i => (!cs.value || (i.category || "정보 제공") === cs.value) && (!w || [i.title, i.orig, i.sender, i.summary, i.body].join(" ").toLowerCase().includes(w)));
+    const w = q.value.trim().toLowerCase(); coolFilter = { q:q.value, cat:cs.value, from:from.value, to:to.value };
+    const day = i => String(i.receivedAt).slice(0, 10);
+    const rows = items.filter(i => (!from.value || day(i) >= from.value) && (!to.value || day(i) <= to.value) && (!cs.value || (i.category || "정보 제공") === cs.value) && (!w || [i.title, i.orig, i.sender, i.summary, i.body].join(" ").toLowerCase().includes(w)));
     count.textContent = rows.length + "개";
     list.replaceChildren(...rows.slice(0, shown).map(i => {
       const b = el("button",{type:"button",className:"coolrow"},
@@ -3257,9 +3260,10 @@ async function openCool(){
     }), ...(rows.length > shown ? [navBtn("더 보기 (" + (rows.length - shown) + "개 남음)", () => { shown += 30; draw(); }, "30개 더 보기")] : []));
     if(!rows.length) list.append(el("p",{className:"note"}, "찾는 메시지가 없어요."));
   };
-  q.oninput = () => { shown = 30; draw(); }; cs.onchange = () => { shown = 30; draw(); };
+  q.oninput = () => { shown = 30; draw(); }; cs.onchange = from.onchange = to.onchange = () => { shown = 30; draw(); };
   draw();
-  box.replaceChildren(status, el("div",{className:"alltools one"}, q, cs, navBtn("설정", openCoolSettings, "쿨메신저 할 일 설정 · 금칙어")), count, list);
+  box.replaceChildren(status, el("div",{className:"alltools one"}, q, cs, navBtn("설정", openCoolSettings, "쿨메신저 할 일 설정 · 금칙어")),
+    el("div",{className:"alltools range"}, el("span",{className:"hint"}, "받은 날"), from, el("span",{}, "~"), to, el("button",{type:"button",className:"ttback",title:"기간 지우기","aria-label":"기간 지우기",onclick:() => { from.value = ""; to.value = ""; shown = 30; draw(); }}, "✕")), count, list);
 }
 function openCoolMsg(i, seen){
   const todoId = seen[i.key] && seen[i.key] !== "-" ? seen[i.key] : null, t = todoId && todos.find(x => x.id === todoId);
@@ -4674,7 +4678,20 @@ let budgets = [], spends = [];
 const won = n => (Number(n) || 0).toLocaleString("ko-KR") + "원";
 const usedOf = (g, i) => spends.filter(s => s.group === g.id && (!i || s.item === i.id)).reduce((a, s) => a + (Number(s.amount) || 0), 0);
 const planOfG = g => (g.items || []).reduce((a, i) => a + (Number(i.amount) || 0), 0);
-const budCall = async (fn, ...a) => { say("저장하는 중…"); try{ apply(await call(fn, ...a)); render(); say("✓ 저장했어요."); return true; }catch(e){ say(e?.message || "저장하지 못했어요."); return false; } };
+const budUndo = (fn, a) => {
+  const re = async (f, ...x) => { apply(await call(f, ...x)); render(); };
+  if(fn === "saveBudget"){ const old = structuredClone(budgets.find(g => g.id === a.id)), had = new Set(budgets.map(g => g.id)), sp = structuredClone(spends.filter(s => s.group === a.id));
+    return ["예산", old ? async () => { await re("saveBudget", old); if(sp.length) await re("restoreSpends", sp); } : async () => { const x = budgets.find(g => !had.has(g.id)); if(x) await re("deleteBudget", x.id); }]; }
+  if(fn === "deleteBudget"){ const old = structuredClone(budgets.find(g => g.id === a)), sp = structuredClone(spends.filter(s => s.group === a));
+    return old ? ["공동체 지우기", async () => { await re("saveBudget", old); if(sp.length) await re("restoreSpends", sp); }] : null; }
+  if(fn === "addSpend"){ const had = new Set(spends.map(s => s.id)); return ["쓴 내역", async () => { const x = spends.find(s => !had.has(s.id)); if(x) await re("deleteSpend", x.id); }]; }
+  if(fn === "deleteSpend"){ const old = structuredClone(spends.find(s => s.id === a)); return old ? ["쓴 내역 지우기", () => re("restoreSpends", [old])] : null; }
+  return null;
+};
+const budCall = async (fn, ...a) => {
+  say("저장하는 중…"); const un = undoing ? null : budUndo(fn, a[0]);
+  try{ apply(await call(fn, ...a)); render(); if(un){ undoStack.push({ label:un[0], run:un[1] }); if(undoStack.length > 30) undoStack.shift(); } say("✓ 저장했어요. (Ctrl+Z 로 되돌리기)"); return true; }
+  catch(e){ say(e?.message || "저장하지 못했어요."); return false; } };
 function renderBudget(a){
   if(!window.fbCall || !["class", "admin"].includes(a.id)) return null;
   const mine = budgets.filter(g => g.area === a.id).sort((x, y) => (x.createdAt || 0) - (y.createdAt || 0)), edit = canWrite();
@@ -4882,7 +4899,7 @@ wrapUndo("updateCheck", (id, p) => { const old = before(checks.find(c => c.id ==
 wrapUndo("addTodo", t => ["할 일 추가", () => { const x = newest(todos, y => y.text === t.text); if(x) store.deleteTodo(x.id); }]);
 wrapUndo("addNote", n => ["조·종례 추가", () => { const x = newest(notes, y => y.text === n.text && y.date === n.date); if(x) store.deleteNote(x.id); }]);
 wrapUndo("addCheck", title => ["제출물 추가", () => { const x = newest(checks, y => y.title === title); if(x) store.deleteCheck(x.id); }]);
-wrapUndo("deleteTodo", id => { const o = structuredClone(todos.find(t => t.id === id)); return o ? ["할 일 지우기", () => store.addTodo({ text:o.text, detail:o.detail || "", due:o.due || "", area:o.area || "", cat:o.cat || "", files:o.files || [] })] : null; });
+wrapUndo("deleteTodo", id => { const o = structuredClone(todos.find(t => t.id === id)); return o ? ["할 일 지우기", () => store.addTodo({ text:o.text, detail:o.detail || "", due:o.due || "", area:o.area || "", cat:o.cat || "", tcat:o.tcat || "", files:o.files || [] })] : null; });
 wrapUndo("deleteNote", id => { const o = structuredClone(notes.find(n => n.id === id)); return o ? ["조·종례 지우기", () => store.addNote({ date:o.date, type:o.type || "", text:o.text, detail:o.detail || "", share:o.share !== false, files:o.files || [] })] : null; });
 wrapUndo("deleteCheck", id => { const o = structuredClone(checks.find(c => c.id === id)); if(!o) return null;
   return ["제출물 지우기", async () => { const had = new Set(checks.map(c => c.id)); apply(await call("addCheck", o.title, o.size || 30));
@@ -4893,15 +4910,18 @@ document.addEventListener("keydown", async e => {
   if(!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || e.key.toLowerCase() !== "z") return;
   const a = document.activeElement;
   if(a && (a.isContentEditable || (/^(INPUT|TEXTAREA)$/.test(a.tagName) && !/^(checkbox|radio|button|file|date|time|number)$/.test(a.type)))) return; // 글 쓰는 칸 안에서는 글자 되돌리기
-  e.preventDefault();
+  e.preventDefault(); doUndo();
+});
+async function doUndo(){
   const u = undoStack.pop();
   if(!u) return say("되돌릴 것이 없어요.");
   if(!canWrite()) return say("지금은 되돌릴 수 없어요.");
   undoing = true;
-  try{ await u.run(); say("되돌렸어요: " + u.label + (undoStack.length ? " (Ctrl+Z 로 더 되돌릴 수 있어요)" : "")); $("dayDlg")?.open && $("dayDlg").close(); }
+  try{ await u.run(); say("되돌렸어요: " + u.label + (undoStack.length ? " (더 되돌릴 수 있어요)" : "")); $("dayDlg")?.open && $("dayDlg").close(); }
   catch(x){ say("되돌리지 못했어요. 잠시 뒤 다시 시도해 주세요."); }
   finally{ undoing = false; }
-});
+}
+document.addEventListener("click", e => { if(e.target.closest?.("#undoBtn")) doUndo(); });
 
 function matches(it){
   if(!query) return true;
