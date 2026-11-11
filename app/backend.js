@@ -183,10 +183,31 @@
   setInterval(() => { if (readyDone && !busy()) carryNotes().then(ch => { if (ch && window.apply) window.apply(getAll()); }).catch(() => {}); }, 10 * 60e3); // 밤을 넘겨 열어 둔 때
   // 쿨메신저 비서(선생님 PC)가 드라이브에 올려 둔 '할 일' 목록을 교무수첩 할 일로 가져옴
   // 처음 보는 것: 안 끝낸 것만 할 일로 더함 / 이미 가져온 것: 비서에서 끝냄으로 바꾸면 여기서도 끝냄
-  const COOL_FILE = "쿨메신저 할 일 (교무수첩이 읽음).json";
+  const COOL_FILE = "쿨메신저 할 일 (교무수첩이 읽음).json", COOL_WORDS = "쿨메신저 금칙어 (교무수첩).json";
+  let coolBox = null;
+  const coolApi = {
+    // 쿨메신저 창: PC '쿨메신저 연결'이 올려 둔 메시지 전체 (+ 받은 시각) 와 이미 할 일로 넣은 것
+    async coolMessages() { await coolSync().catch(() => {}); const seen = cfgGet("coolSeen") || {}; return { at: (coolBox || {}).at || "", items: (coolBox || {}).items || [], seen }; },
+    // 정보 제공으로 온 것도 직접 할 일로
+    async coolToTodo(key) {
+      const i = ((coolBox || {}).items || []).find(x => String(x.key) === String(key)); if (!i) fail("메시지를 찾지 못했어요. 새로 고침 해 주세요.");
+      const id = "cool-" + i.key, todos = get("todos");
+      if (!todos.some(t => t.id === id)) await put("todos", todos.concat({ id, text: S(i.title, 60), due: DATE_RE.test(String(i.due)) ? i.due : "", done: false, createdAt: Date.parse(i.receivedAt) || Date.now(), area: "", cat: "", tcat: "", files: [], src: "cool",
+        detail: S([i.summary, ...(i.links || [])].filter(Boolean).join("\n") + "\n\n(쿨메신저 · " + (i.sender || "") + " · " + String(i.receivedAt || "").slice(0, 10) + ")", 2000).trim() }));
+      await cfgPut({ coolSeen: { ...(cfgGet("coolSeen") || {}), [i.key]: id } }); return getAll();
+    },
+    async coolWords() { const f = (await findOne("name='" + COOL_WORDS + "'"))[0]; if (!f) return null; return ((await (await G(DRIVE + "/" + f.id + "?alt=media")).json()) || {}).words || []; },
+    async saveCoolWords(list) {
+      const words = (Array.isArray(list) ? list : []).map(w => S(w, 100).trim()).filter(Boolean).slice(0, 200), f = (await findOne("name='" + COOL_WORDS + "'"))[0];
+      await driveJson({ name: COOL_WORDS }, JSON.stringify({ words }), f && f.id); return words;
+    },
+  };
   async function coolSync() {
     const f = (await findOne("name='" + COOL_FILE + "'"))[0]; if (!f) return false;
-    const list = (((await (await G(DRIVE + "/" + f.id + "?alt=media")).json()) || {}).items || []).filter(i => i && i.key != null && i.title);
+    const inbox = ((await (await G(DRIVE + "/" + f.id + "?alt=media")).json()) || {});
+    coolBox = inbox; // 쿨메신저 창에서 씀 (메시지 전체·요약·원문·첨부)
+    // 할 일로 넣는 것은 '할 일'로 분류된 것만 (분류 칸이 없는 예전 목록은 모두 할 일이었음), 금칙어(비공개)는 빼고
+    const list = (inbox.items || []).filter(i => i && i.key != null && i.title && !i.private && (!i.category || i.category === "할 일"));
     const seen = { ...(cfgGet("coolSeen") || {}) }; let ch = false;
     // 휴대폰·PC가 동시에 가져오면 겹쳤음 → 쿨메신저 할 일은 번호를 'cool-메시지키'로 고정 (두 기기가 같은 번호를 써서 합칠 때 하나로)
     // 예전에 겹쳐 들어간 것은 하나만 남김 (하나라도 끝냈으면 끝냄으로)
@@ -284,7 +305,7 @@
   async function patchRow(t, id, fn) { const rows = get(t).slice(), i = rows.findIndex(r => String(r.id) === String(id)); if (i < 0) fail("항목을 찾지 못했어요. 새로 고침 해 주세요."); rows[i] = fn({ ...rows[i] }); await put(t, rows); }
   async function dropRow(t, id) { await put(t, get(t).filter(r => String(r.id) !== String(id))); }
 
-  const API = {
+  const API = { ...coolApi,
     getAll,
     async saveTimetable(t) {
       const periods = Number(t && t.periods);
