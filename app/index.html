@@ -3265,7 +3265,7 @@ async function openAllTodos(preset){
       cb.onchange = async () => { t.done = cb.checked; try{ await store.updateTodo(t.id, { done:cb.checked }); }catch(e){ t.done = !cb.checked; cb.checked = t.done; } draw(); };
       const name = el("button",{type:"button",className:"linkbtn"}, t.text); name.onclick = () => { if(!todos.some(x => x.id === t.id)) todos.push(t); openTodo(t.id); };
       return el("div",{className:"nrow" + (t.done ? " done" : "")}, cb, catPick(t, canWrite()), el("span",{className:"ntext",title:t.text}, name), coolMark(t),
-        el("small",{className:"hint"}, [t.due ? "마감 " + t.due.slice(5).replace("-", "/") : "", made(t) ? "만든 날 " + made(t).slice(5).replace("-", "/") : ""].filter(Boolean).join(" · ")));
+        el("small",{className:"hint"}, t.due ? "마감 " + t.due.slice(5).replace("-", "/") : ""));
     }));
     if(!rows.length) list.append(el("p",{className:"note"}, "찾는 할 일이 없어요."));
     if(rows.length > shown) list.append(navBtn("더 보기 (" + (rows.length - shown) + "개 남음)", () => { shown += 30; draw(); }, "30개 더 보기"));
