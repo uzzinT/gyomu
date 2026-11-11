@@ -185,6 +185,12 @@
   // 처음 보는 것: 안 끝낸 것만 할 일로 더함 / 이미 가져온 것: 비서에서 끝냄으로 바꾸면 여기서도 끝냄
   const COOL_FILE = "쿨메신저 할 일 (교무수첩이 읽음).json", COOL_WORDS = "쿨메신저 금칙어 (교무수첩).json";
   let coolBox = null;
+  const coolCfg = () => ({ auto: true, noDue: true, tcat: "", ...(((cfgGet("config") || {}).cool) || {}) });
+  const coolFiles = i => [...(i.files || []).filter(f => f && f.url).map(f => ({ name: S("📎 " + f.name, 200), url: String(f.url), fileId: S(f.id, 200) })),
+    ...(i.links || []).filter(l => /^https:\/\/\S+$/.test(String(l))).map(l => { let h = ""; try { h = new URL(l).hostname.replace(/^www\./, ""); } catch (e) {} return { name: S("🔗 " + (h || "링크"), 200), url: String(l), fileId: "" }; })].slice(0, 10);
+  const coolTodo = (i, manual) => ({ id: "cool-" + i.key, text: S(i.title, 60), due: DATE_RE.test(String(i.due)) ? i.due : "", done: false, createdAt: Date.parse(i.receivedAt) || Date.now(),
+    area: "", cat: "", tcat: S(coolCfg().tcat, 40), files: coolFiles(i), src: "cool", coolKey: String(i.key), ...(manual ? { manual: true } : {}),
+    detail: S((i.summary || "") + "\n\n(쿨메신저 · " + (i.sender || "") + " · " + String(i.receivedAt || "").slice(0, 10) + ")", 2000).trim() });
   const coolApi = {
     // 쿨메신저 창: PC '쿨메신저 연결'이 올려 둔 메시지 전체 (+ 받은 시각) 와 이미 할 일로 넣은 것
     async coolMessages() { await coolSync().catch(() => {}); const seen = cfgGet("coolSeen") || {}; return { at: (coolBox || {}).at || "", items: (coolBox || {}).items || [], seen }; },
@@ -192,8 +198,7 @@
     async coolToTodo(key) {
       const i = ((coolBox || {}).items || []).find(x => String(x.key) === String(key)); if (!i) fail("메시지를 찾지 못했어요. 새로 고침 해 주세요.");
       const id = "cool-" + i.key, todos = get("todos");
-      if (!todos.some(t => t.id === id)) await put("todos", todos.concat({ id, text: S(i.title, 60), due: DATE_RE.test(String(i.due)) ? i.due : "", done: false, createdAt: Date.parse(i.receivedAt) || Date.now(), area: "", cat: "", tcat: "", files: [], src: "cool", manual: true,
-        detail: S([i.summary, ...(i.links || [])].filter(Boolean).join("\n") + "\n\n(쿨메신저 · " + (i.sender || "") + " · " + String(i.receivedAt || "").slice(0, 10) + ")", 2000).trim() }));
+      if (!todos.some(t => t.id === id)) await put("todos", todos.concat(coolTodo(i, true)));
       await cfgPut({ coolSeen: { ...(cfgGet("coolSeen") || {}), [i.key]: id } }); return getAll();
     },
     async coolWords() { const f = (await findOne("name='" + COOL_WORDS + "'"))[0]; if (!f) return null; return ((await (await G(DRIVE + "/" + f.id + "?alt=media")).json()) || {}).words || []; },
@@ -221,17 +226,24 @@
     (inbox.items || []).forEach(i => { if (i && (i.private || i.category === "정보 제공")) { notTodo.add("cool-" + i.key); if (seen[i.key] && seen[i.key] !== "-") notTodo.add(seen[i.key]); } });
     for (let n = todos.length - 1; n >= 0; n--) { const t = todos[n]; if (t.src === "cool" && !t.manual && !t.done && notTodo.has(t.id)) { todos.splice(n, 1); ch = true; } }
     if (drop.size) ch = true;
+    const cc = coolCfg();
     for (const i of list) {
       const k = String(i.key), mine = x => x.id === seen[k] || (x.src === "cool" && x.text === S(i.title, 60) && x.createdAt === Date.parse(i.receivedAt));
       const at = seen[k] ? todos.findIndex(mine) : -1;
       if (!seen[k]) {
-        seen[k] = i.done ? "-" : "cool-" + k; ch = true;
-        if (!i.done && !todos.some(x => x.id === seen[k])) todos.push({ id: seen[k], text: S(i.title, 60), due: DATE_RE.test(String(i.due)) ? i.due : "", done: false, createdAt: Date.parse(i.receivedAt) || Date.now(), area: "", cat: "", tcat: "", files: [], src: "cool",
-          detail: S([i.summary, ...(i.links || [])].filter(Boolean).join("\n") + "\n\n(쿨메신저 · " + (i.sender || "") + " · " + String(i.receivedAt || "").slice(0, 10) + ")", 2000).trim() });
+        if (i.done) { seen[k] = "-"; ch = true; continue; }
+        if (!cc.auto || (!cc.noDue && !i.due)) continue; // 설정: 저절로 넣지 않음 / 마감일 없는 것은 넣지 않음 (나중에 켜면 그때 넣음)
+        seen[k] = "cool-" + k; ch = true;
+        if (!todos.some(x => x.id === seen[k])) todos.push(coolTodo(i));
+      } else if (at >= 0) {
+        // PC가 첨부를 나중에 올리면 그때 파일 칸에 더함
+        const t = todos[at], have = new Set((t.files || []).map(x => x.url)), add = coolFiles(i).filter(x => !have.has(x.url));
+        if (add.length && (t.files || []).length < 10) { todos[at] = { ...t, files: (t.files || []).concat(add).slice(0, 10) }; ch = true; }
+        if (i.done && !todos[at].done) { todos[at] = { ...todos[at], done: true }; ch = true; }
       } else if (i.done && at >= 0 && !todos[at].done) { todos[at] = { ...todos[at], done: true }; ch = true; }
     }
     if (!ch) return false;
-    const keep = new Set(list.map(i => String(i.key))); Object.keys(seen).forEach(k => { if (!keep.has(k)) delete seen[k]; }); // 비서가 지운 옛것은 잊음
+    const keep = new Set((inbox.items || []).map(i => String(i.key))); Object.keys(seen).forEach(k => { if (!keep.has(k)) delete seen[k]; }); // 비서가 지운 옛것은 잊음
     await put("todos", todos); await cfgPut({ coolSeen: seen }); return true;
   }
   let coolBusy = false; // 두 번 겹쳐 돌면 같은 할 일이 두 번 생길 수 있어서
@@ -335,7 +347,8 @@
       const seen = {}, carry = {};
       Object.keys(cfg.carry || {}).forEach(k => { if (TERM_RE.test(k) && Array.isArray(cfg.carry[k])) carry[k] = cfg.carry[k].filter(x => AREA_IDS.indexOf(x) >= 0); });
       const clean = { term: termOf(cfg.term), carry, homeroom: cfg.homeroom !== false, homeroomClass: S(cfg.homeroomClass, 10).trim(), sources: cleanSources(cfg.sources), attend: cfg.attend && typeof cfg.attend === "object" ? { url: SHEET_URL_RE.test(String(cfg.attend.url || "")) ? String(cfg.attend.url) : "", pos: Math.max(0, Math.min(9, Math.floor(Number(cfg.attend.pos)) || 0)), on: cfg.attend.on !== false, posSet: cfg.attend.posSet === true, name: S(cfg.attend.name, 12).trim(), msg_today: S(cfg.attend.msg_today, 300), msg_alert: S(cfg.attend.msg_alert, 300) } : undefined,
-        evCats: cleanEvCats(cfg.evCats), todoCats: cleanEvCats(cfg.todoCats), bells: cleanBells(cfg.bells), offWork: T.test(String(cfg.offWork)) ? cfg.offWork : undefined, onWork: T.test(String(cfg.onWork)) ? cfg.onWork : undefined,
+        evCats: cleanEvCats(cfg.evCats), todoCats: cleanEvCats(cfg.todoCats),
+        cool: cfg.cool && typeof cfg.cool === "object" ? { auto: cfg.cool.auto !== false, noDue: cfg.cool.noDue !== false, tcat: S(cfg.cool.tcat, 40) } : undefined, bells: cleanBells(cfg.bells), offWork: T.test(String(cfg.offWork)) ? cfg.offWork : undefined, onWork: T.test(String(cfg.onWork)) ? cfg.onWork : undefined,
         planRange: cfg.planRange && DATE_RE.test(String(cfg.planRange.s)) && DATE_RE.test(String(cfg.planRange.e)) ? { s: cfg.planRange.s, e: cfg.planRange.e } : undefined,
         planDays: cleanPlanDays(cfg.planDays),
         subjGroups: cfg.subjGroups && typeof cfg.subjGroups === "object" ? Object.fromEntries(Object.entries(cfg.subjGroups).slice(0, 60).map(([k, v]) => [S(k, 30).trim(), S(v, 30).trim()]).filter(([k, v]) => k && v && k !== v)) : undefined,
