@@ -367,7 +367,7 @@ nav{margin-bottom:14px}
 .nrow span{overflow-wrap:anywhere;min-width:0}
 .nrow.done span{color:var(--muted);text-decoration:line-through}
 .nadd{display:flex;gap:6px;margin-top:10px}
-.nadd input{flex:1;min-width:0}
+.nadd input{flex:1;min-width:0}.nadd>.btn{flex:none;align-self:center}
 .notes .empty{border:0;padding:2px 0}
 .tapes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .tapes .tape{margin:0;padding:8px 14px;font-size:1.35rem}
@@ -2285,7 +2285,7 @@ function renderNotes(){
       store.addNote({ date:key, type:"", text });
       setTimeout(() => $("noteText")?.focus(), 30); // 다시 그려진 입력칸으로 커서를 돌려 연달아 입력
     };
-    parts.push(el("div",{className:"nadd"}, inp), el("div",{className:"nbulk"}, navBtn("복사", () => copyText(notesText(key, list), "조·종례"), "조·종례를 글로 복사", !list.length)));
+    parts.push(el("div",{className:"nadd"}, inp, navBtn("복사", () => copyText(notesText(key, list), "조·종례"), "조·종례를 글로 복사", !list.length)));
   }
   return el("section",{className:"panel notes"}, ...parts);
 }
