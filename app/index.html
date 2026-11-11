@@ -276,6 +276,12 @@ nav{margin-bottom:14px}
 .nact .coolmark,.alltodos .coolmark{width:.95em;height:.95em;margin:0 2px 0 0;flex:none;opacity:.9}
 .tlater{margin-top:6px}.tlater .btn{width:100%}
 .alltools.one{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;margin:6px 0}.alltools.one .field{flex:1 1 0;min-width:0;width:auto;margin:0}.alltools.one>button{flex:none}
+#dayDlg:has(.pvbox){width:min(960px,calc(100vw - 24px))}
+.pvbox{max-height:72dvh;overflow:auto;background:var(--paper2,#f4f4f0);border-radius:8px;padding:8px;display:grid;gap:8px;justify-items:center}
+.pvpage,.pvimg{max-width:100%;height:auto;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.pvtext{white-space:pre-wrap;font-size:.9rem;background:#fff;padding:12px;border-radius:6px;width:100%;box-sizing:border-box}
+.pvsheet{overflow:auto;max-width:100%;background:#fff}.pvsheet table{border-collapse:collapse;font-size:.8rem}.pvsheet td{border:1px solid #ddd;padding:2px 6px;white-space:nowrap}
+.pvbox .hwpjs-viewer,.pvbox>div:not(.pvtext):not(.pvsheet){max-width:100%;overflow:auto}
 .alltools.range .ttback{position:static;padding:4px 6px}
 .alltools.range{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;margin:6px 0}.alltools.range input[type=date]{flex:1 1 0;min-width:0;width:auto}.alltools.range>span,.alltools.range>button{flex:none}
 .tcat{display:inline-block;margin-right:5px;padding:0 6px;border-radius:999px;font-size:.72rem;line-height:1.5;color:#fff;background:var(--c,#667);vertical-align:1px}
@@ -2278,17 +2284,59 @@ function renderNotes(){
   }
   return el("section",{className:"panel notes"}, ...parts);
 }
-document.addEventListener("click", async e => {
+document.addEventListener("click", e => {
   const a = e.target.closest?.('a[href^="https://www.googleapis.com/drive/v3/files/"]'); if(!a || !window.fbFileBlob) return;
-  e.preventDefault();
-  const name = a.textContent.replace(/^[📎🔗]\s*/u, "").trim() || "첨부", view = /\.(pdf|png|jpe?g|gif|webp|bmp)$/i.test(name), w = view ? window.open("", "_blank") : null;
-  say("파일 여는 중…");
-  try{
-    const url = URL.createObjectURL(await window.fbFileBlob(a.href));
-    if(w) w.location = url; else { const d = el("a",{href:url,download:name}); document.body.append(d); d.click(); d.remove(); }
-    say(""); setTimeout(() => URL.revokeObjectURL(url), 60000);
-  }catch(x){ w?.close(); say(x?.message || "파일을 열지 못했어요."); }
+  e.preventDefault(); openPreview(a.href.split("#")[0], a.textContent.replace(/^[📎🔗]\s*/u, "").trim() || "첨부");
 }, true);
+// ---------- 첨부 미리보기 ----------
+const loadScript = src => new Promise((res, rej) => { if(document.querySelector('script[src="' + src + '"]')) return res(); const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = () => rej(new Error("미리보기 도구를 불러오지 못했어요.")); document.head.append(s); });
+const PDFJS = "https:" + "/" + "/cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
+async function pdfInto(box, buf){
+  await loadScript(PDFJS + "pdf.min.js"); pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + "pdf.worker.min.js";
+  const doc = await pdfjsLib.getDocument({ data:buf }).promise, w = Math.min(box.clientWidth || 600, 900);
+  for(let p = 1; p <= Math.min(doc.numPages, 30); p++){
+    const page = await doc.getPage(p), v0 = page.getViewport({ scale:1 }), v = page.getViewport({ scale:w / v0.width * (window.devicePixelRatio || 1) });
+    const c = el("canvas",{className:"pvpage"}); c.width = v.width; c.height = v.height; box.append(c);
+    await page.render({ canvasContext:c.getContext("2d"), viewport:v }).promise;
+  }
+  if(doc.numPages > 30) box.append(el("p",{className:"hint"}, "앞 30쪽까지만 보여요. 나머지는 내려받아 보세요."));
+}
+// 한글(hwp): 공개 뷰어 hwp.js (Apache-2.0). 브라우저에 없는 'fs'만 빈 것으로 바꿔 불러옴
+let hwpLib = null;
+async function hwpInto(box, buf){
+  if(!hwpLib){ const src = await (await fetch("https:" + "/" + "/cdn.jsdelivr.net/npm/hwp.js@0.0.3/build/esm.js")).text();
+    const url = URL.createObjectURL(new Blob([src.replace(/import\s+([\w$]+)\s+from\s+['"]fs['"];?/g, (m, v) => "const " + v + " = {};")], { type:"text/javascript" }));
+    hwpLib = await import(url); URL.revokeObjectURL(url); }
+  new hwpLib.Viewer(box, new Uint8Array(buf), { type:"array" });
+}
+// 한글(hwpx): 압축 안의 본문 XML 에서 글자만 (표·그림 모양은 빠짐)
+async function hwpxInto(box, buf){
+  await xlsxReady();
+  const z = XLSX.CFB.read(new Uint8Array(buf), { type:"array" }), dec = new TextDecoder();
+  const secs = z.FileIndex.map((f, i) => [f, z.FullPaths[i]]).filter(([f, p]) => /Contents\/section\d+\.xml$/i.test(p)).sort((a, b) => a[1].localeCompare(b[1], undefined, { numeric:true }));
+  const paras = secs.flatMap(([f]) => (dec.decode(f.content).match(/<hp:p\b[\s\S]*?<\/hp:p>/g) || []).map(p => (p.match(/<hp:t\b[^>]*>([\s\S]*?)<\/hp:t>/g) || []).map(t => t.replace(/<[^>]+>/g, "")).join("")));
+  const txt = el("div",{className:"pvtext"}); txt.textContent = paras.join("\n").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").replace(/&quot;/g, '"');
+  box.append(el("p",{className:"hint"}, "hwpx 파일은 글자만 보여요. 표·그림 모양은 내려받아 보세요."), txt);
+}
+async function openPreview(url, name){
+  const box = el("div",{className:"pvbox"}, el("p",{className:"hint"}, "불러오는 중…")), ext = (name.match(/\.([a-z0-9]+)$/i) || [])[1]?.toLowerCase() || "";
+  let blob = null;
+  const dl = el("button",{type:"button",className:"btn",disabled:true}, "내려받기");
+  dl.onclick = () => { const u = URL.createObjectURL(blob), d = el("a",{href:u,download:name}); document.body.append(d); d.click(); d.remove(); setTimeout(() => URL.revokeObjectURL(u), 60000); };
+  modal(name, box, el("div",{className:"actions"}, el("span",{className:"spacer"}), dl));
+  try{
+    blob = await window.fbFileBlob(url); dl.disabled = false;
+    const buf = await blob.arrayBuffer(); box.replaceChildren();
+    if(/^(png|jpe?g|gif|webp|bmp)$/.test(ext)){ const im = el("img",{className:"pvimg",alt:name}); im.src = URL.createObjectURL(blob); box.append(im); }
+    else if(ext === "pdf") await pdfInto(box, buf);
+    else if(ext === "hwp") await hwpInto(box, buf);
+    else if(ext === "hwpx") await hwpxInto(box, buf);
+    else if(/^(xlsx|xlsm|xls|csv)$/.test(ext)){ await xlsxReady(); const wb = XLSX.read(buf, { type:"array" });
+      wb.SheetNames.slice(0, 5).forEach(n => { const d = el("div",{className:"pvsheet"}); d.innerHTML = XLSX.utils.sheet_to_html(wb.Sheets[n], { header:"", footer:"" }); d.querySelectorAll("script,style").forEach(x => x.remove()); box.append(el("b",{}, n), d); }); }
+    else if(/^(txt|md)$/.test(ext)){ const t = el("div",{className:"pvtext"}); t.textContent = new TextDecoder().decode(buf); box.append(t); }
+    else box.append(el("p",{className:"note"}, "이 파일은 미리보기가 안 돼요. [내려받기]로 열어 주세요."));
+  }catch(x){ box.replaceChildren(el("p",{className:"note"}, (x?.message || "미리보기를 만들지 못했어요.") + " [내려받기]로 열어 보세요.")); if(blob) dl.disabled = false; }
+}
 function navBtn(label, fn, aria, disabled){ const b = el("button",{className:"btn ghost small",type:"button","aria-label":aria,disabled:!!disabled}, label); b.onclick = fn; return b; }
 
 // 월별 달력
