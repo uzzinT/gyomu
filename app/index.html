@@ -396,6 +396,7 @@ nav{margin-bottom:14px}
 .evrow input:not([type=date]){flex:1 1 auto}
 .catlist{display:grid;gap:10px;margin:8px 0 4px}
 .catrow{display:flex;gap:10px;align-items:center}
+.catgrip{cursor:grab;touch-action:none;user-select:none;color:var(--muted);padding:6px 2px;flex:none;letter-spacing:-2px}.catrow.dragging{opacity:.55;background:var(--mint,#eef6ee)}
 .catrow .field{width:auto}
 .catrow input.field{flex:1;min-width:6em}
 .catrow .hint{min-width:2.5em;text-align:right}
@@ -2322,7 +2323,22 @@ function openCats(list0, key, title, note, countOf, okMsg, back){
     }));
     const n = countOf(c);
     const del = navBtn("지우기", () => { rows.splice(i, 1); draw(); }, (c.name || "새") + " 분류 지우기");
-    return el("div",{className:"catrow"}, name, color, el("span",{className:"hint"}, n + "개"), del);
+    // ⋮⋮ 를 잡고 끌어 순서 바꾸기 (마우스·손가락 모두): 끄는 동안 줄만 옮기고, 놓으면 그 순서로 다시 그림 (저장은 [저장])
+    const grip = el("span",{className:"catgrip",title:"끌어서 순서 바꾸기","aria-label":(c.name || "새 분류") + " 순서 바꾸기"}, "⋮⋮");
+    grip.onpointerdown = e => {
+      e.preventDefault(); grip.setPointerCapture(e.pointerId); row.classList.add("dragging");
+      grip.onpointermove = ev => {
+        const over = document.elementFromPoint(ev.clientX, ev.clientY)?.closest(".catrow");
+        if(!over || over === row || over.parentNode !== list) return;
+        const r = over.getBoundingClientRect(); list.insertBefore(row, ev.clientY < r.top + r.height / 2 ? over : over.nextSibling);
+      };
+      grip.onpointerup = grip.onpointercancel = () => {
+        grip.onpointermove = grip.onpointerup = grip.onpointercancel = null;
+        const order = [...list.children].map(x => rows[Number(x.dataset.i)]); rows.splice(0, rows.length, ...order); draw();
+      };
+    };
+    const row = el("div",{className:"catrow"}, grip, name, color, el("span",{className:"hint"}, n + "개"), del); row.dataset.i = i;
+    return row;
   }));
   draw();
   const add = navBtn("+ 분류 더하기", () => { if(rows.length >= 12) return; rows.push({ id:"c" + Date.now().toString(36), name:"", color:"slate" }); draw(); list.lastElementChild?.querySelector("input")?.focus(); }, "분류 더하기");
