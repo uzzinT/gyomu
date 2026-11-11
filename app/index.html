@@ -247,6 +247,9 @@ nav{margin-bottom:14px}
 .fcol{display:grid;gap:16px;align-content:start}
 .ttterm{font-size:.7rem;font-weight:500;color:var(--muted);margin-left:6px}.ttterm.past{color:var(--wine)}
 .alltools{flex-wrap:wrap}.alltools input[type=search]{flex:1 1 10em}
+.alltools.range{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;margin:6px 0}.alltools.range input[type=date]{flex:1 1 0;min-width:0;width:auto}.alltools.range>span,.alltools.range>button{flex:none}
+.tcat{display:inline-block;margin-right:5px;padding:0 6px;border-radius:999px;font-size:.72rem;line-height:1.5;color:#fff;background:var(--c,#667);vertical-align:1px}
+.nadd .tcatsel{flex:none;width:auto;max-width:7em}.nadd #todoText{flex:1;min-width:0}
 .alltodos{display:grid;gap:2px;max-height:60vh;overflow:auto}
 .alltodos .nrow small{margin-left:auto;white-space:nowrap}
 .lostrow{display:flex;gap:4px;align-items:baseline;margin:2px 0;font-size:.85rem}
@@ -1043,7 +1046,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="backend.js?v=fdf4c5af"></script>
+<script src="backend.js?v=21e4a5b2"></script>
 <style>
 #fbGate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--desk)}
 #fbGate .fbbox{background:var(--paper);border-radius:22px;padding:36px 32px;text-align:center;box-shadow:0 18px 40px -24px rgba(20,40,25,.35);max-width:340px}
@@ -2230,8 +2233,14 @@ function weekAdd(){
 
 // 내 일정 분류 나누기: 이름·색을 고치고 더하고 지움 (지운 분류의 일정은 '기타'로 남음)
 const CLOTH_NAMES = { navy:"남색", green:"초록", ochre:"황토", wine:"자주", slate:"회색" };
-function openEvCats(){
-  const rows = evCats().map(c => ({ ...c }));
+const DEFAULT_TODO_CATS = [{ id:"work", name:"업무", color:"navy" }, { id:"homeroom", name:"담임", color:"green" }, { id:"club", name:"동아리", color:"ochre" }];
+const todoCats = () => Array.isArray(config.todoCats) ? config.todoCats : DEFAULT_TODO_CATS;
+const todoCatOf = t => t && t.tcat ? todoCats().find(c => c.id === t.tcat) : null;
+const tcatChip = t => { const c = todoCatOf(t); if(!c) return ""; const s = el("span",{className:"tcat"}, c.name); s.style.setProperty("--c", cloth(c.color)); return s; };
+const openEvCats = () => openCats(evCats, "evCats", "내 일정 분류", "'학교'는 올린 학사일정이에요. 그 밖의 분류는 마음대로 나누세요 (예: 개인, 학급, 동아리). 분류를 지워도 그 일정은 '기타'로 남아요.", c => events.filter(e => e.cat === c.id).length, "일정 분류를 저장했어요.");
+const openTodoCats = () => openCats(todoCats, "todoCats", "할 일 분류", "할 일을 나눌 분류예요 (예: 업무, 담임, 동아리). 분류를 지워도 그 할 일은 '분류 없음'으로 남아요.", c => todos.filter(t => t.tcat === c.id).length, "할 일 분류를 저장했어요.");
+function openCats(list0, key, title, note, countOf, okMsg){
+  const rows = list0().map(c => ({ ...c }));
   const list = el("div",{className:"catlist"}), err = el("div",{className:"err"});
   const draw = () => list.replaceChildren(...rows.map((c, i) => {
     const name = el("input",{className:"field",maxLength:12,value:c.name,placeholder:"분류 이름","aria-label":"분류 이름"}); name.oninput = () => { c.name = name.value; };
@@ -2242,7 +2251,7 @@ function openEvCats(){
       s.onclick = () => { c.color = x; color.querySelectorAll(".sw").forEach(b => b.setAttribute("aria-pressed", b === s)); };
       return s;
     }));
-    const n = events.filter(e => e.cat === c.id).length;
+    const n = countOf(c);
     const del = navBtn("지우기", () => { rows.splice(i, 1); draw(); }, (c.name || "새") + " 분류 지우기");
     return el("div",{className:"catrow"}, name, color, el("span",{className:"hint"}, n + "개"), del);
   }));
@@ -2253,10 +2262,10 @@ function openEvCats(){
     const clean = rows.map(c => ({ ...c, name:c.name.trim() })).filter(c => c.name);
     if(new Set(clean.map(c => c.name)).size !== clean.length) return err.textContent = "같은 이름의 분류가 있어요.";
     save.disabled = true;
-    try{ await store.saveConfigPatch({ evCats:clean }); $("dayDlg").close(); say("일정 분류를 저장했어요."); }
+    try{ await store.saveConfigPatch({ [key]:clean }); $("dayDlg").close(); say(okMsg); }
     catch(e){ save.disabled = false; err.textContent = e?.message && !e.code ? e.message : "저장하지 못했어요. 잠시 뒤 다시 시도해 주세요."; }
   };
-  modal("내 일정 분류", el("p",{className:"note"}, "'학교'는 올린 학사일정이에요. 그 밖의 분류는 마음대로 나누세요 (예: 개인, 학급, 동아리). 분류를 지워도 그 일정은 '기타'로 남아요."), list, add, err,
+  modal(title, el("p",{className:"note"}, note), list, add, err,
     el("div",{className:"actions"}, el("span",{className:"spacer"}), save));
 }
 
@@ -3054,6 +3063,7 @@ function parseMessage(text){
 }
 console.assert(parseMessage("[교무부] 학부모 상담 신청서 취합\n10월 30일(금)까지 제출 바랍니다.").text === "학부모 상담 신청서 취합");
 console.assert(parseMessage("성적 확인 ~ 11.4").due.endsWith("-11-04") && parseMessage("회의 안내").due === "");
+let lastTcat = "";
 function renderTodos(){
   const edit = canWrite(), today = ymd(new Date());
   const open = todos.filter(t => !t.done).sort((a, b) => (a.due || "9999").localeCompare(b.due || "9999") || (a.createdAt || 0) - (b.createdAt || 0));
@@ -3064,20 +3074,22 @@ function renderTodos(){
     const more = el("button",{className:"ttback more",type:"button",title:"자세히"}, "자세히");
     more.onclick = e => { e.preventDefault(); openTodo(t.id); };
     const badge = t.due ? el("span",{className:"tdue" + (t.due <= today ? " soon" : "")}, dueLabel(t.due)) : "";
-    return el("label",{className:"nrow" + (t.done ? " done" : "")}, cb, el("span",{className:"ntext"}, t.text), el("span",{className:"nact"}, badge, more));
+    return el("label",{className:"nrow" + (t.done ? " done" : "")}, cb, el("span",{className:"ntext"}, tcatChip(t), t.text), el("span",{className:"nact"}, badge, more));
   };
   const parts = [el("div",{className:"panel-head"}, el("h2",{}, "할 일"), el("small",{className:"ncount"}, open.length ? String(open.length) : ""),
     el("div",{className:"tt-tools"}, navBtn("전체", openAllTodos, "끝낸 것까지 할 일 전체 · 찾기"), ...(edit ? [navBtn("쿨메신저 붙여넣기", openPaste, "쿨메신저 글을 붙여 넣어 할 일 만들기")] : [])))];
   parts.push(...(open.length ? open.map(row) : [el("div",{className:"empty"}, "할 일이 없어요")]));
   if(edit){
     const inp = el("input",{className:"field",id:"todoText",maxLength:60,placeholder:"할 일을 쓰고 Enter"});
+    const tc = window.fbCall ? el("select",{className:"field tcatsel",id:"todoCat","aria-label":"분류"}, el("option",{value:""}, "분류 없음"), ...todoCats().map(c => el("option",{value:c.id,selected:c.id === lastTcat}, c.name))) : null;
+    if(tc) tc.onchange = () => { lastTcat = tc.value; };
     inp.onkeyup = e => {
       if(e.key !== "Enter" || e.isComposing || !inp.value.trim()) return;
       const text = inp.value.trim(); inp.value = "";
-      store.addTodo({ text, detail:"", due:"" });
+      store.addTodo({ text, detail:"", due:"", tcat:tc ? tc.value : "" });
       setTimeout(() => $("todoText")?.focus(), 30);
     };
-    parts.push(el("div",{className:"nadd"}, inp));
+    parts.push(el("div",{className:"nadd"}, ...(tc ? [tc] : []), inp));
   }
   return el("section",{className:"panel notes todos"}, ...parts);
 }
@@ -3103,25 +3115,30 @@ async function openAllTodos(){
   const to = el("input",{type:"date",className:"field","aria-label":"기간 끝",title:"이날까지 (마감일이나 만든 날)"});
   const inRange = x => !!x && (!from.value || x >= from.value) && (!to.value || x <= to.value);
   const st = el("select",{className:"field","aria-label":"상태"}, el("option",{value:""}, "전체"), el("option",{value:"open"}, "안 끝낸 것"), el("option",{value:"done"}, "끝낸 것"));
+  const cs = el("select",{className:"field","aria-label":"분류"}, el("option",{value:""}, "모든 분류"), el("option",{value:"-"}, "분류 없음"), ...todoCats().map(c => el("option",{value:c.id}, c.name)));
   const list = el("div",{className:"alltodos"}), count = el("p",{className:"hint"});
+  let shown = 30; // 처음엔 30개, [더 보기]로 30개씩
   const made = t => t.createdAt ? ymd(new Date(t.createdAt)) : "";
   const draw = () => {
     const w = q.value.trim(), d = from.value || to.value;
-    const rows = all.filter(t => (!w || (t.text + " " + (t.detail || "")).includes(w)) && (!d || inRange(t.due) || inRange(made(t))) && (!st.value || (st.value === "done") === !!t.done))
+    const rows = all.filter(t => (!w || (t.text + " " + (t.detail || "")).includes(w)) && (!d || inRange(t.due) || inRange(made(t))) && (!cs.value || (cs.value === "-" ? !todoCatOf(t) : t.tcat === cs.value)) && (!st.value || (st.value === "done") === !!t.done))
       .sort((a, b) => (!!a.done - !!b.done) || (b.createdAt || 0) - (a.createdAt || 0));
     count.textContent = rows.length + "개";
-    list.replaceChildren(...rows.slice(0, 200).map(t => {
+    list.replaceChildren(...rows.slice(0, shown).map(t => {
       const cb = el("input",{type:"checkbox",checked:!!t.done,disabled:!canWrite(),"aria-label":"끝냄"});
       cb.onchange = async () => { t.done = cb.checked; try{ await store.updateTodo(t.id, { done:cb.checked }); }catch(e){ t.done = !cb.checked; cb.checked = t.done; } draw(); };
       const name = el("button",{type:"button",className:"linkbtn"}, t.text); name.onclick = () => { if(!todos.some(x => x.id === t.id)) todos.push(t); openTodo(t.id); };
-      return el("div",{className:"nrow" + (t.done ? " done" : "")}, cb, el("span",{className:"ntext"}, name),
+      return el("div",{className:"nrow" + (t.done ? " done" : "")}, cb, el("span",{className:"ntext"}, tcatChip(t), name),
         el("small",{className:"hint"}, [t.due ? "마감 " + t.due.slice(5).replace("-", "/") : "", made(t) ? "만든 날 " + made(t).slice(5).replace("-", "/") : ""].filter(Boolean).join(" · ")));
     }));
     if(!rows.length) list.append(el("p",{className:"note"}, "찾는 할 일이 없어요."));
+    if(rows.length > shown) list.append(navBtn("더 보기 (" + (rows.length - shown) + "개 남음)", () => { shown += 30; draw(); }, "30개 더 보기"));
   };
-  q.oninput = draw; from.onchange = draw; to.onchange = draw; st.onchange = draw;
+  const again = () => { shown = 30; draw(); };
+  q.oninput = again; from.onchange = again; to.onchange = again; st.onchange = again; cs.onchange = again;
   draw();
-  modal("할 일 전체", el("div",{className:"tt-tools alltools"}, q, st), el("div",{className:"tt-tools alltools"}, el("span",{className:"hint"}, "기간"), from, "~", to, navBtn("기간 지우기", () => { from.value = ""; to.value = ""; draw(); }, "기간 조건 지우기")),
+  modal("할 일 전체", el("div",{className:"tt-tools alltools"}, q, ...(window.fbCall ? [cs] : []), st, ...(window.fbCall && canWrite() ? [navBtn("분류 고치기", openTodoCats, "할 일 분류 더하기·지우기")] : [])),
+    el("div",{className:"alltools range"}, el("span",{className:"hint"}, "기간"), from, el("span",{}, "~"), to, el("button",{type:"button",className:"ttback",title:"기간 지우기","aria-label":"기간 지우기",onclick:() => { from.value = ""; to.value = ""; again(); }}, "✕")),
     el("p",{className:"hint"}, "마감일이나 만든 날이 기간 안에 있는 할 일이 나와요. 한쪽만 넣어도 돼요."), count, list);
 }
 function openTodo(id){
@@ -3132,12 +3149,13 @@ function openTodo(id){
   const detail = el("textarea",{id:"todoDetail",rows:6,maxLength:2000,value:t.detail || "",readOnly:!edit,placeholder:"세부 내용"});
   const err = el("div",{className:"err"});
   const att = attachBox(t.files, edit);
-  const kids = [el("label",{className:"memo-label"}, "할 일", text), el("label",{className:"memo-label"}, "마감일", due), el("label",{className:"memo-label"}, "세부 내용", detail), att.node, err];
+  const tc = el("select",{className:"field",id:"todoCatEdit",disabled:!edit}, el("option",{value:""}, "분류 없음"), ...todoCats().map(c => el("option",{value:c.id,selected:c.id === t.tcat}, c.name)));
+  const kids = [el("label",{className:"memo-label"}, "할 일", text), ...(window.fbCall ? [el("label",{className:"memo-label"}, "분류", tc)] : []), el("label",{className:"memo-label"}, "마감일", due), el("label",{className:"memo-label"}, "세부 내용", detail), att.node, err];
   if(edit){
     const save = el("button",{className:"btn",type:"button"}, "저장");
     save.onclick = () => {
       if(!text.value.trim()) return err.textContent = "할 일을 적어 주세요.";
-      store.updateTodo(t.id, { text:text.value.trim(), due:/^\d{4}-\d{2}-\d{2}$/.test(due.value) ? due.value : "", detail:detail.value.trim(), files:att.files() });
+      store.updateTodo(t.id, { text:text.value.trim(), due:/^\d{4}-\d{2}-\d{2}$/.test(due.value) ? due.value : "", detail:detail.value.trim(), files:att.files(), ...(window.fbCall ? { tcat:tc.value } : {}) });
       $("dayDlg").close();
     };
     const del = navBtn("지우기", () => {
@@ -4737,7 +4755,7 @@ function checkDraft(d){
   return problems;
 }
 async function saveSettings(btn, err){
-  const d = { ...structuredClone(draft), evCats:config.evCats, bells:config.bells, offWork:config.offWork, onWork:config.onWork, planRange:config.planRange, planDays:config.planDays }, problems = checkDraft(d); // 일정 분류·수업 시간은 설정 화면 밖에서 바뀜
+  const d = { ...structuredClone(draft), evCats:config.evCats, todoCats:config.todoCats, bells:config.bells, offWork:config.offWork, onWork:config.onWork, planRange:config.planRange, planDays:config.planDays }, problems = checkDraft(d); // 일정 분류·수업 시간은 설정 화면 밖에서 바뀜
   if(problems.length) return err.textContent = problems.join("\n");
   btn.disabled = true; err.textContent = "";
   try{ const data = await call("saveConfig", d); draft = null; apply(data); $("status").textContent = "설정을 저장했어요."; }

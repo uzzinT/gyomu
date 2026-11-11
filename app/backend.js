@@ -277,7 +277,7 @@
       const seen = {}, carry = {};
       Object.keys(cfg.carry || {}).forEach(k => { if (TERM_RE.test(k) && Array.isArray(cfg.carry[k])) carry[k] = cfg.carry[k].filter(x => AREA_IDS.indexOf(x) >= 0); });
       const clean = { term: termOf(cfg.term), carry, homeroom: cfg.homeroom !== false, homeroomClass: S(cfg.homeroomClass, 10).trim(), sources: cleanSources(cfg.sources), attend: cfg.attend && typeof cfg.attend === "object" ? { url: SHEET_URL_RE.test(String(cfg.attend.url || "")) ? String(cfg.attend.url) : "", pos: Math.max(0, Math.min(9, Math.floor(Number(cfg.attend.pos)) || 0)), on: cfg.attend.on !== false, posSet: cfg.attend.posSet === true, name: S(cfg.attend.name, 12).trim(), msg_today: S(cfg.attend.msg_today, 300), msg_alert: S(cfg.attend.msg_alert, 300) } : undefined,
-        evCats: cleanEvCats(cfg.evCats), bells: cleanBells(cfg.bells), offWork: T.test(String(cfg.offWork)) ? cfg.offWork : undefined, onWork: T.test(String(cfg.onWork)) ? cfg.onWork : undefined,
+        evCats: cleanEvCats(cfg.evCats), todoCats: cleanEvCats(cfg.todoCats), bells: cleanBells(cfg.bells), offWork: T.test(String(cfg.offWork)) ? cfg.offWork : undefined, onWork: T.test(String(cfg.onWork)) ? cfg.onWork : undefined,
         planRange: cfg.planRange && DATE_RE.test(String(cfg.planRange.s)) && DATE_RE.test(String(cfg.planRange.e)) ? { s: cfg.planRange.s, e: cfg.planRange.e } : undefined,
         planDays: cleanPlanDays(cfg.planDays),
         areas: cfg.areas.map(a => {
@@ -372,13 +372,13 @@
     async addTodo(t) {
       const text = S(t && t.text, 60).trim(); if (!text) fail("할 일을 적어 주세요.");
       const area = areaIds().indexOf(String(t.area)) >= 0 ? String(t.area) : "";
-      await put("todos", get("todos").concat({ id: uuid(), text, detail: S(t.detail, 2000).trim(), due: DATE_RE.test(String(t.due)) ? t.due : "", done: false, createdAt: Date.now(), area, cat: area ? S(t.cat, 40) : "", files: cleanFiles(t.files) })); return getAll();
+      await put("todos", get("todos").concat({ id: uuid(), text, detail: S(t.detail, 2000).trim(), due: DATE_RE.test(String(t.due)) ? t.due : "", done: false, createdAt: Date.now(), area, cat: area ? S(t.cat, 40) : "", tcat: S(t.tcat, 40), files: cleanFiles(t.files) })); return getAll();
     },
     // 할 일 전체 (끝낸 것·오래된 것까지)
     async allTodos() { return get("todos"); },
     async updateTodo(id, p) { p = p || {}; await patchRow("todos", id, o => {
       if ("text" in p && String(p.text).trim()) o.text = S(p.text, 60).trim(); if ("detail" in p) o.detail = S(p.detail, 2000).trim();
-      if ("due" in p) o.due = DATE_RE.test(String(p.due)) ? p.due : ""; if ("done" in p) o.done = !!p.done; if ("files" in p) o.files = cleanFiles(p.files); return o; }); return getAll(); },
+      if ("due" in p) o.due = DATE_RE.test(String(p.due)) ? p.due : ""; if ("done" in p) o.done = !!p.done; if ("files" in p) o.files = cleanFiles(p.files); if ("tcat" in p) o.tcat = S(p.tcat, 40); return o; }); return getAll(); },
     async deleteTodo(id) { await dropRow("todos", id); return getAll(); },
     async savePlan(subject, lines) {
       subject = S(subject, 30).trim(); if (!subject) fail("과목 이름이 없어요.");
