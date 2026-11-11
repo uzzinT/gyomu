@@ -248,6 +248,7 @@ nav{margin-bottom:14px}
 .ttterm{font-size:.7rem;font-weight:500;color:var(--muted);margin-left:6px}.ttterm.past{color:var(--wine)}
 .alltools{flex-wrap:wrap}.alltools input[type=search]{flex:1 1 10em}
 .subjname{flex:0 0 7em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.coolbtn{position:relative}.nbadge{position:absolute;top:-7px;right:-6px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:#e5484d;color:#fff;font-size:.66rem;font-weight:700;line-height:17px;text-align:center;box-shadow:0 0 0 2px var(--paper)}
 .coolrow{display:grid;grid-template-columns:3.2em 3.2em minmax(0,1fr) auto;gap:6px;align-items:baseline;text-align:left;border:0;border-top:1px dashed var(--line);background:none;padding:6px 2px;font:inherit;color:inherit;cursor:pointer}
 .coolrow:hover{background:rgba(0,0,0,.03)}.coolrow .cd{font-size:.78rem;color:var(--muted)}.coolrow .cc{font-size:.7rem;border-radius:999px;padding:0 6px;background:var(--line);text-align:center}
 .coolrow .cc.todo{background:var(--sun,#e8a33d);color:#fff}.coolrow .cs{max-width:8em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1148,7 +1149,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="backend.js?v=5e17c113"></script>
+<script src="backend.js?v=c5dd3868"></script>
 <style>
 #fbGate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--desk)}
 #fbGate .fbbox{background:var(--paper);border-radius:22px;padding:36px 32px;text-align:center;box-shadow:0 18px 40px -24px rgba(20,40,25,.35);max-width:340px}
@@ -1347,6 +1348,7 @@ function apply(data){
   memoFiles = data?.memoFiles && typeof data.memoFiles === "object" ? data.memoFiles : {};
   evNotes = data?.evNotes && typeof data.evNotes === "object" ? data.evNotes : {};
   budgets = Array.isArray(data?.budgets) ? data.budgets : []; spends = Array.isArray(data?.spends) ? data.spends : [];
+  coolUnread = Number(data?.coolUnread) || 0;
   logs = Array.isArray(data?.logs) ? data.logs : [];
   todos = Array.isArray(data?.todos) ? data.todos : [];
   plans = data?.plans && typeof data.plans === "object" ? data.plans : {};
@@ -1362,8 +1364,11 @@ function apply(data){
   yearFolder = data?.folder && safeUrl(data.folder.url) ? data.folder : null;
   items = (data?.items || []).filter(i => i.title && (safeUrl(i.url) || i.kind === "memo"));
   ready = true;
-  $("status").textContent = items.length ? "" : "아직 아무것도 없어요. 영역을 열고 '+ 추가'로 첫 링크나 파일을 넣어 보세요.";
-  $("status").dataset.empty = items.length ? "" : "1";
+  // 방금 띄운 알림(복사했어요·저장했어요 등)은 저장이 끝나 다시 그릴 때 지우지 않음
+  if(Date.now() - Number($("status").dataset.at || 0) > 4500){
+    $("status").textContent = items.length ? "" : "아직 아무것도 없어요. 영역을 열고 '+ 추가'로 첫 링크나 파일을 넣어 보세요.";
+    $("status").dataset.empty = items.length ? "" : "1";
+  }
   if(tab !== "settings" || !draft) render(); else renderTabs();
 }
 
@@ -2217,7 +2222,7 @@ function nextSchoolDay(k){
   }
   return ymd(addDays(parseYmd(k), 1));
 }
-const say = msg => { const s = $("status"); s.dataset.empty = ""; s.hidden = false; s.textContent = msg; };
+const say = msg => { const s = $("status"); s.dataset.empty = ""; s.hidden = false; s.textContent = msg; s.dataset.at = msg ? Date.now() : 0; };
 // 알림: 글이 바뀌면 맨 위(열린 창보다 위)에 띄우고 몇 초 뒤 사라짐. '…중' 글은 다음 글이 올 때까지 둠
 {
   const s = $("status"); let timer;
@@ -2263,7 +2268,7 @@ function renderNotes(){
   const copyTo = async ns => {
     const to = nextSchoolDay(key);
     for(const n of ns) await store.addNote({ date:to, type:"", text:n.text, detail:n.detail || "", share:n.share !== false, files:n.files || [] });
-    say(ns.length + "개를 " + dayLabel(parseYmd(to)) + "로 복사했어요.");
+    say("✓ " + (ns.length > 1 ? ns.length + "개를 " : "'" + String(ns[0]?.text || "").slice(0, 20) + "'를 ") + dayLabel(parseYmd(to)) + " 조·종례로 복사했어요.");
   };
   const tools = el("div",{className:"tt-tools"},
     navBtn("전체", () => openNoteAll(), "지난 조·종례 전체 보기"),
@@ -3363,7 +3368,7 @@ function renderTodos(){
     return el("div",{className:"nrow" + (t.done ? " done" : "")}, cb, catPick(t, edit), tx, el("span",{className:"nact"}, coolMark(t), badge, more));
   };
   const parts = [el("div",{className:"panel-head"}, el("h2",{}, "할 일"), el("small",{className:"ncount"}, open.length ? String(open.length) : ""),
-    el("div",{className:"tt-tools"}, sortSel, navBtn("전체", openAllTodos, "끝낸 것까지 할 일 전체 · 찾기"), ...(window.fbCall ? [navBtn("쿨메신저", () => openCool(), "쿨메신저로 받은 메시지 모두 보기")] : [])))];
+    el("div",{className:"tt-tools"}, sortSel, navBtn("전체", openAllTodos, "끝낸 것까지 할 일 전체 · 찾기"), ...(window.fbCall ? [(() => { const b = navBtn("쿨메신저", () => openCool(), coolUnread ? "쿨메신저 새 메시지 " + coolUnread + "개" : "쿨메신저로 받은 메시지 모두 보기"); b.classList.add("coolbtn"); if(coolUnread) b.append(el("span",{className:"nbadge","aria-hidden":"true"}, coolUnread > 99 ? "99+" : String(coolUnread))); return b; })()] : [])))];
   parts.push(...(open.length ? open.map(row) : [el("div",{className:"empty"}, "7일 안에 할 일이 없어요")]));
   if(later.length) parts.push(el("div",{className:"tlater"}, navBtn("앞으로 남은 것 " + later.length + "개 (8일 뒤~)", () => openAllTodos("later"), "마감이 8일 넘게 남은 할 일 보기")));
   if(edit){
@@ -3439,11 +3444,12 @@ async function openAllTodos(preset){
   $("dayDlg").querySelector(".daybox")?.setAttribute("data-autosave", "1"); // 찾기 칸·체크는 바로 저장되거나 저장할 게 없음 → 닫을 때 묻지 않음
 }
 // ---------- 쿨메신저: PC '쿨메신저 연결'이 드라이브에 올린 메시지 (분류·요약은 PC의 Claude) ----------
-let coolFilter = { q:"", cat:"" };
+let coolFilter = { q:"", cat:"" }, coolUnread = 0;
 async function openCool(){
   const box = el("div",{className:"coollist","data-autosave":"1"}, el("p",{className:"note"}, "불러오는 중…"));
   modal("쿨메신저", box);
   let data; try{ data = await call("coolMessages"); }catch(e){ return box.replaceChildren(el("p",{className:"note"}, "불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.")); }
+  if(coolUnread) call("coolMarkRead").then(d => { apply(d); renderHome(); }).catch(() => {});
   const items = (data.items || []).slice().sort((a, b) => String(b.receivedAt).localeCompare(String(a.receivedAt)));
   const at = data.at ? new Date(data.at) : null, mins = at ? Math.round((Date.now() - at) / 6e4) : null;
   const status = el("p",{className:"hint" + (mins == null || mins > 40 ? " warn" : "")}, at

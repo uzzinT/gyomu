@@ -193,6 +193,7 @@
     detail: S((i.summary || "") + "\n\n(쿨메신저 · " + (i.sender || "") + " · " + String(i.receivedAt || "").slice(0, 10) + ")", 2000).trim() });
   const coolApi = {
     // 쿨메신저 창: PC '쿨메신저 연결'이 올려 둔 메시지 전체 (+ 받은 시각) 와 이미 할 일로 넣은 것
+    async coolMarkRead() { await cfgPut({ coolReadAt: Date.now() }); return getAll(); },
     async coolMessages() { await coolSync().catch(() => {}); const seen = cfgGet("coolSeen") || {}; return { at: (coolBox || {}).at || "", items: (coolBox || {}).items || [], seen }; },
     // 정보 제공으로 온 것도 직접 할 일로
     async coolToTodo(key) {
@@ -223,6 +224,7 @@
     const over = cfgGet("coolCat") || {}; // 선생님이 바꾼 분류 (할 일 ↔ 정보 제공)
     (inbox.items || []).forEach(i => { if (i && over[i.key]) i.category = over[i.key]; });
     coolBox = inbox; // 쿨메신저 창에서 씀 (메시지 전체·요약·원문·첨부)
+    if (!cfgGet("coolReadAt")) await cfgPut({ coolReadAt: Date.now() }); // 처음엔 지난 것은 모두 읽은 것으로
     // 할 일로 넣는 것은 PC의 Claude가 '할 일'로 분류한 것만. 정보 제공·아직 분류 전·금칙어(비공개)는 쿨메신저 창에만
     const list = (inbox.items || []).filter(i => i && i.key != null && i.title && !i.private && i.category === "할 일");
     const seen = { ...(cfgGet("coolSeen") || {}) }; let ch = false;
@@ -261,7 +263,9 @@
     await put("todos", todos); await cfgPut({ coolSeen: seen }); return true;
   }
   let coolBusy = false; // 두 번 겹쳐 돌면 같은 할 일이 두 번 생길 수 있어서
-  const coolRun = async () => { if (coolBusy) return; coolBusy = true; try { if (await coolSync() && window.apply) window.apply(getAll()); } catch (e) { console.warn("쿨메신저 할 일", e); } finally { coolBusy = false; } };
+  const coolUnreadCount = () => { const at = Number(cfgGet("coolReadAt")) || 0; return coolBox && at ? (coolBox.items || []).filter(i => i && (Date.parse(i.receivedAt) || 0) > at).length : 0; };
+  let lastUnread = 0;
+  const coolRun = async () => { if (coolBusy) return; coolBusy = true; try { const ch = await coolSync(), n = coolUnreadCount(); if ((ch || n !== lastUnread) && window.apply) window.apply(getAll()); lastUnread = n; } catch (e) { console.warn("쿨메신저 할 일", e); } finally { coolBusy = false; } };
   [4000, 20000].forEach(ms => setTimeout(() => { if (readyDone) coolRun(); }, ms));
   setInterval(() => { if (readyDone && !busy()) coolRun(); }, 5 * 60e3);
   // 열어 둔 동안에도 15초마다 다른 기기에서 고친 것 확인 (창을 열었거나 입력 중이면 다음에)
@@ -328,7 +332,7 @@
       notes: get("notes").filter(n => n.date >= t), checks: get("checks").filter(c => !c.closed),
       logs: get("logs").filter(l => l.date >= lt && (l.text || l.lesson > 0 || (l.files || []).length)),
       todos: get("todos").filter(x => !x.done || x.createdAt >= old),
-      budgets: get("budgets"), spends: get("spends")
+      budgets: get("budgets"), spends: get("spends"), coolUnread: coolUnreadCount()
     });
   }
   // 표에서 id 로 찾아 바꾸기
