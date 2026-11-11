@@ -219,7 +219,7 @@ nav{margin-bottom:14px}
 .ttback:hover{color:var(--ink)}
 
 /* 홈 3단: 오늘·조종례 | 바로 가기·시간표 | 월별 달력·이번 주 일정 */
-.home4{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.05fr) minmax(0,1.05fr);gap:18px 28px;align-items:start}
+.home4{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr) minmax(0,1fr);gap:18px 28px;align-items:start}
 @media (max-width:1150px){.home4{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.home4 .col:last-child{grid-column:1/-1}}
 @media (max-width:700px){.home4{grid-template-columns:1fr}}
 .home4 .col{display:grid;gap:16px;min-width:0;align-content:start}
@@ -1002,6 +1002,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 .hdr-top{display:flex;align-items:center;gap:12px 24px;flex-wrap:wrap}
 .hdr-title{flex:none}
 .hdrrefresh{margin-top:4px;border:1px solid rgba(255,255,255,.35);background:transparent;color:rgba(255,255,255,.85);border-radius:999px;padding:2px 10px;font:inherit;font-size:.72rem;cursor:pointer}
+.hdrrefresh{display:inline-flex;align-items:center;gap:4px;vertical-align:middle}#undoBtn,#redoBtn{padding:3px 7px;margin-left:4px}
 .hdrrefresh:hover{background:rgba(255,255,255,.12)}.hdrrefresh:disabled{opacity:.6;cursor:wait}
 .hdr-pins{flex:1 1 280px;display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;align-items:center;min-width:0}
 .hdr-label{font-size:.72rem;font-weight:700;letter-spacing:.06em;color:rgba(255,255,255,.6);margin-right:2px}
@@ -1057,7 +1058,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
   <div class="inner">
     <header>
       <div class="hdr-top">
-        <div class="hdr-title"><h1>나의 교무수첩</h1><div class="term" id="term"></div><button type="button" class="hdrrefresh" id="refreshBtn" title="다른 기기에서 고친 것까지 새로 불러오기" aria-label="새로고침">⟳ 새로고침</button><button type="button" class="hdrrefresh" id="undoBtn" title="방금 한 것 되돌리기 (Ctrl+Z)" aria-label="되돌리기">↶ 되돌리기</button></div>
+        <div class="hdr-title"><h1>나의 교무수첩</h1><div class="term" id="term"></div><button type="button" class="hdrrefresh" id="refreshBtn" title="다른 기기에서 고친 것까지 새로 불러오기" aria-label="새로고침"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><path d="M21 3v5h-5"/></svg> 새로고침</button><button type="button" class="hdrrefresh" id="undoBtn" title="되돌리기 (Ctrl+Z)" aria-label="되돌리기"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button><button type="button" class="hdrrefresh" id="redoBtn" title="다시 하기 (Ctrl+Y)" aria-label="다시 하기"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button></div>
         <div class="hdr-pins" id="hdrPins" aria-label="바로 가기"></div>
       </div>
       <nav id="tabs" role="tablist"></nav>
@@ -4721,7 +4722,7 @@ const budUndo = (fn, a) => {
 };
 const budCall = async (fn, ...a) => {
   say("저장하는 중…"); const un = undoing ? null : budUndo(fn, a[0]);
-  try{ apply(await call(fn, ...a)); render(); if(un){ undoStack.push({ label:un[0], run:un[1] }); if(undoStack.length > 30) undoStack.shift(); } say("✓ 저장했어요. (Ctrl+Z 로 되돌리기)"); return true; }
+  try{ apply(await call(fn, ...a)); render(); if(un) pushUndo({ label:un[0], run:un[1], redo:() => budCall(fn, ...a) }); say("✓ 저장했어요. (Ctrl+Z 로 되돌리기)"); return true; }
   catch(e){ say(e?.message || "저장하지 못했어요."); return false; } };
 function renderBudget(a){
   if(!window.fbCall || !["class", "admin"].includes(a.id)) return null;
@@ -4909,9 +4910,12 @@ const UNDO_DEF = { done:false, closed:false, share:true, files:[], text:"", deta
 const before = (o, p) => Object.fromEntries(Object.keys(p).map(k => [k, o && o[k] !== undefined ? structuredClone(o[k]) : (k in UNDO_DEF ? structuredClone(UNDO_DEF[k]) : "")]));
 // 새로 만든 것 찾기: 같은 이름 가운데 진짜 id(tmp 아님)인 가장 최근 것
 const newest = (list, same) => list.filter(x => same(x) && !String(x.id).startsWith("tmp")).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))[0];
+const redoStack = [];
+let redoing = false;
+function pushUndo(x){ undoStack.push(x); if(undoStack.length > 30) undoStack.shift(); if(!redoing) redoStack.length = 0; }
 function wrapUndo(name, mk){
   const f = store[name];
-  store[name] = (...a) => { if(!undoing){ try{ const u = mk(...a); if(u){ undoStack.push({ label:u[0], run:u[1] }); if(undoStack.length > 30) undoStack.shift(); } }catch(e){} } return f(...a); };
+  store[name] = (...a) => { if(!undoing){ try{ const u = mk(...a); if(u) pushUndo({ label:u[0], run:u[1], redo:u[2] || (() => store[name](...a)) }); }catch(e){} } return f(...a); };
 }
 wrapUndo("saveEvents", () => { const old = structuredClone(events); return ["일정", () => store.saveEvents(old)]; });
 wrapUndo("saveSchool", () => { const old = structuredClone(events); return ["학사일정", () => store.saveEvents(old)]; });
@@ -4930,29 +4934,41 @@ wrapUndo("updateCheck", (id, p) => { const old = before(checks.find(c => c.id ==
 wrapUndo("addTodo", t => ["할 일 추가", () => { const x = newest(todos, y => y.text === t.text); if(x) store.deleteTodo(x.id); }]);
 wrapUndo("addNote", n => ["조·종례 추가", () => { const x = newest(notes, y => y.text === n.text && y.date === n.date); if(x) store.deleteNote(x.id); }]);
 wrapUndo("addCheck", title => ["제출물 추가", () => { const x = newest(checks, y => y.title === title); if(x) store.deleteCheck(x.id); }]);
-wrapUndo("deleteTodo", id => { const o = structuredClone(todos.find(t => t.id === id)); return o ? ["할 일 지우기", () => store.addTodo({ text:o.text, detail:o.detail || "", due:o.due || "", area:o.area || "", cat:o.cat || "", tcat:o.tcat || "", files:o.files || [] })] : null; });
-wrapUndo("deleteNote", id => { const o = structuredClone(notes.find(n => n.id === id)); return o ? ["조·종례 지우기", () => store.addNote({ date:o.date, type:o.type || "", text:o.text, detail:o.detail || "", share:o.share !== false, files:o.files || [] })] : null; });
+wrapUndo("deleteTodo", id => { const o = structuredClone(todos.find(t => t.id === id)); return o ? ["할 일 지우기", () => store.addTodo({ text:o.text, detail:o.detail || "", due:o.due || "", area:o.area || "", cat:o.cat || "", tcat:o.tcat || "", files:o.files || [] }), () => { const x = todos.find(t => t.id === id) || newest(todos, y => y.text === o.text); if(x) store.deleteTodo(x.id); }] : null; });
+wrapUndo("deleteNote", id => { const o = structuredClone(notes.find(n => n.id === id)); return o ? ["조·종례 지우기", () => store.addNote({ date:o.date, type:o.type || "", text:o.text, detail:o.detail || "", share:o.share !== false, files:o.files || [] }), () => { const x = notes.find(n => n.id === id) || newest(notes, y => y.text === o.text && y.date === o.date); if(x) store.deleteNote(x.id); }] : null; });
 wrapUndo("deleteCheck", id => { const o = structuredClone(checks.find(c => c.id === id)); if(!o) return null;
+  const again = () => { const x = checks.find(c => c.id === id) || newest(checks, y => y.title === o.title); if(x) store.deleteCheck(x.id); };
   return ["제출물 지우기", async () => { const had = new Set(checks.map(c => c.id)); apply(await call("addCheck", o.title, o.size || 30));
-    const x = checks.find(c => !had.has(c.id) && c.title === o.title); if(x) store.updateCheck(x.id, { done:o.done || [], size:o.size || 30, closed:!!o.closed, due:o.due || "", files:o.files || [], memo:o.memo || "", memoShare:o.memoShare !== false }); }]; });
+    const x = checks.find(c => !had.has(c.id) && c.title === o.title); if(x) store.updateCheck(x.id, { done:o.done || [], size:o.size || 30, closed:!!o.closed, due:o.due || "", files:o.files || [], memo:o.memo || "", memoShare:o.memoShare !== false }); }, again]; });
 // 시간표 칸 바꾸기·올리기
-{ const f = saveTTNow; saveTTNow = (next, msg) => { if(!undoing){ const old = structuredClone(tt); undoStack.push({ label:"시간표", run:() => f(old) }); if(undoStack.length > 30) undoStack.shift(); } return f(next, msg); }; }
+{ const f = saveTTNow; saveTTNow = (next, msg) => { if(!undoing){ const old = structuredClone(tt); pushUndo({ label:"시간표", run:() => f(old), redo:() => saveTTNow(next, msg) }); } return f(next, msg); }; }
 document.addEventListener("keydown", async e => {
-  if(!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || e.key.toLowerCase() !== "z") return;
+  const k = e.key.toLowerCase(), redo = k === "y" || (k === "z" && e.shiftKey);
+  if(!(e.ctrlKey || e.metaKey) || e.altKey || (k !== "z" && k !== "y")) return;
   const a = document.activeElement;
   if(a && (a.isContentEditable || (/^(INPUT|TEXTAREA)$/.test(a.tagName) && !/^(checkbox|radio|button|file|date|time|number)$/.test(a.type)))) return; // 글 쓰는 칸 안에서는 글자 되돌리기
-  e.preventDefault(); doUndo();
+  e.preventDefault(); redo ? doRedo() : doUndo();
 });
 async function doUndo(){
   const u = undoStack.pop();
   if(!u) return say("되돌릴 것이 없어요.");
   if(!canWrite()) return say("지금은 되돌릴 수 없어요.");
   undoing = true;
-  try{ await u.run(); say("되돌렸어요: " + u.label + (undoStack.length ? " (더 되돌릴 수 있어요)" : "")); $("dayDlg")?.open && $("dayDlg").close(); }
-  catch(x){ say("되돌리지 못했어요. 잠시 뒤 다시 시도해 주세요."); }
+  try{ await u.run(); if(u.redo) redoStack.push(u); say("되돌렸어요: " + u.label + " (↷ 로 다시 할 수 있어요)"); $("dayDlg")?.open && $("dayDlg").close(); }
+  catch(x){ undoStack.push(u); say("되돌리지 못했어요. 잠시 뒤 다시 시도해 주세요."); }
   finally{ undoing = false; }
 }
-document.addEventListener("click", e => { if(e.target.closest?.("#undoBtn")) doUndo(); });
+// 되돌린 것을 다시: 처음 한 것을 그대로 다시 부름 (그러면 되돌리기 기록도 새로 생김)
+async function doRedo(){
+  const r = redoStack.pop();
+  if(!r) return say("다시 할 것이 없어요.");
+  if(!canWrite()) return say("지금은 다시 할 수 없어요.");
+  redoing = true;
+  try{ await r.redo(); say("다시 했어요: " + r.label); $("dayDlg")?.open && $("dayDlg").close(); }
+  catch(x){ redoStack.push(r); say("다시 하지 못했어요. 잠시 뒤 다시 시도해 주세요."); }
+  finally{ redoing = false; }
+}
+document.addEventListener("click", e => { if(e.target.closest?.("#undoBtn")) doUndo(); if(e.target.closest?.("#redoBtn")) doRedo(); });
 
 function matches(it){
   if(!query) return true;
