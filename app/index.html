@@ -509,7 +509,10 @@ dialog label.inline,.set-area label.inline{display:flex;flex-direction:row;gap:8
 .budrow:hover{background:rgba(0,0,0,.03)}.budrow .bn{grid-area:n;font-weight:600}.budrow .bm{grid-area:m;font-size:.78rem;color:var(--muted)}.budrow .br{grid-area:r;font-size:.85rem;white-space:nowrap}
 .budrow.over .br{color:var(--wine,#a33)}.budbar{grid-area:bar;height:6px;border-radius:3px;background:var(--line);overflow:hidden}.budbar>span{display:block;height:100%;background:var(--c,var(--green,#3a7))}
 .budrow.over .budbar>span{background:var(--wine,#a33)}
-.budamt{max-width:9em}.spendadd{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.spendadd input[type=date]{width:auto}.spendadd input:not([type]){flex:1 1 10em;min-width:0}
+.budamt{max-width:9em}
+.spendform{display:grid;gap:6px;margin:8px 0}.sfrow{display:flex;gap:6px;align-items:center}.sfrow .field{flex:1 1 0;min-width:0;width:0}.sfrow .budamt{flex:0 0 8em;width:8em}
+.sfrow input[type=date]{flex:0 0 auto;width:auto}.sfrow .btn{flex:none}.smemo{display:block}
+.budmemo{white-space:pre-line;font-size:.82rem;color:var(--muted);margin:6px 0 0}.budfiles{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:.82rem}.spendadd{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.spendadd input[type=date]{width:auto}.spendadd input:not([type]){flex:1 1 10em;min-width:0}
 .spends{display:grid;gap:2px;max-height:50vh;overflow:auto}.spendrow{display:flex;gap:8px;align-items:center;padding:4px 0;border-top:1px dashed var(--line)}.spendrow .st{flex:1;min-width:0}.spendrow b{white-space:nowrap}
 .set-add{margin:0 0 18px}
 .set-foot{margin-top:4px}
@@ -1088,7 +1091,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="backend.js?v=34e55abe"></script>
+<script src="backend.js?v=766573bd"></script>
 <style>
 #fbGate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--desk)}
 #fbGate .fbbox{background:var(--paper);border-radius:22px;padding:36px 32px;text-align:center;box-shadow:0 18px 40px -24px rgba(20,40,25,.35);max-width:340px}
@@ -4688,7 +4691,9 @@ function renderBudget(a){
     return el("div",{className:"budcard"},
       el("div",{className:"budhead"}, el("b",{}, g.name), el("small",{className:"hint"}, "편성 " + won(p) + " · 사용 " + won(used) + " · 남음 " + won(p - used)),
         edit ? navBtn("고치기", () => openBudgetEdit(g.id, a.id), g.name + " 예산 고치기") : null),
-      ...(rows.length ? rows : [el("p",{className:"hint"}, "세부 예산이 없어요. [고치기]에서 더하세요.")]));
+      ...(rows.length ? rows : [el("p",{className:"hint"}, "세부 예산이 없어요. [고치기]에서 더하세요.")]),
+      g.memo ? el("p",{className:"budmemo"}, g.memo) : null,
+      (g.files || []).length ? el("div",{className:"budfiles"}, ...g.files.map(f => el("a",{href:f.url,target:"_blank",rel:"noopener noreferrer"}, "📎 " + f.name))) : null);
   });
   const d = el("details",{className:"featbox budget",open:!!featOpen["bud-" + a.id]},
     el("summary",{}, "예산", el("small",{}, mine.length ? "남은 돈 " + won(left) : "공동체별 예산 · 쓴 내역")),
@@ -4722,9 +4727,11 @@ function openBudgetEdit(id, area){
   save.onclick = async () => {
     if(!name.value.trim()) return err.textContent = "공동체 이름을 적어 주세요.";
     save.disabled = true;
-    if(await budCall("saveBudget", { id:g0?.id || "", area, name:name.value.trim(), items:rows.filter(r => r.name.trim()) })) $("dayDlg").close(); else save.disabled = false;
+    if(await budCall("saveBudget", { id:g0?.id || "", area, name:name.value.trim(), items:rows.filter(r => r.name.trim()), memo:memo.value, files:att.files() })) $("dayDlg").close(); else save.disabled = false;
   };
-  const kids = [el("label",{className:"memo-label"}, "공동체", name), el("p",{className:"hint"}, "세부 예산과 편성액(원)"), list, add, err];
+  const memo = el("textarea",{rows:3,maxLength:2000,value:g0?.memo || "",placeholder:"메모 (예: 집행 기한, 담당자, 품의 방법)"});
+  const att = attachBox(g0?.files, true);
+  const kids = [el("label",{className:"memo-label"}, "공동체", name), el("p",{className:"hint"}, "세부 예산과 편성액(원)"), list, add, el("label",{className:"memo-label"}, "메모", memo), att.node, err];
   const foot = [el("span",{className:"spacer"}), save];
   if(g0){
     const n = spends.filter(s => s.group === g0.id).length;
@@ -4747,11 +4754,12 @@ function openSpends(gid, iid){
     const text = el("input",{className:"field",maxLength:80,placeholder:"내용 (예: 협의회 다과)","aria-label":"내용"});
     const amt = el("input",{className:"field budamt",type:"number",step:100,placeholder:"금액(원)","aria-label":"금액"});
     const go = el("button",{className:"btn",type:"button"}, "적기");
-    go.onclick = async () => { if(!Number(amt.value)) return say("금액을 적어 주세요."); go.disabled = true; if(await budCall("addSpend", { group:gid, item:iid, date:day.value, text:text.value, amount:Number(amt.value) })) openSpends(gid, iid); else go.disabled = false; };
-    kids.push(el("div",{className:"spendadd"}, day, text, amt, go));
+    const memo = el("input",{className:"field",maxLength:500,placeholder:"메모 (선택)","aria-label":"메모"});
+    go.onclick = async () => { if(!Number(amt.value)) return say("금액을 적어 주세요."); go.disabled = true; if(await budCall("addSpend", { group:gid, item:iid, date:day.value, text:text.value, memo:memo.value, amount:Number(amt.value) })) openSpends(gid, iid); else go.disabled = false; };
+    kids.push(el("div",{className:"spendform"}, el("div",{className:"sfrow"}, day), el("div",{className:"sfrow"}, text, amt), el("div",{className:"sfrow"}, memo, go)));
   }
   kids.push(el("div",{className:"spends"}, ...(mine.length ? mine.map(s => el("div",{className:"spendrow"},
-    el("span",{className:"hint"}, s.date.slice(5).replace("-", "/")), el("span",{className:"st"}, s.text || "(내용 없음)"), el("b",{}, won(s.amount)),
+    el("span",{className:"hint"}, s.date.slice(5).replace("-", "/")), el("span",{className:"st"}, s.text || "(내용 없음)", s.memo ? el("small",{className:"hint smemo"}, s.memo) : null), el("b",{}, won(s.amount)),
     edit ? (() => { const x = navBtn("지우기", async () => { if(!x.dataset.armed){ x.dataset.armed = "1"; x.textContent = "한 번 더"; return; } if(await budCall("deleteSpend", s.id)) openSpends(gid, iid); }, "이 내역 지우기"); return x; })() : null))
     : [el("p",{className:"hint"}, "아직 쓴 내역이 없어요.")])));
   modal(g.name + " · " + it.name, ...kids);
