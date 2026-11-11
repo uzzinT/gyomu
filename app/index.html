@@ -3477,7 +3477,7 @@ function openCoolMsg(i, seen){
   else {
 
     if((i.links || []).length) kids.push(el("div",{className:"coollinks"}, el("b",{}, "링크"), ...i.links.map(l => el("a",{href:l,target:"_blank",rel:"noopener noreferrer"}, l))));
-    if((i.files || []).length) kids.push(el("div",{className:"coollinks"}, el("b",{}, "첨부"), ...i.files.map(f => f.url ? el("a",{href:f.url,target:"_blank",rel:"noopener noreferrer"}, "📎 " + f.name) : el("span",{className:"hint"}, "📎 " + f.name + (f.pcOnly ? " (25MB가 넘어 PC에만 있어요)" : " (드라이브로 올리는 중)")))));
+    if((i.files || []).length) kids.push(el("div",{className:"coollinks"}, el("b",{}, "첨부"), ...i.files.map(f => f.url ? el("a",{href:f.url,target:"_blank",rel:"noopener noreferrer"}, "📎 " + f.name) : el("span",{className:"hint"}, "📎 " + f.name + (f.pcOnly ? " (25MB가 넘어 PC에만 있어요)" : f.notOnPC ? " — PC 쿨메신저에서 아직 받지 않은 파일이에요. 쿨메신저에서 [받기]를 누르면 몇 분 안에 여기서 열 수 있어요." : " (올리는 중)")))));
     if(i.body) kids.push(el("h3",{className:"coolh"}, "원문"), el("div",{className:"coolbody"}, i.body));
     if(i.summary) kids.push(el("h3",{className:"coolh"}, "요약 (Claude)"), el("div",{className:"coolsum"}, i.summary));
   }
