@@ -2289,7 +2289,7 @@ function renderNotes(){
 }
 document.addEventListener("click", e => {
   // 숨은 저장 공간 첨부 + 드라이브에 올린 파일(할 일·조종례·예산 파일 칸, 쿨메신저 첨부)은 미리보기 창으로
-  const a = e.target.closest?.('a[href^="https://www.googleapis.com/drive/v3/files/"], ul.files a[href*="drive.google.com"], .coollinks a[href*="drive.google.com"], .budfiles a[href*="drive.google.com"]'); if(!a || !window.fbFileBlob) return;
+  const a = e.target.closest?.('a[href^="https://www.googleapis.com/drive/v3/files/"], a[href*="drive.google.com/file/d/"], a[href*="drive.google.com/uc?"], a[href*="drive.google.com/open?id="]'); if(!a || !window.fbFileBlob) return;
   const api = a.href.startsWith("https://www.googleapis.com/"), id = api ? "" : driveIdOf({ url:a.href }); if(!api && !id) return;
   e.preventDefault(); openPreview(api ? a.href.split("#")[0] : "https://www.googleapis.com/drive/v3/files/" + id + "?alt=media", a.textContent.replace(/^[📎🔗]\s*/u, "").trim() || "첨부");
 }, true);
@@ -3423,10 +3423,11 @@ function openCoolMsg(i, seen){
       ...(i.due ? [el("dt",{}, "마감"), el("dd",{}, el("b",{}, dayLabel(parseYmd(i.due))))] : []))];
   if(i.private) kids.push(el("p",{className:"note"}, "🔒 금칙어에 걸려 내용은 받지 않았어요. 쿨메신저에서 직접 보세요."));
   else {
-    if(i.summary) kids.push(el("h3",{className:"coolh"}, "요약 (Claude)"), el("div",{className:"coolsum"}, i.summary));
+
     if((i.links || []).length) kids.push(el("div",{className:"coollinks"}, el("b",{}, "링크"), ...i.links.map(l => el("a",{href:l,target:"_blank",rel:"noopener noreferrer"}, l))));
     if((i.files || []).length) kids.push(el("div",{className:"coollinks"}, el("b",{}, "첨부"), ...i.files.map(f => f.url ? el("a",{href:f.url,target:"_blank",rel:"noopener noreferrer"}, "📎 " + f.name) : el("span",{className:"hint"}, "📎 " + f.name + (f.pcOnly ? " (25MB가 넘어 PC에만 있어요)" : " (드라이브로 올리는 중)")))));
     if(i.body) kids.push(el("h3",{className:"coolh"}, "원문"), el("div",{className:"coolbody"}, i.body));
+    if(i.summary) kids.push(el("h3",{className:"coolh"}, "요약 (Claude)"), el("div",{className:"coolsum"}, i.summary));
   }
   const act = [navBtn("← 목록", () => openCool(), "목록으로")];
   act.push(el("span",{className:"spacer"}));
