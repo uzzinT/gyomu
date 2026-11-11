@@ -609,7 +609,7 @@ tr.attfocus td{background:color-mix(in srgb,var(--ochre) 18%,var(--paper))}
 .tpick{flex:1;min-width:0;display:grid;gap:6px}
 .tpick .actions{flex-wrap:nowrap}
 #tFind{flex:1;min-width:0;width:auto}
-.tchips{max-height:112px;overflow:auto;padding:2px;display:grid;grid-template-columns:repeat(auto-fill,minmax(5.5em,1fr));gap:4px}
+.tchips{padding:2px;display:grid;grid-template-columns:repeat(auto-fill,minmax(5.5em,1fr));gap:4px}
 .tchips .chip{width:100%;min-width:0;justify-content:center;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tgrid .dstart{border-left:2px solid var(--muted)}
 .tgrid .dayhead{background:var(--paper2)}
@@ -628,6 +628,16 @@ tr.attfocus td{background:color-mix(in srgb,var(--ochre) 18%,var(--paper))}
 
 .tfind{flex-wrap:nowrap}
 .tfind #tFind{flex:1;min-width:0;width:auto}
+/* 휴대폰: 창이 옆으로 밀리지 않게 찾기 칸은 한 줄 통째로, 선생님 이름은 한 줄에 5명 */
+@media (max-width:600px){
+  .pickrow{flex-direction:column;gap:4px}.pickrow>b{width:auto;padding:0}
+  .tfind{flex-wrap:wrap}.tfind #tFind{flex:1 1 100%}
+  .tchips{grid-template-columns:repeat(5,minmax(0,1fr));gap:3px}
+  .tchips .chip{padding:4px 2px;font-size:.74rem}
+  #dayDlg:has(.tgrid) .daybox{min-width:0}
+  #dayDlg:has(.tgrid){overflow-x:hidden}
+}
+.tgrid+*,.tt-wrap:has(>.tgrid){overscroll-behavior-x:contain}
 #tSort{width:auto;flex:none}
 .classtt .panel-head{flex-wrap:nowrap}
 .classtt .panel-head h2{white-space:nowrap}
@@ -1028,10 +1038,10 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
   body.onhome .home4{height:100%;align-items:stretch}
   body.onhome .home4 .col{overflow-y:auto;min-height:0;padding-right:4px;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
   body.onhome .home4 .col:last-child{grid-column:auto}
-  body.onhome .home4 .col:nth-child(2){overflow:hidden;display:flex;flex-direction:column}
+  body.onhome .home4 .col:nth-child(2){overflow-x:hidden;overflow-y:auto;display:flex;flex-direction:column}
   body.onhome .home4 .col:nth-child(2)>*{flex:none}
-  body.onhome .home4 .col:nth-child(2)>.tt{flex:1 1 0;min-height:0;display:flex;flex-direction:column}
-  body.onhome .home4 .col:nth-child(2)>.tt>.tt-wrap{flex:1 1 0;min-height:0;overflow:hidden}
+  body.onhome .home4 .col:nth-child(2)>.tt{flex:1 1 auto;min-height:min-content;display:flex;flex-direction:column}
+  body.onhome .home4 .col:nth-child(2)>.tt>.tt-wrap{flex:1 1 auto;min-height:min-content;overflow:visible}
   body.onhome .home4 .col:nth-child(2)>.tt table{height:100%}
   body.onhome .home4 .col:nth-child(2)>.tt th,body.onhome .home4 .col:nth-child(2)>.tt td{height:auto!important;padding:1px 2px!important;line-height:1.15}
 }
@@ -4095,7 +4105,7 @@ function openClassTTEdit(){
     err, el("div",{className:"actions"}, minus, plus, el("span",{className:"spacer"}), save));
 }
 
-// 선생님 시간표: 여러 요일 · 여러 선생님 비교(모두 비는 시간 표시) / 한 선생님 주간 시간표(내 시간표로 가져오기)
+// 선생님 시간표: 전체 선생님 시간표(여러 요일·여러 선생님, 모두 비는 시간 표시) / 한 선생님 주간 시간표(내 시간표로 가져오기)
 let ttSelDays = null, ttSelTeachers = new Set(), ttTeacherQ = "";
 let ttSort = (() => { try{ const v = localStorage.getItem("ttSort"); return ["name", "file", "homeroom"].includes(v) ? v : "name"; }catch{ return "name"; } })();
 // 가장 많이 맡은 과목 (교과별 보기에서 이름 옆에 표시)
@@ -4136,7 +4146,7 @@ function openTeacherTT(mode, sel){
   const P = allTT.periods || 7, sorted = orderedTeachers();
   // 보기 전환: 고른 쪽이 진하게
   const segBtn = (label, m) => { const b = el("button",{type:"button","aria-pressed":String(mode === m)}, label); b.onclick = () => { if(mode !== m) openTeacherTT(m); }; return b; };
-  const tabs = el("div",{className:"seg tseg"}, segBtn("여러 요일 · 여러 선생님 비교", "compare"), segBtn("한 선생님 주간 시간표", "teacher"));
+  const tabs = el("div",{className:"seg tseg"}, segBtn("전체 선생님 시간표", "compare"), segBtn("한 선생님 주간 시간표", "teacher"));
   const label = t => t.name + (t.homeroom ? " · " + t.homeroom + " 담임" : "") + (ttSort === "file" && tagOf(t) ? " · " + tagOf(t) : ""); // 담임 반은 늘 보임
   if(mode === "teacher"){
     const cur = sorted.some(t => t.name === sel) ? sel : (ttSelTeachers.size === 1 ? [...ttSelTeachers][0] : sorted[0].name), t = T.find(x => x.name === cur);
