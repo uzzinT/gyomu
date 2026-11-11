@@ -2430,7 +2430,7 @@ const catPick = (t, edit) => {
   const s = el("select",{className:"catmini" + (c ? "" : " none"),"aria-label":"할 일 분류",title:"분류 바꾸기"}, el("option",{value:""}, "분류"),
     ...todoCats().map(x => el("option",{value:x.id,selected:x.id === t.tcat}, x.name)), el("option",{value:"__edit"}, "✎ 분류 고치기…"));
   if(c) s.style.setProperty("--c", cloth(c.color));
-  s.onchange = () => { if(s.value === "__edit"){ s.value = t.tcat || ""; return openTodoCats(); } t.tcat = s.value; if(c || s.value) s.classList.toggle("none", !s.value); const nc = todoCatOf(t); if(nc) s.style.setProperty("--c", cloth(nc.color)); store.updateTodo(t.id, { tcat:s.value }); };
+  s.onchange = () => { if(s.value === "__edit"){ s.value = t.tcat || ""; return openTodoCats(); } t.tcat = s.value; if(c || s.value) s.classList.toggle("none", !s.value); const nc = todoCatOf(t); if(nc) s.style.setProperty("--c", cloth(nc.color)); store.updateTodo(t.id, { tcat:s.value }); say("✓ 분류를 '" + (todoCatOf(t)?.name || "분류 없음") + "'(으)로 저장했어요."); };
   return s;
 };
 const tcatChip = t => { const c = todoCatOf(t); if(!c) return ""; const s = el("span",{className:"tcat"}, c.name); s.style.setProperty("--c", cloth(c.color)); return s; };
@@ -3346,7 +3346,8 @@ async function openAllTodos(preset){
   const made = t => t.createdAt ? ymd(new Date(t.createdAt)) : "";
   const hits = () => { const w = q.value.trim(), d = from.value || to.value;
     return all.filter(t => (!w || (t.text + " " + (t.detail || "")).includes(w)) && (!d || inRange(t.due) || inRange(made(t))) && (!cs.value || (cs.value === "-" ? !todoCatOf(t) : t.tcat === cs.value)) && (!st.value || (st.value === "later" ? !t.done && !!t.due && t.due > ymd(addDays(new Date(), 7)) : (st.value === "done") === !!t.done)))
-      .sort((a, b) => (!!a.done - !!b.done) || (b.createdAt || 0) - (a.createdAt || 0)); };
+      .sort(st.value === "later" ? (a, b) => (a.due || "9999").localeCompare(b.due || "9999") || (a.createdAt || 0) - (b.createdAt || 0) // 앞으로 남은 것: 마감 빠른 순
+        : (a, b) => (!!a.done - !!b.done) || (b.createdAt || 0) - (a.createdAt || 0)); };
   const draw = () => {
     const rows = hits();
     count.textContent = rows.length + "개";
@@ -3369,7 +3370,8 @@ async function openAllTodos(preset){
   modal("할 일 전체", el("div",{className:"alltools one"}, q, xl),
     el("div",{className:"alltools one"}, ...(window.fbCall ? [cs] : []), st, ...(window.fbCall && canWrite() ? [navBtn("분류 고치기", () => openTodoCats(openAllTodos), "할 일 분류 더하기·지우기")] : [])),
     el("div",{className:"alltools range"}, el("span",{className:"hint"}, "기간"), from, el("span",{}, "~"), to, el("button",{type:"button",className:"ttback",title:"기간 지우기","aria-label":"기간 지우기",onclick:() => { from.value = ""; to.value = ""; again(); }}, "✕")),
-    el("p",{className:"hint"}, "마감일이나 만든 날이 기간 안에 있는 할 일이 나와요. 한쪽만 넣어도 돼요."), count, list);
+    el("p",{className:"hint"}, "마감일이나 만든 날이 기간 안에 있는 할 일이 나와요. 한쪽만 넣어도 돼요."), count, list,
+    el("div",{className:"actions"}, el("span",{className:"hint"}, "체크·분류는 고르는 즉시 저장돼요."), el("span",{className:"spacer"}), el("button",{type:"button",className:"btn",onclick:() => { $("dayDlg").close(); say("✓ 저장했어요."); }}, "저장")));
   $("dayDlg").querySelector(".daybox")?.setAttribute("data-autosave", "1"); // 찾기 칸·체크는 바로 저장되거나 저장할 게 없음 → 닫을 때 묻지 않음
 }
 // ---------- 쿨메신저: PC '쿨메신저 연결'이 드라이브에 올린 메시지 (분류·요약은 PC의 Claude) ----------
