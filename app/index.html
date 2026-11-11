@@ -4128,7 +4128,8 @@ function orderedTeachers(){
 }
 const tagOf = t => ttSort === "homeroom" ? (t.homeroom ? t.homeroom : "") : ttSort === "file" ? mainSubject(t) : "";
 const roomOf = q => { const m = String(q).replace(/\s/g, "").match(/^(\d)(?:학년|-)?(\d{1,2})반?$/) || String(q).match(/^(\d)\s*-\s*(\d{1,2})$/); return m ? [Number(m[1]), Number(m[2])] : null; };
-const teachesIn = (t, g, c) => { const re = new RegExp("(^|[^0-9])" + g + "\\s*-\\s*0?" + c + "(?![0-9])"); return t.cells.flat().some(v => re.test(String(v || ""))); };
+const teachesIn = (t, g, c) => { const re = new RegExp("(^|[^0-9])" + g + "\\s*-\\s*0?" + c + "(?![0-9])"); return t.cells.some((day, d) => (!ttMatchDays || ttMatchDays.has(d)) && (day || []).some(v => re.test(String(v || "")))); };
+let ttMatchDays = null; // 전체 선생님 시간표에서는 고른 요일에 그 반 수업이 있는 선생님만
 const teacherMatch = (t, q) => {
   if(ttHrOnly && !t.homeroom) return false;
   if(!q) return true;
@@ -4162,6 +4163,7 @@ function openTeacherTT(mode, sel){
   const T = allTT?.teachers || [];
   if(!T.length) return modal("선생님 시간표", el("p",{className:"note"}, "설정 → 학기 초 세팅에서 전체 교사 시간표를 올리거나 구글 시트로 연결해 주세요."));
   mode = mode || "compare";
+  ttMatchDays = mode === "compare" ? ttSelDays : null;
   const P = allTT.periods || 7, sorted = orderedTeachers();
   // 보기 전환: 고른 쪽이 진하게
   const segBtn = (label, m) => { const b = el("button",{type:"button","aria-pressed":String(mode === m)}, label); b.onclick = () => { if(mode !== m) openTeacherTT(m); }; return b; };
@@ -4189,6 +4191,7 @@ function openTeacherTT(mode, sel){
   }
   const wd = new Date().getDay();
   if(!ttSelDays) ttSelDays = new Set([wd >= 1 && wd <= 5 ? wd - 1 : 0]);
+  ttMatchDays = ttSelDays;
   const chip = (text, on, fn) => { const b = el("button",{type:"button",className:"chip","aria-pressed":String(on)}, text); b.onclick = fn; return b; };
   const dayChips = el("div",{className:"chips"}, ...DAYS.map((d, j) => chip(d, ttSelDays.has(j), () => {
     if(ttSelDays.has(j)){ if(ttSelDays.size > 1) ttSelDays.delete(j); } else ttSelDays.add(j);
