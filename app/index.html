@@ -588,6 +588,16 @@ dialog label.inline,.set-area label.inline{display:flex;flex-direction:row;gap:8
 .noticebox{display:flex;flex-direction:column;gap:10px}.noticebox>*{margin:0}.noticebox>.actions{gap:8px}
 /* 휴대폰: 입력칸을 누를 때 화면이 커지지 않게 (아이폰은 16px 보다 작은 글씨 칸을 확대함), 두 번 눌러 확대도 막음 */
 html{touch-action:manipulation;-webkit-text-size-adjust:100%}
+/* 휴대폰마다 화면 폭·글꼴 크기가 달라도 옆으로 넘치지 않게 (출결 학생 단추·사유 칸 등) */
+@media (max-width:700px){
+  html,body{overflow-x:clip;max-width:100vw}
+  .attwrap,.attform,.attrow,.attrow>*,.kidgrid,.pergrid,.docrow,.typegroups{min-width:0;max-width:100%;box-sizing:border-box}
+  .attrow>input,.attrow>textarea,.attrow .field,.attform input[type=text],.attform textarea{width:100%;max-width:100%;min-width:0;box-sizing:border-box}
+  .kidgrid{width:100%;grid-template-columns:repeat(5,minmax(0,1fr))!important}
+  .kbtn{min-width:0;max-width:100%;padding-left:2px;padding-right:2px}
+  .pergrid .pbtn{min-width:0;flex:1 1 3.2em}
+}
+@media (max-width:340px){.kidgrid{grid-template-columns:repeat(4,minmax(0,1fr))!important}}
 @media (max-width:700px){input,select,textarea{font-size:16px!important}select.catmini{font-size:11px!important;height:18px!important;min-height:0!important;width:46px!important;padding:0 10px 0 3px!important;line-height:18px!important;-webkit-text-size-adjust:100%}}
 .photosheet{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
 .pscard{display:grid;justify-items:center;gap:2px;border:1px solid var(--line);border-radius:8px;background:var(--paper);padding:6px;font:inherit;color:var(--ink);cursor:pointer}
@@ -1532,26 +1542,26 @@ function attQuick(apply, fn, args, ok){
 // 누르자마자 "저장하는 중…"을 띄우고, 시트에 다 들어가면 "✓ …"로 바꿈
 async function attDo(fn, args, ok){ say("저장하는 중…"); try{ const r = await call(fn, ...args); attSet(r); if(ok) say("✓ " + ok); renderAttend(); return r; }catch(e){ say(e?.message || "저장하지 못했어요."); throw e; } }
 // ----- 화면 -----
-// [+ 종류] 를 누르면 그 자리에 작은 입력 줄이 펼쳐짐. 더하면 onAdded(새 종류) 로 바로 고른 상태가 됨
+// [+ 이번만 쓸 종류]: 그 자리에 작은 입력 줄. 이번 기록에만 쓰고 설정의 출결 종류에는 남기지 않음 (늘 쓸 종류는 설정에서)
+// 고른 종류가 목록에 없으면(이번만 쓰는 종류) 목록 끝에 붙여 보여 줌
+const typesWith = (D, name, docs) => !name || D.types.some(t => t.name === name) ? D.types : D.types.concat({ name, doc:(docs || []).join(", "), group:"", once:true });
 function addTypeChip(D, onAdded){
   const wrap = el("div",{className:"addtype"});
   const open = () => {
     const n = el("input",{type:"text",className:"field",maxLength:30,placeholder:"출결 명칭 (예: 인정조퇴(체험))","aria-label":"출결 명칭"});
     const g = el("select",{className:"field","aria-label":"색상 그룹"}, el("option",{value:""}, "그룹"), ...Object.keys(D.colors || {}).map(x => el("option",{value:x}, x)));
     const d = el("input",{type:"text",className:"field",maxLength:200,placeholder:"필요 서류 (쉼표로: 출결신고서, 체험학습 보고서)","aria-label":"필요 서류"});
-    const go = el("button",{type:"button",className:"btn"}, "더하기");
+    const go = el("button",{type:"button",className:"btn"}, "이번만 쓰기");
     go.onclick = async () => {
       const name = n.value.trim(); if(!name) return say("출결 명칭을 적어 주세요.");
       if(D.types.some(t => t.name === name)) return say("이미 있는 출결 종류예요.");
-      const t = { name, doc:splitDocs(d.value).join(", "), group:g.value };
-      go.disabled = true;
-      try{ await attDo("attSaveTab", ["출결종류", D.types.concat(t).map(x => [x.name, String(x.doc || "").trim(), x.group || ""])], "출결 종류 '" + name + "'를 더했어요."); if(!D.types.some(x => x.name === name)) D.types.push(t); onAdded(t); }
-      catch(e){ go.disabled = false; }
+      const t = { name, doc:splitDocs(d.value).join(", "), group:g.value, once:true };
+      wrap.replaceChildren(btn); onAdded(t); say("'" + name + "'는 이번 기록에만 써요. 늘 쓰려면 설정 → 출결 종류에서 더하세요.");
     };
     wrap.replaceChildren(el("div",{className:"addtype-form"}, n, g, d, el("div",{className:"actions"}, navBtn("취소", () => wrap.replaceChildren(btn), "취소"), go)));
     setTimeout(() => autoFocus(n), 0);
   };
-  const btn = navBtn("+ 종류", open, "출결 종류 더하기 (필요 서류도 함께)", !canWrite());
+  const btn = navBtn("+ 이번만 쓸 종류", open, "이번 기록에만 쓸 출결 종류 (설정에는 저장 안 됨)", !canWrite());
   wrap.append(btn);
   return wrap;
 }
@@ -1585,11 +1595,11 @@ function attInput(){
   const card = (n, label, c, on) => { const b = el(on ? "button" : "div",{className:"dcard",type:on ? "button" : undefined}, el("b",{}, String(n)), el("span",{}, label)); b.style.setProperty("--c", c); if(on) b.onclick = on; return b; };
   const s = el("input",{type:"date",className:"field",value:f.s,"aria-label":"시작일"}), e = el("input",{type:"date",className:"field",value:f.e,"aria-label":"종료일 (하루면 비워 둠)"});
   const typeBox = el("div",{className:"typegroups"}), kidBox = el("div",{className:"kidgrid"}), perBox = el("div",{className:"pergrid"}), perHint = el("span",{className:"hint"}), docBox = el("div",{className:"docrow"});
-  const drawTypes = () => { const groups = [...new Set(D.types.map(typeRow))];
-    typeBox.replaceChildren(...groups.map(g => el("div",{className:"tgroup"}, ...D.types.filter(t => typeRow(t) === g).map(t => chipBtn(t.name, typeColor(t.name), f.type === t.name, () => {
+  const drawTypes = () => { const TS = typesWith(D, f.type, f.docs), groups = [...new Set(TS.map(typeRow))];
+    typeBox.replaceChildren(...groups.map(g => el("div",{className:"tgroup"}, ...TS.filter(t => typeRow(t) === g).map(t => chipBtn(t.name, typeColor(t.name), f.type === t.name, () => {
       f.type = f.type === t.name ? "" : t.name; f.ps = /결석/.test(f.type) ? [0, ...range1(1, f.maxP), 99] : []; f.docs = splitDocs(attTypeDoc(f.type)); f.st = {};
       if(/생리/.test(f.type) && !reason.value) reason.value = "생리통"; drawTypes(); drawPer(); drawDocs(); }))))
-      , addTypeChip(D, t => { f.type = t.name; f.ps = /결석/.test(f.type) ? [0, ...range1(1, f.maxP), 99] : []; f.docs = splitDocs(t.doc); f.st = {}; renderAttend(); })); };
+      , addTypeChip(D, t => { f.type = t.name; f.ps = /결석/.test(f.type) ? [0, ...range1(1, f.maxP), 99] : []; f.docs = splitDocs(t.doc); f.st = {}; drawTypes(); drawPer(); drawDocs(); })); };
   const attTypeDoc = n => D.types.find(t => t.name === n)?.doc || "";
   const drawKids = () => { const kids = attKids(), max = Math.max(0, ...kids.map(k => parseInt(k.num) || 0));
     kidBox.replaceChildren(...range1(1, max).map(i => { const k = kids.find(x => parseInt(x.num) === i); if(!k) return el("span",{});
@@ -1656,7 +1666,7 @@ function attEdit(r){
   const s = el("input",{type:"date",className:"field",value:g.s}), e = el("input",{type:"date",className:"field",value:g.e});
   const stu = el("select",{className:"field","aria-label":"학생"}, ...attKids().map(k => el("option",{value:k.num + "|" + k.name}, stuLabel(k.num, k.name)))); stu.value = r.num + "|" + r.name;
   const typeBox = el("div",{className:"typegroups"}), perBox = el("div",{className:"pergrid"}), docBox = el("div",{className:"docrow"}), reason = el("input",{type:"text",className:"field",value:r.reason,maxLength:300});
-  const drawT = () => typeBox.replaceChildren(...[...new Set(D.types.map(typeRow))].map(gr => el("div",{className:"tgroup"}, ...D.types.filter(t => typeRow(t) === gr).map(t => chipBtn(t.name, typeColor(t.name), g.type === t.name, () => {
+  const drawT = () => typeBox.replaceChildren(...[...new Set(typesWith(D, g.type, g.docs).map(typeRow))].map(gr => el("div",{className:"tgroup"}, ...typesWith(D, g.type, g.docs).filter(t => typeRow(t) === gr).map(t => chipBtn(t.name, typeColor(t.name), g.type === t.name, () => {
     g.type = t.name; g.ps = /결석/.test(g.type) ? [0, ...range1(1, g.maxP), 99] : []; g.docs = splitDocs(t.doc); g.st = {}; drawT(); drawP(); drawD(); })))),
     addTypeChip(D, t => { g.type = t.name; g.ps = /결석/.test(g.type) ? [0, ...range1(1, g.maxP), 99] : []; g.docs = splitDocs(t.doc); g.st = {}; drawT(); drawP(); drawD(); }));
   const drawP = () => perBox.replaceChildren(...[0, ...range1(1, g.maxP), 99].map(p => { const b = el("button",{type:"button",className:"kbtn pbtn","aria-pressed":String(g.ps.includes(p)),disabled:/결석/.test(g.type)}, PN(p)); b.onclick = () => { g.ps = clickPeriod(g.ps, p, g.type, g.maxP); drawP(); }; return b; }));
