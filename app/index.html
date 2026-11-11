@@ -483,6 +483,15 @@ dialog label.inline,.set-area label.inline{display:flex;flex-direction:row;gap:8
 .featbox>summary{cursor:pointer;padding:10px 14px;font:700 1.1rem var(--display);display:flex;gap:10px;align-items:baseline;list-style-position:inside}
 .featbox>summary small{font:400 .75rem var(--body);color:var(--muted)}
 .featbox .feat{padding:4px 14px 14px;margin:0;border:0}
+.budgets{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(min(100%,22em),1fr))}.budgets>.actions,.budgets>.note{grid-column:1/-1}
+.budcard{border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:grid;gap:4px;align-content:start}
+.budhead{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;margin-bottom:4px}.budhead>b{font-size:1rem}.budhead>button{margin-left:auto}
+.budrow{display:grid;grid-template-columns:minmax(4em,1fr) 4em auto;grid-template-areas:"n bar r" "m m m";gap:2px 8px;align-items:center;text-align:left;border:0;border-top:1px dashed var(--line);background:none;padding:6px 2px;font:inherit;cursor:pointer;color:inherit}
+.budrow:hover{background:rgba(0,0,0,.03)}.budrow .bn{grid-area:n;font-weight:600}.budrow .bm{grid-area:m;font-size:.78rem;color:var(--muted)}.budrow .br{grid-area:r;font-size:.85rem;white-space:nowrap}
+.budrow.over .br{color:var(--wine,#a33)}.budbar{grid-area:bar;height:6px;border-radius:3px;background:var(--line);overflow:hidden}.budbar>span{display:block;height:100%;background:var(--c,var(--green,#3a7))}
+.budrow.over .budbar>span{background:var(--wine,#a33)}
+.budamt{max-width:9em}.spendadd{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.spendadd input[type=date]{width:auto}.spendadd input:not([type]){flex:1 1 10em;min-width:0}
+.spends{display:grid;gap:2px;max-height:50vh;overflow:auto}.spendrow{display:flex;gap:8px;align-items:center;padding:4px 0;border-top:1px dashed var(--line)}.spendrow .st{flex:1;min-width:0}.spendrow b{white-space:nowrap}
 .set-add{margin:0 0 18px}
 .set-foot{margin-top:4px}
 #setErr{margin-bottom:14px}
@@ -1046,7 +1055,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="backend.js?v=21e4a5b2"></script>
+<script src="backend.js?v=cbe0d1e9"></script>
 <style>
 #fbGate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--desk)}
 #fbGate .fbbox{background:var(--paper);border-radius:22px;padding:36px 32px;text-align:center;box-shadow:0 18px 40px -24px rgba(20,40,25,.35);max-width:340px}
@@ -1244,6 +1253,7 @@ function apply(data){
   dues = data?.dues && typeof data.dues === "object" ? data.dues : {};
   memoFiles = data?.memoFiles && typeof data.memoFiles === "object" ? data.memoFiles : {};
   evNotes = data?.evNotes && typeof data.evNotes === "object" ? data.evNotes : {};
+  budgets = Array.isArray(data?.budgets) ? data.budgets : []; spends = Array.isArray(data?.spends) ? data.spends : [];
   logs = Array.isArray(data?.logs) ? data.logs : [];
   todos = Array.isArray(data?.todos) ? data.todos : [];
   plans = data?.plans && typeof data.plans === "object" ? data.plans : {};
@@ -4448,6 +4458,89 @@ function renderHome(){ if(tab === "home") renderToday(); else if(areaOf(tab)) re
 // 영역 탭의 핵심 기능 칸은 접어 두고, 펼친 상태는 기억함
 const featOpen = (() => { try{ return JSON.parse(localStorage.getItem("featOpen") || "{}"); }catch{ return {}; } })();
 const FEAT_NAMES = { class:"우리 반 · 조·종례 · 제출물", subject:"시간표 · 수업 기록", admin:"학사일정 · 이번 주 일정" };
+// ---------- 예산 (학급·행정 탭): 공동체 → 세부 예산 → 쓴 내역 ----------
+let budgets = [], spends = [];
+const won = n => (Number(n) || 0).toLocaleString("ko-KR") + "원";
+const usedOf = (g, i) => spends.filter(s => s.group === g.id && (!i || s.item === i.id)).reduce((a, s) => a + (Number(s.amount) || 0), 0);
+const planOfG = g => (g.items || []).reduce((a, i) => a + (Number(i.amount) || 0), 0);
+const budCall = async (fn, ...a) => { say("저장하는 중…"); try{ apply(await call(fn, ...a)); render(); say("✓ 저장했어요."); return true; }catch(e){ say(e?.message || "저장하지 못했어요."); return false; } };
+function renderBudget(a){
+  if(!window.fbCall || !["class", "admin"].includes(a.id)) return null;
+  const mine = budgets.filter(g => g.area === a.id).sort((x, y) => (x.createdAt || 0) - (y.createdAt || 0)), edit = canWrite();
+  const left = mine.reduce((s, g) => s + planOfG(g) - usedOf(g), 0);
+  const cards = mine.map(g => {
+    const p = planOfG(g), used = usedOf(g);
+    const rows = (g.items || []).map(i => {
+      const u = usedOf(g, i), rest = (Number(i.amount) || 0) - u, pct = i.amount ? Math.min(100, Math.round(u / i.amount * 100)) : 0;
+      const bar = el("span",{className:"budbar"}, el("span",{})); bar.firstChild.style.width = pct + "%";
+      const r = el("button",{type:"button",className:"budrow" + (rest < 0 ? " over" : ""),title:"쓴 내역 보기·적기"}, el("span",{className:"bn"}, i.name), bar,
+        el("span",{className:"bm"}, won(u) + " / " + won(i.amount)), el("b",{className:"br"}, "남음 " + won(rest)));
+      r.onclick = () => openSpends(g.id, i.id); return r;
+    });
+    return el("div",{className:"budcard"},
+      el("div",{className:"budhead"}, el("b",{}, g.name), el("small",{className:"hint"}, "편성 " + won(p) + " · 사용 " + won(used) + " · 남음 " + won(p - used)),
+        edit ? navBtn("고치기", () => openBudgetEdit(g.id, a.id), g.name + " 예산 고치기") : null),
+      ...(rows.length ? rows : [el("p",{className:"hint"}, "세부 예산이 없어요. [고치기]에서 더하세요.")]));
+  });
+  const d = el("details",{className:"featbox budget",open:!!featOpen["bud-" + a.id]},
+    el("summary",{}, "예산", el("small",{}, mine.length ? "남은 돈 " + won(left) : "공동체별 예산 · 쓴 내역")),
+    el("div",{className:"feat budgets"}, ...(cards.length ? cards : [el("p",{className:"note"}, "아직 예산이 없어요. 공동체(예: 3학년부, AI 교학공)를 더하고 그 안에 세부 예산을 나누세요.")]),
+      edit ? el("div",{className:"actions"}, navBtn("+ 공동체 더하기", () => openBudgetEdit(null, a.id), "예산 공동체 더하기")) : null));
+  d.ontoggle = () => { featOpen["bud-" + a.id] = d.open; try{ localStorage.setItem("featOpen", JSON.stringify(featOpen)); }catch{} };
+  return d;
+}
+// 공동체 이름과 세부 예산(이름·편성액) 더하기·지우기
+function openBudgetEdit(id, area){
+  const g0 = budgets.find(x => x.id === id), rows = (g0?.items || []).map(i => ({ ...i }));
+  const name = el("input",{className:"field",maxLength:30,value:g0?.name || "",placeholder:"공동체 이름 (예: 3학년부)","aria-label":"공동체 이름"});
+  const list = el("div",{className:"catlist"}), err = el("div",{className:"err"});
+  const draw = () => list.replaceChildren(...rows.map((it, k) => {
+    const n = el("input",{className:"field",maxLength:30,value:it.name,placeholder:"세부 예산 (예: 강사비)","aria-label":"세부 예산 이름"}); n.oninput = () => { it.name = n.value; };
+    const m = el("input",{className:"field budamt",type:"number",min:0,step:1000,value:it.amount || "",placeholder:"편성액(원)","aria-label":"편성액"}); m.oninput = () => { it.amount = Number(m.value) || 0; };
+    const cnt = g0 && it.id ? spends.filter(s => s.group === g0.id && s.item === it.id).length : 0;
+    const del = navBtn("지우기", () => { if(cnt && !del.dataset.armed){ del.dataset.armed = "1"; del.textContent = "쓴 내역 " + cnt + "건도 지워요"; return; } rows.splice(k, 1); draw(); }, "세부 예산 지우기");
+    return el("div",{className:"catrow"}, n, m, del);
+  }));
+  draw();
+  const add = navBtn("+ 세부 예산 더하기", () => { if(rows.length >= 40) return; rows.push({ id:"", name:"", amount:0 }); draw(); }, "세부 예산 더하기");
+  const save = el("button",{className:"btn",type:"button"}, "저장");
+  save.onclick = async () => {
+    if(!name.value.trim()) return err.textContent = "공동체 이름을 적어 주세요.";
+    save.disabled = true;
+    if(await budCall("saveBudget", { id:g0?.id || "", area, name:name.value.trim(), items:rows.filter(r => r.name.trim()) })) $("dayDlg").close(); else save.disabled = false;
+  };
+  const kids = [el("label",{className:"memo-label"}, "공동체", name), el("p",{className:"hint"}, "세부 예산과 편성액(원)"), list, add, err];
+  const foot = [el("span",{className:"spacer"}), save];
+  if(g0){
+    const n = spends.filter(s => s.group === g0.id).length;
+    const del = navBtn("공동체 지우기", async () => {
+      if(!del.dataset.armed){ del.dataset.armed = "1"; del.textContent = "한 번 더 누르면 지워요" + (n ? " (쓴 내역 " + n + "건 포함)" : ""); return; }
+      if(await budCall("deleteBudget", g0.id)) $("dayDlg").close();
+    }, "공동체 지우기");
+    foot.unshift(del);
+  }
+  modal(g0 ? g0.name + " 예산 고치기" : "공동체 더하기", ...kids, el("div",{className:"actions"}, ...foot));
+}
+// 세부 예산 하나의 쓴 내역: 보기·적기·지우기
+function openSpends(gid, iid){
+  const g = budgets.find(x => x.id === gid), it = g?.items.find(i => i.id === iid); if(!it) return;
+  const mine = spends.filter(s => s.group === gid && s.item === iid).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
+  const used = usedOf(g, it), edit = canWrite();
+  const kids = [el("p",{className:"note"}, "편성 " + won(it.amount) + " · 사용 " + won(used) + " · 남음 " + won((Number(it.amount) || 0) - used))];
+  if(edit){
+    const day = el("input",{type:"date",className:"field",value:ymd(new Date()),"aria-label":"날짜"});
+    const text = el("input",{className:"field",maxLength:80,placeholder:"내용 (예: 협의회 다과)","aria-label":"내용"});
+    const amt = el("input",{className:"field budamt",type:"number",step:100,placeholder:"금액(원)","aria-label":"금액"});
+    const go = el("button",{className:"btn",type:"button"}, "적기");
+    go.onclick = async () => { if(!Number(amt.value)) return say("금액을 적어 주세요."); go.disabled = true; if(await budCall("addSpend", { group:gid, item:iid, date:day.value, text:text.value, amount:Number(amt.value) })) openSpends(gid, iid); else go.disabled = false; };
+    kids.push(el("div",{className:"spendadd"}, day, text, amt, go));
+  }
+  kids.push(el("div",{className:"spends"}, ...(mine.length ? mine.map(s => el("div",{className:"spendrow"},
+    el("span",{className:"hint"}, s.date.slice(5).replace("-", "/")), el("span",{className:"st"}, s.text || "(내용 없음)"), el("b",{}, won(s.amount)),
+    edit ? (() => { const x = navBtn("지우기", async () => { if(!x.dataset.armed){ x.dataset.armed = "1"; x.textContent = "한 번 더"; return; } if(await budCall("deleteSpend", s.id)) openSpends(gid, iid); }, "이 내역 지우기"); return x; })() : null))
+    : [el("p",{className:"hint"}, "아직 쓴 내역이 없어요.")])));
+  modal(g.name + " · " + it.name, ...kids);
+}
 function featBox(a, feat){
   const d = el("details",{className:"featbox",open:!!featOpen[a.id]},
     el("summary",{}, FEAT_NAMES[a.id] || "기능", el("small",{}, "오늘 탭에서도 볼 수 있어요")), el("div",{className:"feat"}, ...feat));
@@ -4634,8 +4727,8 @@ function renderArea(){
     return el("section",{className:"group"}, el("h3",{}, c.name, el("small",{}, `${g.length}`)),
       ...(g.length ? [el("div",{className:"cards"}, ...g.map(it => card(it, color)))] : [el("div",{className:"empty"}, query ? "찾는 항목이 없어요" : "아직 비어 있어요")]));
   });
-  const feat = FEATURES[a.id] ? FEATURES[a.id]() : [], tdGroup = renderAreaTodos(a, color);
-  $("view").replaceChildren(...(feat.length ? [featBox(a, feat)] : []), chips, ...(tdGroup ? [tdGroup] : []), ...groups);
+  const feat = FEATURES[a.id] ? FEATURES[a.id]() : [], tdGroup = renderAreaTodos(a, color), bud = renderBudget(a);
+  $("view").replaceChildren(...(feat.length ? [featBox(a, feat)] : []), ...(bud ? [bud] : []), chips, ...(tdGroup ? [tdGroup] : []), ...groups);
 }
 
 // ---------- 설정 ----------

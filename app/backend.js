@@ -10,7 +10,7 @@
   firebase.initializeApp(FB);
   const auth = firebase.auth(), fs = firebase.firestore();
 
-  const TABLES = ["cfg", "items", "events", "memos", "notes", "checks", "logs", "todos", "teachers", "classRosters", "attend", "pmsg", "evnotes"];
+  const TABLES = ["cfg", "items", "events", "memos", "notes", "checks", "logs", "todos", "teachers", "classRosters", "attend", "pmsg", "evnotes", "budgets", "spends"];
   const EMPTY = { cfg: {}, classRosters: {} };
   let uid = null, DB = null;
   try { localStorage.removeItem("gtok"); } catch (e) {} // 예전 1시간짜리 구글 열쇠 (이제 안 씀)
@@ -20,7 +20,7 @@
   // 두 기기(휴대폰·PC)에서 따로 고쳐도 사라지지 않게: 이 기기에서 바꾼 것만 기록해 두었다가, 저장할 때 드라이브의 최신본에 그것만 얹음
   // 표마다 줄을 찾는 열쇠 (열쇠가 없는 표는 표 통째로)
   const KEY = { items: r => r.id, notes: r => r.id, checks: r => r.id, todos: r => r.id, logs: r => r.date + "|" + r.period, evnotes: r => r.key, pmsg: r => r.id + "|" + r.no,
-    memos: r => r.date, events: r => r.date + "|" + r.title + "|" + (r.cat || ""), attend: r => r.date + "|" + r.code + "|" + r.no };
+    memos: r => r.date, events: r => r.date + "|" + r.title + "|" + (r.cat || ""), attend: r => r.date + "|" + r.code + "|" + r.no, budgets: r => r.id, spends: r => r.id };
   const freshPend = () => ({ t: {}, cfg: {} });
   let pend = freshPend(); // t[표] = true(통째로) 또는 { ch: {열쇠:1}, gone: {열쇠:1} }, cfg[설정 이름] = 1
   function track(p, t, old, v) {
@@ -244,7 +244,8 @@
       evNotes: Object.fromEntries(get("evnotes").filter(n => n && n.key).map(n => [n.key, { text: n.text || "", due: !!n.due, files: n.files || [] }])),
       notes: get("notes").filter(n => n.date >= t), checks: get("checks").filter(c => !c.closed),
       logs: get("logs").filter(l => l.date >= lt && (l.text || l.lesson > 0 || (l.files || []).length)),
-      todos: get("todos").filter(x => !x.done || x.createdAt >= old)
+      todos: get("todos").filter(x => !x.done || x.createdAt >= old),
+      budgets: get("budgets"), spends: get("spends")
     });
   }
   // 표에서 id 로 찾아 바꾸기
@@ -380,6 +381,30 @@
       if ("text" in p && String(p.text).trim()) o.text = S(p.text, 60).trim(); if ("detail" in p) o.detail = S(p.detail, 2000).trim();
       if ("due" in p) o.due = DATE_RE.test(String(p.due)) ? p.due : ""; if ("done" in p) o.done = !!p.done; if ("files" in p) o.files = cleanFiles(p.files); if ("tcat" in p) o.tcat = S(p.tcat, 40); return o; }); return getAll(); },
     async deleteTodo(id) { await dropRow("todos", id); return getAll(); },
+    // 예산: 공동체(예: 3학년부, AI 교학공) 하나에 세부 예산 여러 개, 쓴 내역은 세부 예산마다
+    async saveBudget(g) {
+      const name = S(g && g.name, 30).trim(); if (!name) fail("공동체 이름을 적어 주세요.");
+      const area = areaIds().indexOf(String(g.area)) >= 0 ? String(g.area) : fail("영역이 올바르지 않아요.");
+      const won = v => Math.max(0, Math.min(1e11, Math.round(Number(v) || 0)));
+      const seen = {}, items = (Array.isArray(g.items) ? g.items : []).slice(0, 40)
+        .map(i => ({ id: S(i && i.id, 40) || uuid(), name: S(i && i.name, 30).trim(), amount: won(i && i.amount) })).filter(i => i.name && !seen[i.id] && (seen[i.id] = true));
+      const id = S(g.id, 40), rows = get("budgets").slice(), at = rows.findIndex(r => r.id === id);
+      const row = { id: at >= 0 ? id : uuid(), area, name, items, createdAt: at >= 0 ? rows[at].createdAt : Date.now() };
+      if (at >= 0) rows[at] = row; else rows.push(row);
+      await put("budgets", rows);
+      // 지운 세부 예산의 쓴 내역도 함께 지움 (화면에서 미리 알려 줌)
+      const ids = new Set(items.map(i => i.id)), sp = get("spends");
+      if (sp.some(s => s.group === row.id && !ids.has(s.item))) await put("spends", sp.filter(s => s.group !== row.id || ids.has(s.item)));
+      return getAll();
+    },
+    async deleteBudget(id) { await dropRow("budgets", id); await put("spends", get("spends").filter(s => s.group !== id)); return getAll(); },
+    async addSpend(s) {
+      const g = get("budgets").find(x => x.id === String(s && s.group)); if (!g || !g.items.some(i => i.id === s.item)) fail("예산을 찾지 못했어요. 새로 고침 해 주세요.");
+      const amount = Math.round(Number(s.amount) || 0); if (!amount) fail("금액을 적어 주세요.");
+      await put("spends", get("spends").concat({ id: uuid(), group: g.id, item: s.item, date: DATE_RE.test(String(s.date)) ? s.date : ymd(new Date()), text: S(s.text, 80).trim(), amount: Math.max(-1e11, Math.min(1e11, amount)), createdAt: Date.now() }));
+      return getAll();
+    },
+    async deleteSpend(id) { await dropRow("spends", id); return getAll(); },
     async savePlan(subject, lines) {
       subject = S(subject, 30).trim(); if (!subject) fail("과목 이름이 없어요.");
       const clean = (Array.isArray(lines) ? lines : []).map(s => S(s, 80).trim()).filter(Boolean).slice(0, 300), plans = { ...(cfgGet("plans") || {}) };
@@ -677,7 +702,7 @@
   }
 
   // ---------- 새 학년도: 지난 학년도를 드라이브 'YYYY학년도' 폴더에 시트로 정리하고, Firebase 에도 한 부 보관 ----------
-  const YEAR_TABLES = ["items", "events", "memos", "notes", "checks", "logs", "todos", "teachers", "classRosters", "attend", "pmsg"];
+  const YEAR_TABLES = ["items", "events", "memos", "notes", "checks", "logs", "todos", "teachers", "classRosters", "attend", "pmsg", "spends"];
   const YEAR_CFG = ["timetable", "kept", "ttTerm", "plans", "rosters", "students", "classTT", "periods", "studentTT", "stuPw", "classPw", "inputHash"];
   const J = v => JSON.stringify(v ?? null);
   // parseBook 이 다시 읽을 수 있는 모양 (예전 교무수첩 시트와 같은 탭·칸)
@@ -735,6 +760,7 @@
       await yearFolder(newYear);
       // 새 학년도는 영역·분류·수업 시간 설정만 남기고 처음부터
       for (const t of YEAR_TABLES) await put(t, t === "classRosters" ? {} : []);
+      await put("budgets", get("budgets").map(g => ({ ...g, items: (g.items || []).map(i => ({ ...i, amount: 0 })) })));
       // 학급 출결 시트: 같은 모양으로 새 학년도 것을 복제 (출결 종류·알림 규칙·교시·화면 설정은 그대로, 기록·휴지통·명부·학사일정은 비움). 지난 시트는 그대로 남음
       let attend = c.attend;
       if (c.attend && c.attend.url) try {
@@ -948,7 +974,7 @@
   async function importFromSheet() {
     const out = await parseBook(OLD_SHEET), keep = get("cfg");
     out.cfg.drive = keep.drive; // 찾아 둔 드라이브 폴더는 그대로
-    for (const t of TABLES) await put(t, out[t]);
+    for (const t of TABLES) if (out[t] !== undefined || !["budgets", "spends"].includes(t)) await put(t, out[t]);
     await findArchives().catch(() => {});
     return { counts: Object.fromEntries(TABLES.filter(t => Array.isArray(out[t])).map(t => [t, out[t].length])), all: getAll() };
   }
