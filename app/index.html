@@ -2285,9 +2285,7 @@ function renderNotes(){
       store.addNote({ date:key, type:"", text });
       setTimeout(() => $("noteText")?.focus(), 30); // 다시 그려진 입력칸으로 커서를 돌려 연달아 입력
     };
-    const picked = list.filter(n => n.done);
-    const bulk = navBtn("체크한 " + picked.length + "개 다음 날로", () => copyTo(picked), "체크한 항목을 다음 날로 복사", !picked.length);
-    parts.push(el("div",{className:"nadd"}, inp), el("div",{className:"nbulk"}, navBtn("복사", () => copyText(notesText(key, list), "조·종례"), "조·종례를 글로 복사", !list.length), bulk));
+    parts.push(el("div",{className:"nadd"}, inp), el("div",{className:"nbulk"}, navBtn("복사", () => copyText(notesText(key, list), "조·종례"), "조·종례를 글로 복사", !list.length)));
   }
   return el("section",{className:"panel notes"}, ...parts);
 }
