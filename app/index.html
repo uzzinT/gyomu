@@ -254,6 +254,7 @@ nav{margin-bottom:14px}
 .coolsum{white-space:pre-line;background:var(--mint,#eef6ee);border-radius:8px;padding:8px 12px;margin:6px 0}
 .coollinks{display:grid;gap:3px;margin:6px 0;word-break:break-all}.coolbody>div{white-space:pre-wrap;font-size:.85rem;max-height:40vh;overflow:auto;padding:6px 0}
 .hint.warn{color:var(--danger,#b33)}
+.tlater{margin-top:6px}.tlater .btn{width:100%}
 .alltools.one{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;margin:6px 0}.alltools.one .field{flex:1 1 0;min-width:0;width:auto;margin:0}.alltools.one>button{flex:none}
 .alltools.range{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;margin:6px 0}.alltools.range input[type=date]{flex:1 1 0;min-width:0;width:auto}.alltools.range>span,.alltools.range>button{flex:none}
 .tcat{display:inline-block;margin-right:5px;padding:0 6px;border-radius:999px;font-size:.72rem;line-height:1.5;color:#fff;background:var(--c,#667);vertical-align:1px}
@@ -3123,7 +3124,8 @@ function renderTodos(){
   const byDue = (a, b) => (a.due || "9999").localeCompare(b.due || "9999") || (a.createdAt || 0) - (b.createdAt || 0);
   const catIdx = t => { const i = todoCats().findIndex(c => c.id === t.tcat); return i < 0 ? 999 : i; };
   const SORTS = { due:byDue, cat:(a, b) => catIdx(a) - catIdx(b) || byDue(a, b), new:(a, b) => (b.createdAt || 0) - (a.createdAt || 0) };
-  const open = todos.filter(t => !t.done).sort(SORTS[todoSort] || byDue);
+  const lim = ymd(addDays(new Date(), 7)), isLater = t => !!t.due && t.due > lim;
+  const later = todos.filter(t => !t.done && isLater(t)), open = todos.filter(t => !t.done && !isLater(t)).sort(SORTS[todoSort] || byDue);
   const sortSel = el("select",{className:"field tsort","aria-label":"할 일 정렬",title:"할 일 정렬"},
     ...[["due","마감일 순"], ["cat","분류별"], ["new","최근 만든 순"]].map(([v, l]) => el("option",{value:v,selected:todoSort === v}, l)));
   sortSel.onchange = () => { todoSort = sortSel.value; try{ localStorage.setItem("todoSort", todoSort); }catch{} renderHome(); };
@@ -3140,7 +3142,8 @@ function renderTodos(){
   };
   const parts = [el("div",{className:"panel-head"}, el("h2",{}, "할 일"), el("small",{className:"ncount"}, open.length ? String(open.length) : ""),
     el("div",{className:"tt-tools"}, sortSel, navBtn("전체", openAllTodos, "끝낸 것까지 할 일 전체 · 찾기"), ...(window.fbCall ? [navBtn("쿨메신저", () => openCool(), "쿨메신저로 받은 메시지 모두 보기")] : [])))];
-  parts.push(...(open.length ? open.map(row) : [el("div",{className:"empty"}, "할 일이 없어요")]));
+  parts.push(...(open.length ? open.map(row) : [el("div",{className:"empty"}, "7일 안에 할 일이 없어요")]));
+  if(later.length) parts.push(el("div",{className:"tlater"}, navBtn("앞으로 남은 것 " + later.length + "개 (8일 뒤~)", () => openAllTodos("later"), "마감이 8일 넘게 남은 할 일 보기")));
   if(edit){
     const inp = el("input",{className:"field",id:"todoText",maxLength:60,placeholder:"할 일을 쓰고 Enter"});
     const tc = window.fbCall ? el("select",{className:"field tcatsel",id:"todoCat","aria-label":"분류"}, el("option",{value:""}, "분류 없음"), ...todoCats().map(c => el("option",{value:c.id,selected:c.id === lastTcat}, c.name)), el("option",{value:"__edit"}, "✎ 분류 고치기…")) : null;
@@ -3169,20 +3172,21 @@ function openPaste(){
   setTimeout(() => autoFocus(ta), 0);
 }
 // 할 일 전체: 끝낸 것까지, 글자·날짜(마감일 또는 만든 날)로 찾기
-async function openAllTodos(){
+async function openAllTodos(preset){
   let all = todos.slice();
   if(window.fbCall) try{ all = await call("allTodos"); }catch(e){}
   const q = el("input",{type:"search",className:"field",placeholder:"할 일 찾기","aria-label":"할 일 찾기"});
   const from = el("input",{type:"date",className:"field","aria-label":"기간 시작",title:"이날부터 (마감일이나 만든 날)"});
   const to = el("input",{type:"date",className:"field","aria-label":"기간 끝",title:"이날까지 (마감일이나 만든 날)"});
   const inRange = x => !!x && (!from.value || x >= from.value) && (!to.value || x <= to.value);
-  const st = el("select",{className:"field","aria-label":"상태"}, el("option",{value:""}, "전체"), el("option",{value:"open"}, "안 끝낸 것"), el("option",{value:"done"}, "끝낸 것"));
+  const st = el("select",{className:"field","aria-label":"상태"}, el("option",{value:""}, "전체"), el("option",{value:"open"}, "안 끝낸 것"), el("option",{value:"later"}, "앞으로 남은 것 (8일 뒤~)"), el("option",{value:"done"}, "끝낸 것"));
   const cs = el("select",{className:"field","aria-label":"분류"}, el("option",{value:""}, "모든 분류"), el("option",{value:"-"}, "분류 없음"), ...todoCats().map(c => el("option",{value:c.id}, c.name)), ...(canWrite() ? [el("option",{value:"__edit"}, "✎ 분류 고치기…")] : []));
+  if(preset) st.value = preset;
   const list = el("div",{className:"alltodos"}), count = el("p",{className:"hint"});
   let shown = 30; // 처음엔 30개, [더 보기]로 30개씩
   const made = t => t.createdAt ? ymd(new Date(t.createdAt)) : "";
   const hits = () => { const w = q.value.trim(), d = from.value || to.value;
-    return all.filter(t => (!w || (t.text + " " + (t.detail || "")).includes(w)) && (!d || inRange(t.due) || inRange(made(t))) && (!cs.value || (cs.value === "-" ? !todoCatOf(t) : t.tcat === cs.value)) && (!st.value || (st.value === "done") === !!t.done))
+    return all.filter(t => (!w || (t.text + " " + (t.detail || "")).includes(w)) && (!d || inRange(t.due) || inRange(made(t))) && (!cs.value || (cs.value === "-" ? !todoCatOf(t) : t.tcat === cs.value)) && (!st.value || (st.value === "later" ? !t.done && !!t.due && t.due > ymd(addDays(new Date(), 7)) : (st.value === "done") === !!t.done)))
       .sort((a, b) => (!!a.done - !!b.done) || (b.createdAt || 0) - (a.createdAt || 0)); };
   const draw = () => {
     const rows = hits();
