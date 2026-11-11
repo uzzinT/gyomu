@@ -612,6 +612,12 @@ tr.attfocus td{background:color-mix(in srgb,var(--ochre) 18%,var(--paper))}
 /* 선생님 이름: 4줄 높이만 보이고 나머지는 위아래 스크롤 (줄이 반쯤 잘리지 않게 칸 높이를 고정) */
 .tchips{font-size:.8rem;max-height:calc(4 * 2.3em + 3 * 4px + 4px);overflow-y:auto;overscroll-behavior:contain;padding:2px;display:grid;grid-template-columns:repeat(auto-fill,minmax(5.5em,1fr));gap:4px}
 .tchips .chip{font-size:1em;height:2.3em;line-height:calc(2.3em - 2px);padding-top:0;padding-bottom:0;width:100%;min-width:0;justify-content:center;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 담임만: 학년마다 한 줄, 버튼은 이름 위·담임 반 아래 */
+.tchips.hrmode{display:grid;grid-template-columns:minmax(0,1fr);max-height:none;gap:6px}
+.hrgrade{display:flex;gap:6px;align-items:center;min-width:0}.hrgrade>b{flex:none;width:3.2em;font-size:.8rem}
+.hrrow{display:flex;flex-wrap:wrap;gap:4px;min-width:0}
+.tchips .hrrow .chip{width:auto;min-width:3.8em;height:auto;line-height:1.2;padding:3px 6px;white-space:nowrap}
+.tchips .hrrow .chip small{display:block;font-size:.85em;opacity:.75}
 .tgrid .dstart{border-left:2px solid var(--muted)}
 .tgrid .dayhead{background:var(--paper2)}
 .tgrid tr.allfree th,.tgrid tr.allfree td{background:var(--paper2);font-weight:700}
@@ -4117,7 +4123,7 @@ const hrKey = h => { const m = String(h || "").match(/(\d+)\s*-\s*(\d+)/); retur
 function orderedTeachers(){
   const T = (allTT?.teachers || []).slice();
   if(ttSort === "name") T.sort((a, b) => a.name.localeCompare(b.name, "ko"));
-  if(ttSort === "homeroom") T.sort((a, b) => hrKey(a.homeroom) - hrKey(b.homeroom) || a.name.localeCompare(b.name, "ko"));
+  if(ttSort === "homeroom" || ttHrOnly) T.sort((a, b) => hrKey(a.homeroom) - hrKey(b.homeroom) || a.name.localeCompare(b.name, "ko"));
   return T;
 }
 const tagOf = t => ttSort === "homeroom" ? (t.homeroom ? t.homeroom : "") : ttSort === "file" ? mainSubject(t) : "";
@@ -4189,8 +4195,14 @@ function openTeacherTT(mode, sel){
     openTeacherTT("compare");
   })), chip("월~금 모두", ttSelDays.size === 5, () => { ttSelDays = new Set(ttSelDays.size === 5 ? [wd >= 1 && wd <= 5 ? wd - 1 : 0] : [0, 1, 2, 3, 4]); openTeacherTT("compare"); }));
   const tChips = el("div",{className:"chips tchips"});
-  const drawTeacherChips = () => { const q = ttTeacherQ.trim(); tChips.replaceChildren(...sorted.filter(t => teacherMatch(t, q))
-    .map(t => { const b = chip(t.name, ttSelTeachers.has(t.name), () => { ttSelTeachers.has(t.name) ? ttSelTeachers.delete(t.name) : ttSelTeachers.add(t.name); openTeacherTT("compare"); }); b.title = label(t); return b; })); }; // 버튼엔 이름만 (담임 반은 표에)
+  const tChip = t => { const b = chip(t.name, ttSelTeachers.has(t.name), () => { ttSelTeachers.has(t.name) ? ttSelTeachers.delete(t.name) : ttSelTeachers.add(t.name); openTeacherTT("compare"); }); b.title = label(t); if(ttHrOnly && t.homeroom) b.append(el("small",{}, t.homeroom)); return b; };
+  const drawTeacherChips = () => {
+    const q = ttTeacherQ.trim(), list = sorted.filter(t => teacherMatch(t, q));
+    tChips.classList.toggle("hrmode", ttHrOnly);
+    if(!ttHrOnly) return tChips.replaceChildren(...list.map(tChip)); // 버튼엔 이름만 (담임 반은 표에)
+    const by = {}; list.forEach(t => { const g = Math.floor(hrKey(t.homeroom) / 100); (by[g] ||= []).push(t); });
+    tChips.replaceChildren(...Object.keys(by).sort((a, b) => a - b).map(g => el("div",{className:"hrgrade"}, el("b",{}, g < 1e7 ? g + "학년" : "기타"), el("div",{className:"hrrow"}, ...by[g].map(tChip)))));
+  };
   const find = teacherSearch(t => { ttSelTeachers.add(t.name); openTeacherTT("compare"); refocusFind(); }, drawTeacherChips, list => { list.forEach(t => ttSelTeachers.add(t.name)); openTeacherTT("compare"); refocusFind(); });
   drawTeacherChips();
   const clear = navBtn("선택 해제 (모두 보기)", () => { ttSelTeachers.clear(); openTeacherTT("compare"); }, "선택 해제", !ttSelTeachers.size);
