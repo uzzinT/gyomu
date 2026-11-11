@@ -609,8 +609,9 @@ tr.attfocus td{background:color-mix(in srgb,var(--ochre) 18%,var(--paper))}
 .tpick{flex:1;min-width:0;display:grid;gap:6px}
 .tpick .actions{flex-wrap:nowrap}
 #tFind{flex:1;min-width:0;width:auto}
-.tchips{padding:2px;display:grid;grid-template-columns:repeat(auto-fill,minmax(5.5em,1fr));gap:4px}
-.tchips .chip{width:100%;min-width:0;justify-content:center;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 선생님 이름: 4줄 높이만 보이고 나머지는 위아래 스크롤 (줄이 반쯤 잘리지 않게 칸 높이를 고정) */
+.tchips{font-size:.8rem;max-height:calc(4 * 2.3em + 3 * 4px + 4px);overflow-y:auto;overscroll-behavior:contain;padding:2px;display:grid;grid-template-columns:repeat(auto-fill,minmax(5.5em,1fr));gap:4px}
+.tchips .chip{font-size:1em;height:2.3em;line-height:calc(2.3em - 2px);padding-top:0;padding-bottom:0;width:100%;min-width:0;justify-content:center;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tgrid .dstart{border-left:2px solid var(--muted)}
 .tgrid .dayhead{background:var(--paper2)}
 .tgrid tr.allfree th,.tgrid tr.allfree td{background:var(--paper2);font-weight:700}
@@ -630,10 +631,10 @@ tr.attfocus td{background:color-mix(in srgb,var(--ochre) 18%,var(--paper))}
 .tfind #tFind{flex:1;min-width:0;width:auto}
 /* 휴대폰: 창이 옆으로 밀리지 않게 찾기 칸은 한 줄 통째로, 선생님 이름은 한 줄에 5명 */
 @media (max-width:600px){
-  .pickrow{flex-direction:column;gap:4px}.pickrow>b{width:auto;padding:0}
-  .tfind{flex-wrap:wrap}.tfind #tFind{flex:1 1 100%}
-  .tchips{grid-template-columns:repeat(5,minmax(0,1fr));gap:3px}
-  .tchips .chip{padding:4px 2px;font-size:.74rem}
+  .pickrow{flex-direction:column;align-items:stretch;gap:4px}.pickrow>b{width:auto;padding:0}
+  .tpick{grid-template-columns:minmax(0,1fr)}.tpick .actions.tfind,.tfind{flex-wrap:wrap}.tfind #tFind{flex:1 1 100%}
+  .tchips{grid-template-columns:repeat(5,minmax(0,1fr));font-size:.74rem}
+  .tchips .chip{padding:0 2px}
   #dayDlg:has(.tgrid) .daybox{min-width:0}
   #dayDlg:has(.tgrid){overflow-x:hidden}
 }
