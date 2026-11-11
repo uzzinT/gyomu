@@ -1122,7 +1122,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="backend.js?v=c71fa1e0"></script>
+<script src="backend.js?v=31e2a6e6"></script>
 <style>
 #fbGate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--desk)}
 #fbGate .fbbox{background:var(--paper);border-radius:22px;padding:36px 32px;text-align:center;box-shadow:0 18px 40px -24px rgba(20,40,25,.35);max-width:340px}
@@ -2251,6 +2251,17 @@ function renderNotes(){
   }
   return el("section",{className:"panel notes"}, ...parts);
 }
+document.addEventListener("click", async e => {
+  const a = e.target.closest?.('a[href^="https://www.googleapis.com/drive/v3/files/"]'); if(!a || !window.fbFileBlob) return;
+  e.preventDefault();
+  const name = a.textContent.replace(/^[📎🔗]\s*/u, "").trim() || "첨부", view = /\.(pdf|png|jpe?g|gif|webp|bmp)$/i.test(name), w = view ? window.open("", "_blank") : null;
+  say("파일 여는 중…");
+  try{
+    const url = URL.createObjectURL(await window.fbFileBlob(a.href));
+    if(w) w.location = url; else { const d = el("a",{href:url,download:name}); document.body.append(d); d.click(); d.remove(); }
+    say(""); setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }catch(x){ w?.close(); say(x?.message || "파일을 열지 못했어요."); }
+}, true);
 function navBtn(label, fn, aria, disabled){ const b = el("button",{className:"btn ghost small",type:"button","aria-label":aria,disabled:!!disabled}, label); b.onclick = fn; return b; }
 
 // 월별 달력

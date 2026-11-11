@@ -246,8 +246,9 @@
         if (!todos.some(x => x.id === seen[k])) todos.push(coolTodo(i));
       } else if (at >= 0) {
         // PC가 첨부를 나중에 올리면 그때 파일 칸에 더함
-        const t = todos[at], have = new Set((t.files || []).map(x => x.url)), add = coolFiles(i).filter(x => !have.has(x.url));
-        if (add.length && (t.files || []).length < 10) { todos[at] = { ...t, files: (t.files || []).concat(add).slice(0, 10) }; ch = true; }
+        const t = todos[at], files = (t.files || []).slice(); let fc = false;
+        coolFiles(i).forEach(x => { const j = files.findIndex(y => y.name === x.name); if (j >= 0) { if (files[j].url !== x.url) { files[j] = x; fc = true; } } else if (files.length < 10) { files.push(x); fc = true; } });
+        if (fc) { todos[at] = { ...t, files }; ch = true; }
         if (i.done && !todos[at].done) { todos[at] = { ...todos[at], done: true }; ch = true; }
       } else if (i.done && at >= 0 && !todos[at].done) { todos[at] = { ...todos[at], done: true }; ch = true; }
     }
@@ -575,6 +576,7 @@
   const GX = async (url, opts) => respOf(await proxy(await reqOf(url, opts)));
   async function okR(r) { if (!r.ok) { let m = ""; try { m = (await r.json()).error.message; } catch (e) {} fail("구글 드라이브·시트에서 거절했어요 (" + r.status + ") " + m); } return r; }
   const G = async (url, opts) => okR(await GX(url, opts));
+  window.fbFileBlob = async url => { if (!/^https:\/\/www\.googleapis\.com\/drive\/v3\/files\/[\w-]+\?alt=media$/.test(url)) throw new Error("열 수 없는 주소예요."); return (await G(url)).blob(); };
   // 여러 개를 창구 한 번에: [[주소, 옵션], ...]. 차례로(하나 실패하면 멈춤) 또는 parallel 이면 한꺼번에. 실패가 있으면 그 이유로 멈춤
   async function GM(list, parallel, raw) { // raw: 실패해도 멈추지 않고 답을 그대로 (휴대폰 알림처럼 하나씩 따질 때)
     const rs = (await proxy({ many: await Promise.all(list.map(([u, o]) => reqOf(u, o))), parallel: !!parallel })).many.map(respOf);
