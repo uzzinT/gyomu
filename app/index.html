@@ -3099,13 +3099,15 @@ async function openAllTodos(){
   let all = todos.slice();
   if(window.fbCall) try{ all = await call("allTodos"); }catch(e){}
   const q = el("input",{type:"search",className:"field",placeholder:"할 일 찾기","aria-label":"할 일 찾기"});
-  const day = el("input",{type:"date",className:"field","aria-label":"날짜로 찾기",title:"마감일이나 만든 날"});
+  const from = el("input",{type:"date",className:"field","aria-label":"기간 시작",title:"이날부터 (마감일이나 만든 날)"});
+  const to = el("input",{type:"date",className:"field","aria-label":"기간 끝",title:"이날까지 (마감일이나 만든 날)"});
+  const inRange = x => !!x && (!from.value || x >= from.value) && (!to.value || x <= to.value);
   const st = el("select",{className:"field","aria-label":"상태"}, el("option",{value:""}, "전체"), el("option",{value:"open"}, "안 끝낸 것"), el("option",{value:"done"}, "끝낸 것"));
   const list = el("div",{className:"alltodos"}), count = el("p",{className:"hint"});
   const made = t => t.createdAt ? ymd(new Date(t.createdAt)) : "";
   const draw = () => {
-    const w = q.value.trim(), d = day.value;
-    const rows = all.filter(t => (!w || (t.text + " " + (t.detail || "")).includes(w)) && (!d || t.due === d || made(t) === d) && (!st.value || (st.value === "done") === !!t.done))
+    const w = q.value.trim(), d = from.value || to.value;
+    const rows = all.filter(t => (!w || (t.text + " " + (t.detail || "")).includes(w)) && (!d || inRange(t.due) || inRange(made(t))) && (!st.value || (st.value === "done") === !!t.done))
       .sort((a, b) => (!!a.done - !!b.done) || (b.createdAt || 0) - (a.createdAt || 0));
     count.textContent = rows.length + "개";
     list.replaceChildren(...rows.slice(0, 200).map(t => {
@@ -3117,9 +3119,10 @@ async function openAllTodos(){
     }));
     if(!rows.length) list.append(el("p",{className:"note"}, "찾는 할 일이 없어요."));
   };
-  q.oninput = draw; day.onchange = draw; st.onchange = draw;
+  q.oninput = draw; from.onchange = draw; to.onchange = draw; st.onchange = draw;
   draw();
-  modal("할 일 전체", el("div",{className:"tt-tools alltools"}, q, day, st, navBtn("날짜 지우기", () => { day.value = ""; draw(); }, "날짜 조건 지우기")), count, list);
+  modal("할 일 전체", el("div",{className:"tt-tools alltools"}, q, st), el("div",{className:"tt-tools alltools"}, el("span",{className:"hint"}, "기간"), from, "~", to, navBtn("기간 지우기", () => { from.value = ""; to.value = ""; draw(); }, "기간 조건 지우기")),
+    el("p",{className:"hint"}, "마감일이나 만든 날이 기간 안에 있는 할 일이 나와요. 한쪽만 넣어도 돼요."), count, list);
 }
 function openTodo(id){
   const t = todos.find(x => x.id === id); if(!t) return;
