@@ -498,9 +498,9 @@ dialog label.inline,.set-area label.inline{display:flex;flex-direction:row;gap:8
 .checks .panel-head h2{margin-right:auto}
 
 /* 패널 머리줄은 한 줄로 */
-.notes .panel-head{flex-wrap:nowrap}
+.notes .panel-head{flex-wrap:wrap;row-gap:4px}
 .panel-head h2,.ncount{white-space:nowrap}
-.notes .panel-head .tt-tools{flex-wrap:nowrap;flex:none}
+.notes .panel-head .tt-tools{flex-wrap:wrap;flex:0 1 auto;gap:4px}
 .panel-head .btn.small{white-space:nowrap}
 .notes .panel-head .btn.small{padding:3px 7px}
 .nbulk{justify-content:space-between;gap:8px}
@@ -823,7 +823,7 @@ dialog::backdrop{background:rgba(16,32,21,.45);backdrop-filter:blur(2px)}
 /* 서류 관리: 붙어 있던 곳 띄우기 (거르기 줄↔표, 휴지통 제목↔목록, 목록↔단추) */
 .attwrap .notes>.attrow+div{margin-top:12px}.attwrap .trash>summary+.attlist{margin-top:8px}.attwrap .attlist>.attline+.actions{margin-top:12px}
 /* 행정 영역 학사일정: 달력 넓게, 이번 주 일정 좁게 */
-@media (min-width:900px){.feat:has(> .panel.week){grid-template-columns:minmax(0,1.8fr) minmax(280px,1fr)}}
+@media (min-width:900px){.feat:has(.panel.week){grid-template-columns:minmax(0,1.8fr) minmax(280px,1fr)}}
 .tbadge{min-width:17px;height:17px;padding:0 5px;border-radius:9px;background:var(--sun);color:#fff;font-size:.66rem;line-height:17px;text-align:center}
 .attgrid{display:grid;gap:14px}
 .dcards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
@@ -1922,6 +1922,24 @@ const xlsxReady = () => window.XLSX ? Promise.resolve() : new Promise((res, rej)
   s.onload = res; s.onerror = () => rej(new Error("엑셀 읽기 도구를 불러오지 못했어요. 인터넷 연결을 확인해 주세요."));
   document.head.append(s);
 });
+// 엑셀로 내려받기: sheets = [[시트 이름, [[머리줄], ...줄]], ...]
+async function downloadXlsx(name, sheets){
+  say("엑셀 만드는 중…");
+  try{
+    await xlsxReady();
+    const wb = XLSX.utils.book_new(), used = new Set();
+    sheets.forEach(([n, aoa]) => {
+      let s = String(n).replace(/[\\\/?*\[\]:]/g, " ").slice(0, 31) || "시트", i = 2;
+      while(used.has(s)) s = s.slice(0, 28) + " " + i++;
+      used.add(s);
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      ws["!cols"] = aoa[0].map((_, c) => ({ wch:Math.min(60, Math.max(6, ...aoa.map(r => String(r[c] ?? "").length * 1.6))) }));
+      XLSX.utils.book_append_sheet(wb, ws, s);
+    });
+    XLSX.writeFile(wb, name + " " + ymd(new Date()) + ".xlsx");
+    say("✓ 엑셀을 내려받았어요.");
+  }catch(e){ say(e?.message || "엑셀을 만들지 못했어요."); }
+}
 async function readTTFile(file){
   await xlsxReady();
   const wb = XLSX.read(await file.arrayBuffer(), { type:"array" });
@@ -2160,7 +2178,8 @@ function renderNotes(){
       store.addNote({ date:key, type:"", text });
       setTimeout(() => $("noteText")?.focus(), 30); // 다시 그려진 입력칸으로 커서를 돌려 연달아 입력
     };
-    const bulk = navBtn("남은 " + left.length + "개 다음 날로", () => copyTo(left), "전달 안 한 항목을 다음 날로 복사", !left.length);
+    const picked = list.filter(n => n.done);
+    const bulk = navBtn("체크한 " + picked.length + "개 다음 날로", () => copyTo(picked), "체크한 항목을 다음 날로 복사", !picked.length);
     parts.push(el("div",{className:"nadd"}, inp), el("div",{className:"nbulk"}, navBtn("복사", () => copyText(notesText(key, list), "조·종례"), "조·종례를 글로 복사", !list.length), bulk));
   }
   return el("section",{className:"panel notes"}, ...parts);
@@ -3129,10 +3148,11 @@ async function openAllTodos(){
   const list = el("div",{className:"alltodos"}), count = el("p",{className:"hint"});
   let shown = 30; // 처음엔 30개, [더 보기]로 30개씩
   const made = t => t.createdAt ? ymd(new Date(t.createdAt)) : "";
+  const hits = () => { const w = q.value.trim(), d = from.value || to.value;
+    return all.filter(t => (!w || (t.text + " " + (t.detail || "")).includes(w)) && (!d || inRange(t.due) || inRange(made(t))) && (!cs.value || (cs.value === "-" ? !todoCatOf(t) : t.tcat === cs.value)) && (!st.value || (st.value === "done") === !!t.done))
+      .sort((a, b) => (!!a.done - !!b.done) || (b.createdAt || 0) - (a.createdAt || 0)); };
   const draw = () => {
-    const w = q.value.trim(), d = from.value || to.value;
-    const rows = all.filter(t => (!w || (t.text + " " + (t.detail || "")).includes(w)) && (!d || inRange(t.due) || inRange(made(t))) && (!cs.value || (cs.value === "-" ? !todoCatOf(t) : t.tcat === cs.value)) && (!st.value || (st.value === "done") === !!t.done))
-      .sort((a, b) => (!!a.done - !!b.done) || (b.createdAt || 0) - (a.createdAt || 0));
+    const rows = hits();
     count.textContent = rows.length + "개";
     list.replaceChildren(...rows.slice(0, shown).map(t => {
       const cb = el("input",{type:"checkbox",checked:!!t.done,disabled:!canWrite(),"aria-label":"끝냄"});
@@ -3145,9 +3165,11 @@ async function openAllTodos(){
     if(rows.length > shown) list.append(navBtn("더 보기 (" + (rows.length - shown) + "개 남음)", () => { shown += 30; draw(); }, "30개 더 보기"));
   };
   const again = () => { shown = 30; draw(); };
+  const xl = navBtn("엑셀로 받기", () => downloadXlsx("할 일", [["할 일", [["분류", "할 일", "세부 내용", "마감일", "만든 날", "끝냄"],
+    ...hits().map(t => [todoCatOf(t)?.name || "", t.text, t.detail || "", t.due || "", made(t), t.done ? "✓" : ""])]]]), "찾은 할 일을 엑셀로 받기");
   q.oninput = again; from.onchange = again; to.onchange = again; st.onchange = again; cs.onchange = again;
   draw();
-  modal("할 일 전체", el("div",{className:"tt-tools alltools"}, q, ...(window.fbCall ? [cs] : []), st, ...(window.fbCall && canWrite() ? [navBtn("분류 고치기", openTodoCats, "할 일 분류 더하기·지우기")] : [])),
+  modal("할 일 전체", el("div",{className:"tt-tools alltools"}, q, ...(window.fbCall ? [cs] : []), st, ...(window.fbCall && canWrite() ? [navBtn("분류 고치기", openTodoCats, "할 일 분류 더하기·지우기")] : []), xl),
     el("div",{className:"alltools range"}, el("span",{className:"hint"}, "기간"), from, el("span",{}, "~"), to, el("button",{type:"button",className:"ttback",title:"기간 지우기","aria-label":"기간 지우기",onclick:() => { from.value = ""; to.value = ""; again(); }}, "✕")),
     el("p",{className:"hint"}, "마감일이나 만든 날이 기간 안에 있는 할 일이 나와요. 한쪽만 넣어도 돼요."), count, list);
 }
@@ -3216,8 +3238,10 @@ function openNoteFind(){
 // 전체 목록 (지난 것·숨긴 것까지): 찾기 칸으로 좁히고, 누르면 그날/그 제출물로
 async function openNoteAll(){
   const box = el("div",{className:"alllist"}, el("p",{className:"note"}, "불러오는 중…")), q = el("input",{type:"search",className:"field",id:"allNoteQ",placeholder:"찾을 말 (비우면 전체)"});
-  modal("조·종례 전체", q, box);
   let list = [];
+  const xl = navBtn("엑셀로 받기", () => { const s = q.value.trim().toLowerCase();
+    downloadXlsx("조·종례", [["조·종례", [["날짜", "구분", "내용", "자세히", "전달함"], ...list.filter(n => !s || (n.text + " " + (n.detail || "")).toLowerCase().includes(s)).map(n => [n.date, n.type || "", n.text, n.detail || "", n.done ? "✓" : ""])]]]); }, "찾은 조·종례를 엑셀로 받기");
+  modal("조·종례 전체", el("div",{className:"tt-tools alltools"}, q, xl), box);
   try{ list = await call("listNotes"); if(!Array.isArray(list)) list = []; }catch(e){ return box.replaceChildren(el("p",{className:"note"}, "불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.")); }
   const draw = () => {
     const s = q.value.trim().toLowerCase(), hit = list.filter(n => !s || (n.text + " " + (n.detail || "")).toLowerCase().includes(s)), by = {};
@@ -3404,6 +3428,15 @@ function planCalc(cls){
       el("p",{className:"hint"}, "체크를 끄면 그날 수업을 빼고, 켜면 넣어서 다시 계산해요. 그날 수업만 바뀌었으면 시간표 칸을 눌러 고치면 돼요."),
       el("div",{className:"tt-wrap"}, el("table",{className:"plan pcflagt"}, el("thead",{}, el("tr",{}, ...["날짜","학사일정","처리","이 반 수업","수업 있음"].map(h => el("th",{}, h)))), el("tbody",{}, ...flagRows)))) : "");
 }
+// 진도표 한 반을 엑셀 줄로 (화면 표와 같은 칸)
+const planAoa = cls => {
+  const plan = planOf(cls), ll = lessonLogs(cls), total = Math.max(plan.length, 0, ...ll.map(l => Number(l.lesson) || 0));
+  const done = new Set(ll.filter(l => l.done).map(l => Number(l.lesson)));
+  return [["차시", "내용", "수업한 날", "완료", "기록"], ...Array.from({length:total}, (_, k) => {
+    const no = k + 1, rec = ll.filter(l => Number(l.lesson) === no).sort((a, b) => a.date.localeCompare(b.date));
+    return [no, plan[k] || "", rec.map(l => l.date + " " + (Number(l.period) + 1) + "교시").join(", "), done.has(no) ? "✓" : "", rec.map(l => l.text).filter(Boolean).join(" / ")];
+  })];
+};
 function openPlan(sel){
   const list = classesKnown();
   if(!list.length) return modal("교과 진도표", el("p",{className:"note"}, "시간표에 '2-3 국어'처럼 반과 과목을 넣으면 반별 진도표가 생겨요."));
@@ -3425,7 +3458,8 @@ function openPlan(sel){
   const table = total
     ? el("div",{className:"tt-wrap"}, el("table",{className:"plan planmain"}, el("thead",{}, el("tr",{}, ...["차시","내용","수업한 날","완료","기록"].map(h => el("th",{}, h)))), el("tbody",{}, ...rows)))
     : el("p",{className:"note"}, "아직 계획도 기록도 없어요. 아래 '계획 입력'에 차시별 내용을 붙여 넣거나, 시간표 칸을 눌러 차시를 골라 기록하세요.");
-  const kids = [el("div",{className:"actions"}, el("label",{className:"inline"}, "반 ", pick), el("span",{className:"spacer"}), el("b",{}, "진도 " + doneSet.size + "/" + total + "차시 (" + pct + "%)")), planCalc(cls), rosterRow(cls), table].filter(Boolean);
+  const xl = navBtn("엑셀로 받기", () => downloadXlsx("교과 진도표", list.map(c => [c, planAoa(c)])), "모든 반 진도표를 엑셀로 받기 (반마다 한 시트)");
+  const kids = [el("div",{className:"actions"}, el("label",{className:"inline"}, "반 ", pick), el("span",{className:"spacer"}), el("b",{}, "진도 " + doneSet.size + "/" + total + "차시 (" + pct + "%)"), xl), planCalc(cls), rosterRow(cls), table].filter(Boolean);
   if(canWrite()){
     // 차시마다 한 칸: 'N차시'는 미리 쓰여 있고, 추가·삭제 가능. 여러 줄을 붙여 넣으면 그 칸부터 나눠 들어감
     const vals = (plan.length ? plan : ["", ""]).map(p => p.replace(/^\s*\d+\s*차시[\s.:·-]*/, ""));
@@ -4450,14 +4484,14 @@ async function openRosterView(){
 const FEATURES = {
   class: () => homeroom() ? [el("div",{className:"fcol"}, renderNotes(), renderChecks()), renderClassTT(), renderClassSetup()].filter(Boolean) : [], // 왼쪽 조·종례(아래 제출물), 가운데 시간표, 오른쪽 우리 반 명단
   subject: () => [el("div",{className:"subjwrap"}, renderMyClasses(), renderTT())], // 왼쪽 내 수업 카드, 오른쪽 시간표
-  admin: () => [renderCal(), renderWeek()],
+  admin: () => [renderCal(), el("div",{className:"fcol"}, renderTodos(), renderWeek())], // 왼쪽 달력, 오른쪽 할 일·이번 주 일정
 };
 // 기능 칸이 바뀌면 지금 보고 있는 탭을 다시 그림
 function renderHome(){ if(tab === "home") renderToday(); else if(areaOf(tab)) renderArea(); addTabBack(); }
 // 영역 안의 할 일 (오늘 탭 '할 일'에도 함께 나옴)
 // 영역 탭의 핵심 기능 칸은 접어 두고, 펼친 상태는 기억함
 const featOpen = (() => { try{ return JSON.parse(localStorage.getItem("featOpen") || "{}"); }catch{ return {}; } })();
-const FEAT_NAMES = { class:"우리 반 · 조·종례 · 제출물", subject:"시간표 · 수업 기록", admin:"학사일정 · 이번 주 일정" };
+const FEAT_NAMES = { class:"우리 반 · 조·종례 · 제출물", subject:"시간표 · 수업 기록", admin:"학사일정 · 할 일 · 이번 주 일정" };
 // ---------- 예산 (학급·행정 탭): 공동체 → 세부 예산 → 쓴 내역 ----------
 let budgets = [], spends = [];
 const won = n => (Number(n) || 0).toLocaleString("ko-KR") + "원";
@@ -4485,10 +4519,17 @@ function renderBudget(a){
   const d = el("details",{className:"featbox budget",open:!!featOpen["bud-" + a.id]},
     el("summary",{}, "예산", el("small",{}, mine.length ? "남은 돈 " + won(left) : "공동체별 예산 · 쓴 내역")),
     el("div",{className:"feat budgets"}, ...(cards.length ? cards : [el("p",{className:"note"}, "아직 예산이 없어요. 공동체(예: 3학년부, AI 교학공)를 더하고 그 안에 세부 예산을 나누세요.")]),
-      edit ? el("div",{className:"actions"}, navBtn("+ 공동체 더하기", () => openBudgetEdit(null, a.id), "예산 공동체 더하기")) : null));
+      el("div",{className:"actions"}, edit ? navBtn("+ 공동체 더하기", () => openBudgetEdit(null, a.id), "예산 공동체 더하기") : null, el("span",{className:"spacer"}),
+        mine.length ? navBtn("엑셀로 받기", () => budgetXlsx(a, mine), a.name + " 예산을 엑셀로 받기") : null)));
   d.ontoggle = () => { featOpen["bud-" + a.id] = d.open; try{ localStorage.setItem("featOpen", JSON.stringify(featOpen)); }catch{} };
   return d;
 }
+const budgetXlsx = (a, mine) => {
+  const itemName = (g, id) => g.items.find(i => i.id === id)?.name || "";
+  downloadXlsx(a.name + " 예산", [
+    ["요약", [["공동체", "세부 예산", "편성액", "사용액", "남은 돈"], ...mine.flatMap(g => [...g.items.map(i => [g.name, i.name, Number(i.amount) || 0, usedOf(g, i), (Number(i.amount) || 0) - usedOf(g, i)]), [g.name, "합계", planOfG(g), usedOf(g), planOfG(g) - usedOf(g)]])]],
+    ["쓴 내역", [["공동체", "세부 예산", "날짜", "내용", "금액"], ...mine.flatMap(g => spends.filter(s => s.group === g.id).sort((x, y) => x.date.localeCompare(y.date)).map(s => [g.name, itemName(g, s.item), s.date, s.text || "", Number(s.amount) || 0]))]]]);
+};
 // 공동체 이름과 세부 예산(이름·편성액) 더하기·지우기
 function openBudgetEdit(id, area){
   const g0 = budgets.find(x => x.id === id), rows = (g0?.items || []).map(i => ({ ...i }));
