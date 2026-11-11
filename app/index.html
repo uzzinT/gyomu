@@ -219,7 +219,7 @@ nav{margin-bottom:14px}
 .ttback:hover{color:var(--ink)}
 
 /* 홈 3단: 오늘·조종례 | 바로 가기·시간표 | 월별 달력·이번 주 일정 */
-.home4{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr) minmax(0,1.1fr);gap:18px 28px;align-items:start}
+.home4{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr) minmax(0,.85fr);gap:18px 28px;align-items:start}
 @media (max-width:1150px){.home4{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.home4 .col:last-child{grid-column:1/-1}}
 @media (max-width:700px){.home4{grid-template-columns:1fr}}
 .home4 .col{display:grid;gap:16px;min-width:0;align-content:start}
@@ -1009,7 +1009,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
   body.onhome .home4 .col:nth-child(2)>.tt table{height:100%}
   body.onhome .home4 .col:nth-child(2)>.tt th,body.onhome .home4 .col:nth-child(2)>.tt td{height:auto!important;padding:1px 2px!important;line-height:1.15}
 }
-@media (min-width:1000px) and (max-width:1150px) and (min-height:620px){body.onhome .home4{grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr) minmax(0,1fr)}}
+@media (min-width:1000px) and (max-width:1150px) and (min-height:620px){body.onhome .home4{grid-template-columns:minmax(0,1fr) minmax(0,1.1fr) minmax(0,.85fr)}}
 </style>
 </head>
 <body>
@@ -3128,7 +3128,9 @@ function renderTodos(){
     const more = el("button",{className:"ttback more",type:"button",title:"자세히"}, "자세히");
     more.onclick = e => { e.preventDefault(); openTodo(t.id); };
     const badge = t.due ? el("span",{className:"tdue" + (t.due <= today ? " soon" : "")}, dueLabel(t.due)) : "";
-    return el("label",{className:"nrow" + (t.done ? " done" : "")}, cb, el("span",{className:"ntext"}, tcatChip(t), t.text), el("span",{className:"nact"}, badge, more));
+    // 글자를 눌러도 체크되지 않게 (label 대신 div): 글자는 자세히 열기, 체크는 상자를 눌렀을 때만
+    const tx = el("span",{className:"ntext",style:"cursor:pointer"}, tcatChip(t), t.text); tx.onclick = () => openTodo(t.id);
+    return el("div",{className:"nrow" + (t.done ? " done" : "")}, cb, tx, el("span",{className:"nact"}, badge, more));
   };
   const parts = [el("div",{className:"panel-head"}, el("h2",{}, "할 일"), el("small",{className:"ncount"}, open.length ? String(open.length) : ""),
     el("div",{className:"tt-tools"}, sortSel, navBtn("전체", openAllTodos, "끝낸 것까지 할 일 전체 · 찾기")))];
