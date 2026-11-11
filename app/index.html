@@ -871,6 +871,8 @@ dialog::backdrop{background:rgba(16,32,21,.45);backdrop-filter:blur(2px)}
 .drange{display:inline-flex;gap:6px;align-items:center;min-width:0}
 /* 출결 고치기 창 넓게 · 종류는 그룹마다 한 줄 (넘치면 좌우로 밀기) */
 #dayDlg:has(.typegroups){width:min(860px,calc(100vw - 32px))}
+.addtype-form{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,.7fr);gap:6px;padding:8px;border:1px dashed var(--line);border-radius:8px;margin-top:4px}
+.addtype-form>input[aria-label="필요 서류"],.addtype-form>.actions{grid-column:1/-1}.addtype-form>.actions{justify-content:flex-end;margin:0}
 .typegroups>.tgroup{flex-wrap:nowrap;overflow-x:auto;padding-bottom:3px;scrollbar-width:thin}.typegroups>.tgroup>*{flex:none}
 /* 서류 관리: 붙어 있던 곳 띄우기 (거르기 줄↔표, 휴지통 제목↔목록, 목록↔단추) */
 .attwrap .notes>.attrow+div{margin-top:12px}.attwrap .trash>summary+.attlist{margin-top:8px}.attwrap .attlist>.attline+.actions{margin-top:12px}
@@ -1516,6 +1518,29 @@ function attQuick(apply, fn, args, ok){
 // 누르자마자 "저장하는 중…"을 띄우고, 시트에 다 들어가면 "✓ …"로 바꿈
 async function attDo(fn, args, ok){ say("저장하는 중…"); try{ const r = await call(fn, ...args); attSet(r); if(ok) say("✓ " + ok); renderAttend(); return r; }catch(e){ say(e?.message || "저장하지 못했어요."); throw e; } }
 // ----- 화면 -----
+// [+ 종류] 를 누르면 그 자리에 작은 입력 줄이 펼쳐짐. 더하면 onAdded(새 종류) 로 바로 고른 상태가 됨
+function addTypeChip(D, onAdded){
+  const wrap = el("div",{className:"addtype"});
+  const open = () => {
+    const n = el("input",{type:"text",className:"field",maxLength:30,placeholder:"출결 명칭 (예: 인정조퇴(체험))","aria-label":"출결 명칭"});
+    const g = el("select",{className:"field","aria-label":"색상 그룹"}, el("option",{value:""}, "그룹"), ...Object.keys(D.colors || {}).map(x => el("option",{value:x}, x)));
+    const d = el("input",{type:"text",className:"field",maxLength:200,placeholder:"필요 서류 (쉼표로: 출결신고서, 체험학습 보고서)","aria-label":"필요 서류"});
+    const go = el("button",{type:"button",className:"btn"}, "더하기");
+    go.onclick = async () => {
+      const name = n.value.trim(); if(!name) return say("출결 명칭을 적어 주세요.");
+      if(D.types.some(t => t.name === name)) return say("이미 있는 출결 종류예요.");
+      const t = { name, doc:splitDocs(d.value).join(", "), group:g.value };
+      go.disabled = true;
+      try{ await attDo("attSaveTab", ["출결종류", D.types.concat(t).map(x => [x.name, String(x.doc || "").trim(), x.group || ""])], "출결 종류 '" + name + "'를 더했어요."); if(!D.types.some(x => x.name === name)) D.types.push(t); onAdded(t); }
+      catch(e){ go.disabled = false; }
+    };
+    wrap.replaceChildren(el("div",{className:"addtype-form"}, n, g, d, el("div",{className:"actions"}, navBtn("취소", () => wrap.replaceChildren(btn), "취소"), go)));
+    setTimeout(() => autoFocus(n), 0);
+  };
+  const btn = navBtn("+ 종류", open, "출결 종류 더하기 (필요 서류도 함께)", !canWrite());
+  wrap.append(btn);
+  return wrap;
+}
 const chipBtn = (label, color, on, onclick, extra) => { const b = el("button",{type:"button",className:"tchip" + (on ? " on" : ""),...(extra || {})}, label); b.style.setProperty("--c", color); b.onclick = onclick; return b; };
 function renderAttend(){
   const A = attCfg(), V = $("view");
@@ -1549,7 +1574,8 @@ function attInput(){
   const drawTypes = () => { const groups = [...new Set(D.types.map(typeRow))];
     typeBox.replaceChildren(...groups.map(g => el("div",{className:"tgroup"}, ...D.types.filter(t => typeRow(t) === g).map(t => chipBtn(t.name, typeColor(t.name), f.type === t.name, () => {
       f.type = f.type === t.name ? "" : t.name; f.ps = /결석/.test(f.type) ? [0, ...range1(1, f.maxP), 99] : []; f.docs = splitDocs(attTypeDoc(f.type)); f.st = {};
-      if(/생리/.test(f.type) && !reason.value) reason.value = "생리통"; drawTypes(); drawPer(); drawDocs(); }))))); };
+      if(/생리/.test(f.type) && !reason.value) reason.value = "생리통"; drawTypes(); drawPer(); drawDocs(); }))))
+      , addTypeChip(D, t => { f.type = t.name; f.ps = /결석/.test(f.type) ? [0, ...range1(1, f.maxP), 99] : []; f.docs = splitDocs(t.doc); f.st = {}; renderAttend(); })); };
   const attTypeDoc = n => D.types.find(t => t.name === n)?.doc || "";
   const drawKids = () => { const kids = attKids(), max = Math.max(0, ...kids.map(k => parseInt(k.num) || 0));
     kidBox.replaceChildren(...range1(1, max).map(i => { const k = kids.find(x => parseInt(x.num) === i); if(!k) return el("span",{});
@@ -1617,7 +1643,8 @@ function attEdit(r){
   const stu = el("select",{className:"field","aria-label":"학생"}, ...attKids().map(k => el("option",{value:k.num + "|" + k.name}, stuLabel(k.num, k.name)))); stu.value = r.num + "|" + r.name;
   const typeBox = el("div",{className:"typegroups"}), perBox = el("div",{className:"pergrid"}), docBox = el("div",{className:"docrow"}), reason = el("input",{type:"text",className:"field",value:r.reason,maxLength:300});
   const drawT = () => typeBox.replaceChildren(...[...new Set(D.types.map(typeRow))].map(gr => el("div",{className:"tgroup"}, ...D.types.filter(t => typeRow(t) === gr).map(t => chipBtn(t.name, typeColor(t.name), g.type === t.name, () => {
-    g.type = t.name; g.ps = /결석/.test(g.type) ? [0, ...range1(1, g.maxP), 99] : []; g.docs = splitDocs(t.doc); g.st = {}; drawT(); drawP(); drawD(); })))));
+    g.type = t.name; g.ps = /결석/.test(g.type) ? [0, ...range1(1, g.maxP), 99] : []; g.docs = splitDocs(t.doc); g.st = {}; drawT(); drawP(); drawD(); })))),
+    addTypeChip(D, t => { g.type = t.name; g.ps = /결석/.test(g.type) ? [0, ...range1(1, g.maxP), 99] : []; g.docs = splitDocs(t.doc); g.st = {}; drawT(); drawP(); drawD(); }));
   const drawP = () => perBox.replaceChildren(...[0, ...range1(1, g.maxP), 99].map(p => { const b = el("button",{type:"button",className:"kbtn pbtn","aria-pressed":String(g.ps.includes(p)),disabled:/결석/.test(g.type)}, PN(p)); b.onclick = () => { g.ps = clickPeriod(g.ps, p, g.type, g.maxP); drawP(); }; return b; }));
   const drawD = () => docBox.replaceChildren(...g.docs.map(d => docChip(d, g.st[d], () => { g.st[d] = !g.st[d]; drawD(); }, () => { g.docs = g.docs.filter(x => x !== d); delete g.st[d]; drawD(); })),
     navBtn("+ 서류", () => { const n = splitDocs(prompt("추가할 서류 이름 (여러 개면 쉼표로: 출결신고서, 병원서류)")).filter(d => !g.docs.includes(d)); if(n.length){ g.docs.push(...n); drawD(); } }, "서류 더하기"));
