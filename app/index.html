@@ -368,6 +368,7 @@ nav{margin-bottom:14px}
 .nrow.done span{color:var(--muted);text-decoration:line-through}
 .nadd{display:flex;gap:6px;margin-top:10px}
 .nadd input{flex:1;min-width:0}.nadd>.btn{flex:none;align-self:center}
+.lessonrow{align-items:end}.lessonrow>label.inline{align-self:end;min-height:40px;display:flex;align-items:center}
 .notes .empty{border:0;padding:2px 0}
 .tapes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .tapes .tape{margin:0;padding:8px 14px;font-size:1.35rem}
@@ -3066,7 +3067,7 @@ function openSlot(key, i, base){
     el("span",{className:"hint"}, "바꾸면 이날만 바뀌어요 (수업 교체). 기본: " + (splitCell(base).filter(Boolean).join(" · ") || "없음")),
     rosterRow(curClass),
     el("label",{className:"memo-label"}, "수업 기록 (진도·특이사항)", note),
-    el("div",{className:"two"}, el("label",{className:"memo-label"}, "진도표 차시", lessonSel), el("label",{className:"inline"}, doneCb, " 이 차시 내용을 했어요")),
+    el("div",{className:"two lessonrow"}, el("label",{className:"memo-label"}, "진도표 차시", lessonSel), el("label",{className:"inline"}, doneCb, " 이 차시 내용을 했어요")),
     lessonInfo,
     ...(edit && /\d+\s*-\s*\d+/.test(curClass) ? [el("div",{className:"tt-tools"}, navBtn("진도표 쓰기", () => openPlan(curClass, true, () => openSlot(key, i, base)), curClass + " 진도표 계획 입력"))] : []),
     att.node,
