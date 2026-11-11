@@ -192,7 +192,7 @@
     async coolToTodo(key) {
       const i = ((coolBox || {}).items || []).find(x => String(x.key) === String(key)); if (!i) fail("메시지를 찾지 못했어요. 새로 고침 해 주세요.");
       const id = "cool-" + i.key, todos = get("todos");
-      if (!todos.some(t => t.id === id)) await put("todos", todos.concat({ id, text: S(i.title, 60), due: DATE_RE.test(String(i.due)) ? i.due : "", done: false, createdAt: Date.parse(i.receivedAt) || Date.now(), area: "", cat: "", tcat: "", files: [], src: "cool",
+      if (!todos.some(t => t.id === id)) await put("todos", todos.concat({ id, text: S(i.title, 60), due: DATE_RE.test(String(i.due)) ? i.due : "", done: false, createdAt: Date.parse(i.receivedAt) || Date.now(), area: "", cat: "", tcat: "", files: [], src: "cool", manual: true,
         detail: S([i.summary, ...(i.links || [])].filter(Boolean).join("\n") + "\n\n(쿨메신저 · " + (i.sender || "") + " · " + String(i.receivedAt || "").slice(0, 10) + ")", 2000).trim() }));
       await cfgPut({ coolSeen: { ...(cfgGet("coolSeen") || {}), [i.key]: id } }); return getAll();
     },
@@ -216,6 +216,10 @@
     const drop = new Set(), doneSig = new Set();
     dup.forEach((ts, s) => { if (ts.length > 1) { ts.slice(1).forEach(t => drop.add(t.id)); if (ts.some(t => t.done)) doneSig.add(s); } });
     const todos = get("todos").filter(t => !drop.has(t.id)).map(t => t.src === "cool" && !t.done && doneSig.has(t.text + "|" + t.createdAt) ? { ...t, done: true } : t);
+    // 새 목록으로 바뀌는 사이 '정보 제공'·비공개 메시지가 저절로 할 일로 들어갔으면 뺌 (직접 만든 것·끝낸 것은 둠)
+    const notTodo = new Set();
+    (inbox.items || []).forEach(i => { if (i && (i.private || i.category === "정보 제공")) { notTodo.add("cool-" + i.key); if (seen[i.key] && seen[i.key] !== "-") notTodo.add(seen[i.key]); } });
+    for (let n = todos.length - 1; n >= 0; n--) { const t = todos[n]; if (t.src === "cool" && !t.manual && !t.done && notTodo.has(t.id)) { todos.splice(n, 1); ch = true; } }
     if (drop.size) ch = true;
     for (const i of list) {
       const k = String(i.key), mine = x => x.id === seen[k] || (x.src === "cool" && x.text === S(i.title, 60) && x.createdAt === Date.parse(i.receivedAt));
