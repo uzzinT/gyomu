@@ -193,6 +193,7 @@
     detail: S((i.summary || "") + "\n\n(쿨메신저 · " + (i.sender || "") + " · " + String(i.receivedAt || "").slice(0, 10) + ")", 2000).trim() });
   const coolApi = {
     // 쿨메신저 창: PC '쿨메신저 연결'이 올려 둔 메시지 전체 (+ 받은 시각) 와 이미 할 일로 넣은 것
+    async saveGuardianMsg(t) { await cfgPut({ guardianMsg: S(t, 500) }); return getAll(); },
     async coolMarkRead() { await cfgPut({ coolReadAt: Date.now() }); return getAll(); },
     async coolMessages() { await coolSync().catch(() => {}); const seen = cfgGet("coolSeen") || {}; return { at: (coolBox || {}).at || "", items: (coolBox || {}).items || [], seen }; },
     // 정보 제공으로 온 것도 직접 할 일로
@@ -332,7 +333,7 @@
       notes: get("notes").filter(n => n.date >= t), checks: get("checks").filter(c => !c.closed),
       logs: get("logs").filter(l => l.date >= lt && (l.text || l.lesson > 0 || (l.files || []).length)),
       todos: get("todos").filter(x => !x.done || x.createdAt >= old),
-      budgets: get("budgets"), spends: get("spends"), coolUnread: coolUnreadCount()
+      budgets: get("budgets"), spends: get("spends"), coolUnread: coolUnreadCount(), guardianMsg: cfgGet("guardianMsg") || ""
     });
   }
   // 표에서 id 로 찾아 바꾸기
@@ -533,9 +534,13 @@
       const seen = {}, phone = v => String(v || "").replace(/[^\d\-+ ]/g, "").trim().slice(0, 20);
       const clean = (Array.isArray(list) ? list : []).map(s => ({ no: Math.floor(Number(s && s.no)), name: S(s && s.name, 20).trim(), phone: phone(s && s.phone), note: S(s && s.note, 100).trim(),
         photo: S(s && s.photo, 100).replace(/[^\w-]/g, ""), memo: S(s && s.memo, 2000).trim(), files: cleanFiles(s && s.files).slice(0, 10),
-        parents: (Array.isArray(s && s.parents) ? s.parents : []).slice(0, 3).map(p => ({ rel: S(p && p.rel, 10).trim(), phone: phone(p && p.phone) })).filter(p => p.phone) }))
+        call: S(s && s.call, 20).trim(),
+        parents: (Array.isArray(s && s.parents) ? s.parents : []).slice(0, 3).map(p => ({ rel: S(p && p.rel, 10).trim(), title: S(p && p.title, 10).trim(), phone: phone(p && p.phone) })).filter(p => p.phone) }))
         .filter(s => s.no >= 1 && s.no <= 50 && s.name && !seen[s.no] && (seen[s.no] = true)).sort((a, b) => a.no - b.no);
-      await cfgPut({ students: clean }); return getAll();
+      // 알림 앱 비밀번호 = 보호자1 연락처 가운데 4자리 (010-1234-5678 → 1234)
+      const mid4 = v => { const g = String(v || "").split(/\D+/).filter(Boolean); if (g.length === 3) return g[1].slice(-4).padStart(4, "0"); const d = String(v || "").replace(/\D/g, ""); return d.length >= 10 ? d.slice(-8, -4) : ""; };
+      const pw = {}; clean.forEach(s => { const m = mid4(s.parents[0] && s.parents[0].phone); if (m) pw[s.no] = m; });
+      await cfgPut({ students: clean, stuPw: pw }); return getAll();
     },
     // 알림 앱 쪽 (학생 계정 만들기·보내기는 3단계에서 학생 앱과 함께)
     noticeInfo() { const tt = cfgGet("studentTT") || {}, ttNames = {}; Object.keys(tt).forEach(no => { ttNames[no] = tt[no].name; }); const c = cfgGet("classPw");
@@ -668,7 +673,7 @@
     class: { name: "입력_우리반시간표", head: [["※ 교시마다 두 줄: 위 칸은 과목, 아래 칸은 선생님이에요. 학반 시간표를 그대로 붙여 넣어도 돼요."], [], ["교시", "월", "화", "수", "목", "금"]], rows: 7, pair: true },
     all: { name: "입력_전체교사시간표", head: [["※ 학교 전체 교사 시간표를 A3 칸부터 그대로 붙여 넣으세요 (요일 줄, 교시 번호 줄, 선생님 줄)."]] },
     events: { name: "입력_학사일정", head: [["※ 한 줄에 하루씩. 기간은 2026.10.28~2026.10.30 처럼 써요."], [], ["날짜", "요일", "행사", "비고"]] },
-    students: { name: "입력_학생명단", head: [["※ 한 줄에 학생 한 명. 쓰지 않는 칸은 비워 두세요. 이 탭은 나만 볼 수 있어요."], [], ["번호", "이름", "학생 연락처", "보호자1 관계", "보호자1 연락처", "보호자2 관계", "보호자2 연락처", "비고"]] }
+    students: { name: "입력_학생명단", head: [["※ 한 줄에 학생 한 명. 쓰지 않는 칸은 비워 두세요. 이 탭은 나만 볼 수 있어요."], [], ["번호", "이름", "학생 연락처", "보호자1 관계", "보호자1 연락처", "보호자2 관계", "보호자2 연락처", "비고", "부르는 이름", "보호자1 호칭", "보호자2 호칭"]] }
   };
   async function inputTab(key) {
     const def = INPUT_TABS[key]; if (!def) fail("없는 입력 탭이에요.");
@@ -684,6 +689,10 @@
       // 새 시트에 처음 생기는 빈 탭(시트1)은 지움
       const blank = (await tabsOf(book)).filter(x => x.sheetId !== t.sheetId && /^(Sheet|시트)\d+$/.test(x.title));
       if (blank.length) await G(SHEETS + "/" + book + ":batchUpdate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requests: blank.map(x => ({ deleteSheet: { sheetId: x.sheetId } })) }) }).catch(() => {});
+    }
+    if (key === "students") { // 예전에 만든 탭이면 새 칸 이름을 머리줄 끝에 더함
+      const h = ((await batchGet(book, ["'" + def.name + "'!A3:Z3"], "FORMATTED_VALUE"))[0] || [])[0] || [], add = ["부르는 이름", "보호자1 호칭", "보호자2 호칭"].filter(x => !h.includes(x));
+      if (add.length && h.length) await G(SHEETS + "/" + book + "/values/" + q("'" + def.name + "'!" + String.fromCharCode(65 + h.length) + "3") + "?valueInputOption=RAW", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ values: [add] }) });
     }
     return "https://docs.google.com/spreadsheets/d/" + book + "/edit#gid=" + t.sheetId;
   }
