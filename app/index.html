@@ -222,7 +222,7 @@ nav{margin-bottom:14px}
 .home4{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr) minmax(0,1fr);gap:18px 28px;align-items:start}
 @media (max-width:1150px){.home4{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.home4 .col:last-child{grid-column:1/-1}}
 @media (max-width:700px){.home4{grid-template-columns:1fr}}
-.home4 .col{display:grid;gap:16px;min-width:0;align-content:start}
+.home4 .col{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;min-width:0;align-content:start} /* 칸 폭을 넘는 긴 글(한 줄 할 일 이름)이 칸을 밀어내지 않게 */
 .home4 .tt{margin:0}
 .panel-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
 .panel-head>.tt-tools,.tt-head>.tt-tools{margin-left:auto;justify-content:flex-end}
@@ -1044,7 +1044,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
   body.onhome .home4 .col:nth-child(2)>*{flex:none}
   body.onhome .home4 .col:nth-child(2)>.tt{flex:1 1 auto;min-height:min-content;display:flex;flex-direction:column}
   body.onhome .home4 .col:nth-child(2)>.tt>.tt-wrap{flex:1 1 auto;min-height:min-content;overflow:visible}
-  body.onhome .home4 .col:nth-child(2)>.tt table{height:100%}
+  body.onhome .home4 .col:nth-child(2)>.tt table{height:100%;min-width:0;table-layout:fixed;width:100%}
   body.onhome .home4 .col:nth-child(2)>.tt th,body.onhome .home4 .col:nth-child(2)>.tt td{height:auto!important;padding:1px 2px!important;line-height:1.15}
 }
 @media (min-width:1000px) and (max-width:1150px) and (min-height:620px){body.onhome .home4{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)}}
