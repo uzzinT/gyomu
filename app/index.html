@@ -254,6 +254,9 @@ nav{margin-bottom:14px}
 .coolrow .cc.todo{background:var(--sun,#e8a33d);color:#fff}.coolrow .cs{max-width:8em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .coolmeta{display:grid;grid-template-columns:auto minmax(0,1fr);gap:3px 10px;margin:0;font-size:.85rem}.coolmeta dt{color:var(--muted)}.coolmeta dd{margin:0;overflow-wrap:anywhere}
 .coolh{font-size:.8rem;margin:10px 0 2px;color:var(--muted);letter-spacing:.05em}
+.coolimgs{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.coolimgs a{display:block;text-decoration:none;color:var(--muted)}.coolimgs img{display:block;max-width:100%;height:auto;border:1px solid var(--line);border-radius:6px;background:#fff}
+.coolimgs small{display:block;font-size:.75rem;margin-top:2px}
 .coolbody{white-space:pre-wrap;font-size:.88rem;max-height:45vh;overflow:auto;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--paper)}
 .coolsum{white-space:pre-line;background:var(--mint,#eef6ee);border-radius:8px;padding:8px 12px;margin:6px 0}
 .coollinks{display:grid;gap:3px;margin:6px 0;word-break:break-all}
@@ -3526,8 +3529,17 @@ function openCoolMsg(i, seen){
   else {
 
     if((i.links || []).length) kids.push(el("div",{className:"coollinks"}, el("b",{}, "링크"), ...i.links.map(l => el("a",{href:l,target:"_blank",rel:"noopener noreferrer"}, l))));
-    if((i.files || []).length) kids.push(el("div",{className:"coollinks"}, el("b",{}, "첨부"), ...i.files.map(f => f.url ? el("a",{href:f.url,target:"_blank",rel:"noopener noreferrer"}, "📎 " + f.name) : el("span",{className:"hint"}, "📎 " + f.name + (f.pcOnly ? " (25MB가 넘어 PC에만 있어요)" : f.notOnPC ? " — PC 쿨메신저에서 아직 받지 않은 파일이에요. 쿨메신저에서 [받기]를 누르면 몇 분 안에 여기서 열 수 있어요." : " (올리는 중)")))));
+    const isInline = f => /^본문 (그림|표) \d+\.(png|jpe?g|gif|bmp|webp)$/i.test(f.name); // PC 연결이 본문 속 그림·표를 그림으로 만든 것
+    const media = (i.files || []).filter(isInline), files = (i.files || []).filter(f => !isInline(f));
+    if(files.length) kids.push(el("div",{className:"coollinks"}, el("b",{}, "첨부"), ...files.map(f => f.url ? el("a",{href:f.url,target:"_blank",rel:"noopener noreferrer"}, "📎 " + f.name) : el("span",{className:"hint"}, "📎 " + f.name + (f.pcOnly ? " (25MB가 넘어 PC에만 있어요)" : f.notOnPC ? " — PC 쿨메신저에서 아직 받지 않은 파일이에요. 쿨메신저에서 [받기]를 누르면 몇 분 안에 여기서 열 수 있어요." : " (올리는 중)")))));
     if(i.body) kids.push(el("h3",{className:"coolh"}, "원문"), el("div",{className:"coolbody"}, i.body));
+    if(media.length) kids.push(el("div",{className:"coolimgs"}, ...media.map(f => {
+      const cap = f.name.replace(/^본문 /, ""); // 확장자를 남겨야 미리보기가 그림으로 엶
+      if(!f.url || !window.fbFileBlob) return el("p",{className:"hint"}, cap + " (올리는 중)");
+      const img = el("img",{alt:cap,loading:"lazy"});
+      window.fbFileBlob(f.url).then(b => { img.src = URL.createObjectURL(b); }).catch(() => { img.replaceWith(el("span",{className:"hint"}, "그림을 불러오지 못했어요.")); });
+      return el("a",{href:f.url,title:"크게 보기"}, img, el("small",{}, cap)); // 누르면 미리보기 창
+    })));
     if(i.summary) kids.push(el("h3",{className:"coolh"}, "요약 (Claude)"), el("div",{className:"coolsum"}, i.summary));
   }
   const act = [navBtn("← 목록", () => openCool(), "목록으로")];
