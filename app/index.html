@@ -4386,30 +4386,56 @@ function openTeacherTT(mode, sel){
   const segBtn = (label, m) => { const b = el("button",{type:"button","aria-pressed":String(mode === m)}, label); b.onclick = () => { if(mode !== m) openTeacherTT(m); }; return b; };
   const tabs = el("div",{className:"seg tseg"}, segBtn("전체 선생님 시간표", "compare"), segBtn("한 선생님 주간 시간표", "teacher"));
   const label = t => t.name + (t.homeroom ? " · " + t.homeroom + " 담임" : "") + (ttSort === "file" && tagOf(t) ? " · " + tagOf(t) : ""); // 담임 반은 늘 보임
+  const wd = new Date().getDay();
+  if(!ttSelDays) ttSelDays = new Set([wd >= 1 && wd <= 5 ? wd - 1 : 0]);
+  const chip = (text, on, fn) => { const b = el("button",{type:"button",className:"chip","aria-pressed":String(on)}, text); b.onclick = fn; return b; };
   if(mode === "teacher"){
+    ttMatchDays = ttSelDays; // 교실 찾기는 고른 요일에 그 교실 수업이 있는 선생님만
     const cur = sorted.some(t => t.name === sel) ? sel : (ttSelTeachers.size === 1 ? [...ttSelTeachers][0] : sorted[0].name), t = T.find(x => x.name === cur);
     const pick = el("select",{className:"field",id:"tPick"});
+    const hrFirst = ttHrOnly || ttSort === "homeroom"; // 담임 기준: 반을 앞에
+    const optLabel = x => hrFirst && x.homeroom ? x.homeroom + " 담임 · " + x.name : label(x);
+    const roomBox = el("div",{});
     const fill = () => {
+      ttMatchDays = ttSelDays;
       const q = ttTeacherQ.trim(), list = sorted.filter(x => teacherMatch(x, q) || x.name === cur);
-      pick.replaceChildren(...list.map(x => el("option",{value:x.name,selected:x.name === cur}, label(x))));
+      pick.replaceChildren(...list.map(x => el("option",{value:x.name,selected:x.name === cur}, optLabel(x))));
+      const r = roomOf(q);
+      if(!r) return roomBox.replaceChildren();
+      // 그 교실에 들어오는 선생님(고른 요일) + 몇 교시인지, 그 반 담임은 맨 앞
+      const re = new RegExp("(^|[^0-9])" + r[0] + "\\s*-\\s*0?" + r[1] + "(?![0-9])"), days = [...ttSelDays].sort();
+      const when = x => days.flatMap(d => (x.cells[d] || []).map((v, p) => re.test(String(v || "")) ? (days.length > 1 ? DAYS[d] : "") + (p + 1) : null).filter(Boolean));
+      const isHr = x => hrKey(x.homeroom) === r[0] * 100 + r[1];
+      const inRoom = sorted.map(x => ({ x, w: when(x) })).filter(o => o.w.length || isHr(o.x)).sort((a, b) => isHr(b.x) - isHr(a.x));
+      const dayChips = el("div",{className:"chips"}, ...DAYS.map((d, j) => chip(d, ttSelDays.has(j), () => {
+        if(ttSelDays.has(j)){ if(ttSelDays.size > 1) ttSelDays.delete(j); } else ttSelDays.add(j);
+        fill();
+      })), chip("월~금", ttSelDays.size === 5, () => { ttSelDays = new Set(ttSelDays.size === 5 ? [wd >= 1 && wd <= 5 ? wd - 1 : 0] : [0, 1, 2, 3, 4]); fill(); }));
+      const tChips = el("div",{className:"chips tchips hrmode"}, el("div",{className:"hrrow"}, ...(inRoom.length ? inRoom.map(o => {
+        const b = chip(o.x.name, o.x.name === cur, () => openTeacherTT("teacher", o.x.name));
+        b.append(el("small",{}, (isHr(o.x) ? "담임 " : "") + (o.w.length ? o.w.join("·") + "교시" : "")));
+        return b;
+      }) : [el("span",{className:"hint"}, "이 요일엔 " + r[0] + "-" + r[1] + " 수업이 없어요.")])));
+      roomBox.replaceChildren(
+        el("div",{className:"pickrow"}, el("b",{}, "요일"), dayChips),
+        el("div",{className:"pickrow"}, el("b",{}, r[0] + "-" + r[1]), tChips));
+      dayChips.style.setProperty("--c", "var(--navy)"); tChips.style.setProperty("--c", "var(--navy)");
     };
     fill();
     pick.onchange = () => openTeacherTT("teacher", pick.value);
-    const find = teacherSearch(x => { openTeacherTT("teacher", x.name); refocusFind(); }, fill);
+    // 교실을 찾고 Enter: 첫 선생님을 고르되 교실 목록은 남겨 둠
+    const find = teacherSearch(x => { openTeacherTT("teacher", x.name); refocusFind(); }, fill, list => { ttTeacherQ = $("tFind").value; openTeacherTT("teacher", list[0].name); refocusFind(); });
     const cells = Array.from({length:P}, (_, p) => DAYS.map((_, d) => t.cells[d]?.[p] || ""));
     const mine = canWrite() ? navBtn("이 시간표를 내 시간표로", async () => {
       await saveTTNow({ periods:P, cells:cells.map(r => r.map(v => toMyCell(v.split("\n")))), overrides:tt.overrides }, cur + " 시간표를 내 시간표로 가져왔어요.");
       $("dayDlg").close();
     }, "내 시간표로 가져오기") : "";
     return modal("선생님 시간표", tabs,
-      el("div",{className:"actions tfind"}, find, sortSelect("teacher"), hrOnlyBox("teacher")),
+      el("div",{className:"actions tfind"}, find, sortSelect("teacher"), hrOnlyBox("teacher")), roomBox,
       el("div",{className:"actions"}, el("label",{className:"inline"}, "선생님 ", pick), t.homeroom ? el("span",{className:"hint"}, "담임 " + t.homeroom) : "", el("span",{className:"spacer"}), mine),
       el("div",{className:"tt-wrap"}, gridTable(cells)));
   }
-  const wd = new Date().getDay();
-  if(!ttSelDays) ttSelDays = new Set([wd >= 1 && wd <= 5 ? wd - 1 : 0]);
   ttMatchDays = ttSelDays;
-  const chip = (text, on, fn) => { const b = el("button",{type:"button",className:"chip","aria-pressed":String(on)}, text); b.onclick = fn; return b; };
   const dayChips = el("div",{className:"chips"}, ...DAYS.map((d, j) => chip(d, ttSelDays.has(j), () => {
     if(ttSelDays.has(j)){ if(ttSelDays.size > 1) ttSelDays.delete(j); } else ttSelDays.add(j);
     openTeacherTT("compare");
