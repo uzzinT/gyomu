@@ -296,7 +296,7 @@ nav{margin-bottom:14px}
 .alltools.range .ttback{position:static;padding:4px 6px}
 .alltools.range{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;margin:6px 0}.alltools.range input[type=date]{flex:1 1 0;min-width:0;width:auto}.alltools.range>span,.alltools.range>button{flex:none}
 .tcat{display:inline-block;margin-right:5px;padding:0 6px;border-radius:999px;font-size:.72rem;line-height:1.5;color:#fff;background:var(--c,#667);vertical-align:1px}
-.nadd .tcatsel{flex:0 1 auto;width:auto;min-width:4.5em;max-width:7em}.nadd #todoText{flex:1 1 0;width:0;min-width:0}.nadd input{width:0}
+.nadd .tcatsel{flex:none;width:4.6em;min-width:0;padding-left:6px;padding-right:2px}.nadd .tduein{flex:none;width:8.6em;padding-left:6px;padding-right:4px}.nadd:has(.tduein){flex-wrap:wrap}.nadd:has(.tduein) #todoText{min-width:8em}/* 칸이 좁으면 마감일은 다음 줄로 */.nadd #todoText{flex:1 1 0;width:0;min-width:0}.nadd input{width:0}
 .alltodos{display:grid;gap:2px;max-height:60vh;overflow:auto}
 .alltodos .nrow small{margin-left:auto;white-space:nowrap}
 .lostrow{display:flex;gap:4px;align-items:baseline;margin:2px 0;font-size:.85rem}
@@ -3382,7 +3382,7 @@ function parseMessage(text){
 }
 console.assert(parseMessage("[교무부] 학부모 상담 신청서 취합\n10월 30일(금)까지 제출 바랍니다.").text === "학부모 상담 신청서 취합");
 console.assert(parseMessage("성적 확인 ~ 11.4").due.endsWith("-11-04") && parseMessage("회의 안내").due === "");
-let lastTcat = "", todoSort = (() => { try{ return localStorage.getItem("todoSort") || "due"; }catch{ return "due"; } })();
+let lastTcat = "", todoDraft = { text:"", due:"" }, todoSort = (() => { try{ return localStorage.getItem("todoSort") || "due"; }catch{ return "due"; } })();
 function renderTodos(){
   const edit = canWrite(), today = ymd(new Date());
   const byDue = (a, b) => (a.due || "9999").localeCompare(b.due || "9999") || (a.createdAt || 0) - (b.createdAt || 0);
@@ -3409,16 +3409,22 @@ function renderTodos(){
   parts.push(...(open.length ? open.map(row) : [el("div",{className:"empty"}, "7일 안에 할 일이 없어요")]));
   if(later.length) parts.push(el("div",{className:"tlater"}, navBtn("앞으로 남은 것 " + later.length + "개 (8일 뒤~)", () => openAllTodos("later"), "마감이 8일 넘게 남은 할 일 보기")));
   if(edit){
-    const inp = el("input",{className:"field",id:"todoText",maxLength:60,placeholder:"할 일을 쓰고 Enter"});
+    // 화면이 새로 그려져도(동기화·쿨메신저 받기 등) 쓰던 글·마감·커서를 그대로
+    const focusId = document.activeElement?.id, oldInp = $("todoText"), selAt = oldInp && focusId === "todoText" ? oldInp.selectionStart : null;
+    const inp = el("input",{className:"field",id:"todoText",maxLength:60,placeholder:"할 일을 쓰고 Enter",value:todoDraft.text});
+    const due = el("input",{type:"date",className:"field tduein",id:"todoDue",value:todoDraft.due,"aria-label":"마감일",title:"마감일 (비워 두면 마감 없음)"});
+    inp.oninput = () => { todoDraft.text = inp.value; };
+    due.onchange = () => { todoDraft.due = due.value; };
+    if(focusId === "todoText" || focusId === "todoDue") setTimeout(() => { const f = $(focusId); if(!f) return; f.focus(); if(selAt != null) try{ f.setSelectionRange(selAt, selAt); }catch{} }, 0);
     const tc = window.fbCall ? el("select",{className:"field tcatsel",id:"todoCat","aria-label":"분류"}, el("option",{value:""}, "분류 없음"), ...todoCats().map(c => el("option",{value:c.id,selected:c.id === lastTcat}, c.name)), el("option",{value:"__edit"}, "✎ 분류 고치기…")) : null;
     if(tc) tc.onchange = () => { if(tc.value === "__edit"){ tc.value = lastTcat; return openTodoCats(); } lastTcat = tc.value; };
     inp.onkeyup = e => {
       if(e.key !== "Enter" || e.isComposing || !inp.value.trim()) return;
-      const text = inp.value.trim(); inp.value = "";
-      store.addTodo({ text, detail:"", due:"", tcat:tc ? tc.value : "" });
+      const text = inp.value.trim(), d = due.value; inp.value = ""; due.value = ""; todoDraft = { text:"", due:"" };
+      store.addTodo({ text, detail:"", due:d, tcat:tc ? tc.value : "" });
       setTimeout(() => $("todoText")?.focus(), 30);
     };
-    parts.push(el("div",{className:"nadd"}, ...(tc ? [tc] : []), inp));
+    parts.push(el("div",{className:"nadd"}, ...(tc ? [tc] : []), inp, due));
   }
   return el("section",{className:"panel notes todos"}, ...parts);
 }
