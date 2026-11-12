@@ -2131,7 +2131,7 @@ function renderTT(){
   btn("이번 주", () => { weekOff = 0; renderHome(); }, {disabled: weekOff === 0});
   btn("›", () => { weekOff++; renderHome(); }, {"aria-label":"다음 주"});
   btn("진도표", () => openPlan(), {title:"반별 교과 진도표"});
-  btn("선생님", () => openTeacherTT(), {title:"전체 교사 시간표 · 공강 찾기"});
+  btn("선생님", () => { ttSelDays = null; ttSelTeachers = new Set(); ttTeacherQ = ""; ttHrOnly = false; openTeacherTT(); }, {title:"전체 교사 시간표 · 공강 찾기"});
   if(edit){
     const file = el("input",{type:"file",accept:".xlsx,.xls,.csv",hidden:true,id:"ttFile"});
     file.onchange = async () => {
