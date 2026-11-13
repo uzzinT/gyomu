@@ -183,7 +183,7 @@
   setInterval(() => { if (readyDone && !busy()) carryNotes().then(ch => { if (ch && window.apply) window.apply(getAll()); }).catch(() => {}); }, 10 * 60e3); // 밤을 넘겨 열어 둔 때
   // 쿨메신저 비서(선생님 PC)가 드라이브에 올려 둔 '할 일' 목록을 교무수첩 할 일로 가져옴
   // 처음 보는 것: 안 끝낸 것만 할 일로 더함 / 이미 가져온 것: 비서에서 끝냄으로 바꾸면 여기서도 끝냄
-  const COOL_FILE = "쿨메신저 할 일 (교무수첩이 읽음).json", COOL_WORDS = "쿨메신저 금칙어 (교무수첩).json";
+  const COOL_FILE = "쿨메신저 할 일 (교무수첩이 읽음).json", COOL_WORDS = "쿨메신저 금칙어 (교무수첩).json", COOL_WANT = "쿨메신저 첨부 요청 (교무수첩이 씀).json";
   let coolBox = null, coolVer = "", coolCatSeen;
   const coolCfg = () => ({ auto: true, noDue: true, tcat: "", ...(((cfgGet("config") || {}).cool) || {}) });
   const coolFiles = i => [...(i.files || []).filter(f => f && f.url).map(f => ({ name: S("📎 " + f.name, 200), url: String(f.url), fileId: S(f.id, 200) })),
@@ -208,6 +208,37 @@
       key = String(key); const seen = { ...(cfgGet("coolSeen") || {}) }, id = seen[key] && seen[key] !== "-" ? seen[key] : "cool-" + key;
       await put("todos", get("todos").filter(t => t.id !== id && t.id !== "cool-" + key));
       seen[key] = "-"; await cfgPut({ coolSeen: seen, coolCat: { ...(cfgGet("coolCat") || {}), [key]: "정보 제공" } }); return getAll();
+    },
+    // 첨부를 눌렀을 때만 PC가 올리도록 요청 남김 (PC가 1분마다 확인)
+    // 숨은 저장 공간(앱 데이터)에 올라간 쿨메신저 파일 모두 (드라이브 화면에선 안 보여서 여기서 확인)
+    async coolStored() {
+      const out = []; let page = "";
+      do {
+        const j = await (await G(DRIVE + "?spaces=appDataFolder&pageSize=1000&fields=nextPageToken,files(id,name,size,createdTime,description)" + (page ? "&pageToken=" + encodeURIComponent(page) : ""))).json();
+        (j.files || []).forEach(f => { const m = String(f.description || "").match(/메시지 (\S+)/); out.push({ id: f.id, name: f.name, size: Number(f.size) || 0, at: f.createdTime || "", key: m ? m[1] : "" }); });
+        page = j.nextPageToken || "";
+      } while (page && out.length < 5000);
+      return out.sort((a, b) => String(b.at).localeCompare(String(a.at)));
+    },
+    // 교무수첩으로 가져온 첨부를 다시 PC에만: 드라이브 복사본을 지우고 PC에도 알림
+    async coolDrop(key, name, fileId) {
+      fileId = String(fileId || ""); if (!/^[\w-]{10,}$/.test(fileId)) fail("지울 파일을 찾지 못했어요.");
+      const r = await GX(DRIVE + "/" + fileId, { method: "DELETE" });
+      if (r.status >= 300 && r.status !== 404) fail("지우지 못했어요. 잠시 뒤 다시 시도해 주세요.");
+      if (key) await coolApi.coolWant(key, name, true);
+      const i = ((coolBox || {}).items || []).find(x => String(x.key) === String(key));
+      (i && i.files || []).forEach(x => { if (x.name === name) { x.url = ""; x.id = ""; x.onPC = true; } });
+      const todos = get("todos"); let ch = false;
+      const next = todos.map(t => { const fs = (t.files || []).filter(x => !String(x.url || "").includes(fileId)); if (fs.length === (t.files || []).length) return t; ch = true; return { ...t, files: fs }; });
+      if (ch) await put("todos", next);
+      return getAll();
+    },
+    async coolWant(key, name, drop) {
+      const f = (await findOne("name='" + COOL_WANT + "'"))[0];
+      const cur = f ? (((await (await G(DRIVE + "/" + f.id + "?alt=media")).json()) || {}).want || []) : [];
+      const w = { key: S(key, 40), name: S(name, 200), at: Date.now(), ...(drop ? { drop: true } : {}) };
+      const want = cur.filter(x => x && !(x.key === w.key && x.name === w.name) && Date.now() - (x.at || 0) < 7 * 864e5).concat(w).slice(-50);
+      await driveJson({ name: COOL_WANT, parents: [await rootFolder()] }, JSON.stringify({ want }), f && f.id); return true;
     },
     async coolWords() { const f = (await findOne("name='" + COOL_WORDS + "'"))[0]; if (!f) return null; return ((await (await G(DRIVE + "/" + f.id + "?alt=media")).json()) || {}).words || []; },
     async saveCoolWords(list) {

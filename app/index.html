@@ -259,7 +259,8 @@ nav{margin-bottom:14px}
 .coolimgs small{display:block;font-size:.75rem;margin-top:2px}
 .coolbody{white-space:pre-wrap;font-size:.88rem;max-height:45vh;overflow:auto;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--paper)}
 .coolsum{white-space:pre-line;background:var(--mint,#eef6ee);border-radius:8px;padding:8px 12px;margin:6px 0}
-.coollinks{display:grid;gap:3px;margin:6px 0;word-break:break-all}
+.coolstored .csrow{display:flex;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--line)}.coolstored .csn{flex:1;min-width:0;display:grid;word-break:break-all}.coolstored .csrow .btn{flex:none}
+.coollinks{display:grid;gap:3px;margin:6px 0;word-break:break-all}.coollinks .dropbtn{font-size:.75rem;color:var(--muted);white-space:nowrap}
 .coolmark{display:inline-block;width:1.05em;height:1.05em;margin-right:5px;vertical-align:-2px;background:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAOUSURBVFhH7ZbdS1NxGMeFQuhvSDfNyk23tlrOahkkvUndJAV5EUYbZtObUrOrhAp6UUrNEoJehdJAaCZEKCV0oyFpCr6UaJB4kaZpmSK2b89zenY6tp1cZnd+4QPj+X2f73PO77wtYklLClfR0SsTicPETWKamCBeEFnECrH9P9GQ5UQPgRCMEAXEKrEvriiYhx8l9A5ASydxhIiU9n8TBTmIN0SoYX+im3BKzMJEAQeJKQlcCDNEhsT9nahxL/Fdgv4FzkiX2PBEDQbiqwQsBpwVK/Hzi8y+mBgDiorOoKurC5OTkxgaGsK9e3fhcKwPNUDBYklARcU19PX1YWJiAv39/SgrK4XJtJbX6yX+zyKj2WCIQn39E4TSyMgwUlO3Bw13uTZjcHBQXHPV2dmB+Pg17LPLGH2R6YLbfVRaAb/fj3fv3mJ8fFwqQHt7e9ABtLa2yiowNjam7IJWxcWX2VciY/RFppa6Op+0AQUF+cqAhAQTBgYGpIo5u7Bnz26p/jw4ozFaqXu92VIF2trauPZaxuiLTJ95ywLauHGDOqi2tlaqQEbGIbXu8bilCpSUlKh1qzVRqqDL84Fr32SMvrjx1asWaQMeParBpk1OZGYeVm6sgFJSXOqg9PT9UgVGR0eV+4FvvKqq+1IFmpubFa+M0ReZ/OfPn5O20GpqalKHM7zlvb29shpaeXkn2euXMfoiUz8/gjU11dI6V42NDbDbLEhONGCnI0aBf29L2YKOjjfi+qXZ2VlUVt4AP1mcLWP0RaYHfFYMb3129jHk5+chNzcHhRku1J+w4eNVJ75UJM9hmGpP82w469mJwsJTyjvE6z2OpCSHulOcLWP0RaYDmgaVWx6LOuxzuRN1ngQ05ljwPNcCn9uM4StJ6npVtjWoXzggY/RFpkjivaYJcTFRaniAlyesKN8Xp/D0WGLQuilO2XItnBneJ5qMQbtwN+vXDgT4VOrER82ZB3joDbkD85+9VtRwRxtgINw7VuNZvg3DNPj3oZ/KnGgosCNr1xrFq+0lbkts+KImvhR1mhCVWGMUtliNSEuKRZozFq51RqUWyktwxsL+HVHjMuKKBMFut+H06UL4fI+VryR/IRn+zTVeY0/AL73LJG7hopCtZrOphd+KMzMz8oQHa3p6GtXVD2E2x7dwj7QvnijUSd+GMnon9NDXber69Qowly5dnKJnvttuX1fKHrEvaUlhKCLiB2CN4F89YkvAAAAAAElFTkSuQmCC) center/contain no-repeat;border-radius:3px}
 .catmini{appearance:none;-webkit-appearance:none;flex:none;align-self:center;border:0;border-radius:999px;height:1.55em;width:4.2em;padding:0 10px 0 3px;text-align:center;text-align-last:center;font:inherit;font-size:.68rem;font-weight:600;cursor:pointer;text-overflow:clip;white-space:nowrap;overflow:hidden;
   color:#fff;background:var(--c,#667) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='white' stroke-width='1.6'/%3E%3C/svg%3E") no-repeat right 4px center/6px 4px}
@@ -1153,7 +1154,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="backend.js?v=dafafab2"></script>
+<script src="backend.js?v=79f2308d"></script>
 <style>
 #fbGate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--desk)}
 #fbGate .fbbox{background:var(--paper);border-radius:22px;padding:36px 32px;text-align:center;box-shadow:0 18px 40px -24px rgba(20,40,25,.35);max-width:340px}
@@ -3520,8 +3521,33 @@ async function openCool(){
   };
   q.oninput = () => { shown = 30; draw(); }; cs.onchange = from.onchange = to.onchange = () => { shown = 30; draw(); };
   draw();
-  box.replaceChildren(status, el("div",{className:"alltools one"}, q, cs, navBtn("설정", openCoolSettings, "쿨메신저 할 일 설정 · 금칙어")),
+  box.replaceChildren(status, el("div",{className:"alltools one"}, q, cs, navBtn("설정", openCoolSettings, "쿨메신저 할 일 설정 · 금칙어"), navBtn("올린 파일", openCoolStored, "교무수첩(드라이브)에 올라간 쿨메신저 파일 보기 · 지우기")),
     el("div",{className:"alltools range"}, el("span",{className:"hint"}, "받은 날"), from, el("span",{}, "~"), to, el("button",{type:"button",className:"ttback",title:"기간 지우기","aria-label":"기간 지우기",onclick:() => { from.value = ""; to.value = ""; shown = 30; draw(); }}, "✕")), count, list);
+}
+// 교무수첩(드라이브 숨은 저장 공간)에 올라간 쿨메신저 파일: 드라이브 화면에는 안 보여서 여기서 확인·영구 삭제
+async function openCoolStored(){
+  const box = el("div",{className:"coolstored"}, el("p",{className:"note"}, "불러오는 중…"));
+  modal("올린 파일", box, el("div",{className:"actions"}, navBtn("← 쿨메신저", () => openCool(), "쿨메신저 목록으로")));
+  let list; try{ list = await call("coolStored"); }catch(e){ return box.replaceChildren(el("p",{className:"note"}, e?.message || "불러오지 못했어요.")); }
+  const kb = n => n >= 1048576 ? (n / 1048576).toFixed(1) + "MB" : Math.max(1, Math.round(n / 1024)) + "KB";
+  const draw = () => {
+    const total = list.reduce((s, f) => s + f.size, 0);
+    box.replaceChildren(
+      el("p",{className:"hint"}, "드라이브 화면에는 보이지 않는, 교무수첩만 쓰는 공간이에요. 여기서 지우면 휴지통을 거치지 않고 바로 영구 삭제돼요. PC에 받은 원본은 그대로 남아요."),
+      el("p",{}, el("b",{}, list.length + "개 · " + kb(total))),
+      ...(list.length ? list.map(f => {
+        const x = el("button",{type:"button",className:"btn danger small"}, "영구 삭제");
+        x.onclick = async () => {
+          if(!confirm("'" + f.name + "'을(를) 영구 삭제할까요?\n되돌릴 수 없어요. PC에 받은 원본은 그대로예요.")) return;
+          x.disabled = true;
+          try{ apply(await call("coolDrop", f.key, f.name, f.id)); list = list.filter(y => y.id !== f.id); say("✓ 영구 삭제했어요: " + f.name); draw(); }
+          catch(e){ x.disabled = false; say(e?.message || "지우지 못했어요."); }
+        };
+        const a = el("a",{href:"https://www.googleapis.com/drive/v3/files/" + f.id + "?alt=media",title:"미리보기"}, f.name);
+        return el("div",{className:"csrow"}, el("span",{className:"csn"}, a, el("small",{className:"hint"}, String(f.at).slice(0, 10) + " · " + kb(f.size))), canWrite() ? x : "");
+      }) : [el("p",{className:"note"}, "올라간 파일이 없어요.")]));
+  };
+  draw();
 }
 function openCoolMsg(i, seen){
   const todoId = seen[i.key] && seen[i.key] !== "-" ? seen[i.key] : null, t = (todoId && todos.find(x => x.id === todoId)) || todos.find(x => x.id === "cool-" + i.key);
@@ -3537,10 +3563,43 @@ function openCoolMsg(i, seen){
     if((i.links || []).length) kids.push(el("div",{className:"coollinks"}, el("b",{}, "링크"), ...i.links.map(l => el("a",{href:l,target:"_blank",rel:"noopener noreferrer"}, l))));
     const isInline = f => /^본문 (그림|표) \d+\.(png|jpe?g|gif|bmp|webp)$/i.test(f.name); // PC 연결이 본문 속 그림·표를 그림으로 만든 것
     const media = (i.files || []).filter(isInline), files = (i.files || []).filter(f => !isInline(f));
-    if(files.length) kids.push(el("div",{className:"coollinks"}, el("b",{}, "첨부"), ...files.map(f => f.url ? el("a",{href:f.url,target:"_blank",rel:"noopener noreferrer"}, "📎 " + f.name) : el("span",{className:"hint"}, "📎 " + f.name + (f.pcOnly ? " (25MB가 넘어 PC에만 있어요)" : f.notOnPC ? " — PC 쿨메신저에서 아직 받지 않은 파일이에요. 쿨메신저에서 [받기]를 누르면 몇 분 안에 여기서 열 수 있어요." : " (올리는 중)")))));
+    // 첨부는 이름만. 누르면 그때 PC가 올림 (그 전엔 PC에만 있음)
+    const fetchBtn = f => {
+      const b = el("button",{type:"button",className:"linkbtn",title:"PC에서 가져와 교무수첩에서 보기"}, "📎 " + f.name), st = el("span",{className:"hint"});
+      b.onclick = async () => {
+        if(!canWrite()) return say("지금은 가져올 수 없어요.");
+        b.disabled = true; st.textContent = " — PC에서 가져오는 중이에요. 1~2분 걸려요 (PC가 켜져 있어야 해요).";
+        try{ await call("coolWant", i.key, f.name); }catch(e){ b.disabled = false; st.textContent = ""; return say(e?.message || "요청하지 못했어요."); }
+        for(let n = 0; n < 12; n++){ // 3분까지 기다림
+          await new Promise(r => setTimeout(r, 15000));
+          if(!b.isConnected) return;
+          try{ const d = await call("coolMessages"), x = (d.items || []).find(m => String(m.key) === String(i.key)), g = (x?.files || []).find(y => y.name === f.name && y.url);
+            if(g){ b.replaceWith(el("a",{href:g.url,target:"_blank",rel:"noopener noreferrer"}, "📎 " + f.name)); st.textContent = " — 왔어요. 눌러서 보세요."; return; } }catch{}
+        }
+        b.disabled = false; st.textContent = " — 아직 오지 않았어요. PC가 켜져 있는지 확인하고 다시 눌러 주세요.";
+      };
+      return el("span",{}, b, st);
+    };
+    // 가져온 첨부: 드라이브 복사본 지우기 (PC 원본은 그대로, 다시 누르면 다시 가져옴)
+    const gotFile = f => {
+      const a = el("a",{href:f.url,target:"_blank",rel:"noopener noreferrer"}, "📎 " + f.name);
+      if(!canWrite() || !f.id) return a;
+      const x = el("button",{type:"button",className:"linkbtn dropbtn",title:"교무수첩(드라이브)에 올라간 복사본만 지워요. PC 원본은 그대로예요."}, "드라이브에서 영구 삭제");
+      x.onclick = async () => {
+        if(!confirm("'" + f.name + "'의 드라이브 복사본을 영구 삭제할까요?\n되돌릴 수 없어요. PC에 받은 원본은 그대로 남아요.")) return;
+        x.disabled = true;
+        try{ apply(await call("coolDrop", i.key, f.name, f.id)); say("✓ 드라이브에서 지웠어요: " + f.name); f.url = ""; f.onPC = true; openCoolMsg(i, seen); }
+        catch(e){ x.disabled = false; say(e?.message || "지우지 못했어요."); }
+      };
+      return el("span",{}, a, " ", x);
+    };
+    if(files.length) kids.push(el("div",{className:"coollinks"}, el("b",{}, "첨부"), ...files.map(f => f.url ? gotFile(f)
+      : f.onPC && !f.pcOnly ? fetchBtn(f)
+      : el("span",{className:"hint"}, "📎 " + f.name + (f.pcOnly ? " (25MB가 넘어 PC에만 있어요)" : f.notOnPC ? " — PC 쿨메신저에서 아직 받지 않은 파일이에요. 쿨메신저에서 [받기]를 누르면 여기서 가져올 수 있어요." : " (PC에서 찾는 중)")))));
     if(i.body) kids.push(el("h3",{className:"coolh"}, "원문"), el("div",{className:"coolbody"}, i.body));
     if(media.length) kids.push(el("div",{className:"coolimgs"}, ...media.map(f => {
       const cap = f.name.replace(/^본문 /, ""); // 확장자를 남겨야 미리보기가 그림으로 엶
+      if(!f.url && f.onPC) return fetchBtn(f); // 드라이브에서 지운 것: 누르면 다시 가져옴
       if(!f.url || !window.fbFileBlob) return el("p",{className:"hint"}, cap + " (올리는 중)");
       const img = el("img",{alt:cap,loading:"lazy"});
       window.fbFileBlob(f.url).then(b => { img.src = URL.createObjectURL(b); }).catch(() => { img.replaceWith(el("span",{className:"hint"}, "그림을 불러오지 못했어요.")); });
