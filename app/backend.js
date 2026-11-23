@@ -356,7 +356,7 @@
       archives: Object.entries(cfgGet("archives") || {}).sort().reverse().map(([y, id]) => ({ year: Number(y), url: "https://docs.google.com/spreadsheets/d/" + id + "/edit" })),
       folder: (() => { const y = curYear(), id = ((cfgGet("drive") || {}).years || {})[y]; return id ? { year: y, url: "https://drive.google.com/drive/folders/" + id } : null; })(),
       links: driveLinks(),
-      plans: cfgGet("plans") || {}, rosters: cfgGet("rosters") || {}, students: cfgGet("students") || [], classTT: cfgGet("classTT"),
+      plans: cfgGet("plans") || {}, rosters: cfgGet("rosters") || {}, students: cfgGet("students") || [], classTT: cfgGet("classTT"), classTTs: cfgGet("classTTs") || {},
       classRosters: get("classRosters"), allTT: teachers.length ? { periods: Number(cfgGet("periods")) || 7, teachers } : null, sheet: null,
       events: get("events"), memos, dues, memoFiles,
       // 학사일정 행사 하나마다 글·마감·사진·파일 ('날짜|행사 이름' 으로 찾음: 학사일정을 다시 불러와도 그대로 남게)
@@ -541,6 +541,14 @@
       await cfgPut({ rosters: all }); return getAll();
     },
     async saveClassTT(t) { const cells = ttCells(t && t.cells, 10); if (!cells.length) fail("시간표가 비어 있어요."); await cfgPut({ classTT: { periods: cells.length, cells } }); return getAll(); },
+    // 모든 반 학반 시간표 { "3-3": { who, periods, cells } } (다시 올리면 그 반만 바뀜)
+    async saveClassTTs(list, replace) {
+      const out = replace ? {} : { ...(cfgGet("classTTs") || {}) };
+      (Array.isArray(list) ? list : []).slice(0, 80).forEach(c => { const code = S(c && c.code, 10).replace(/\s/g, ""); const cells = ttCells(c && c.cells, 10);
+        if (/^\d{1,2}-\d{1,2}$/.test(code) && cells.length) out[code] = { who: S(c.who, 20).trim(), periods: cells.length, cells }; });
+      if (!Object.keys(out).length) fail("학반 시간표가 비어 있어요.");
+      await cfgPut({ classTTs: out }); return getAll();
+    },
     async saveAllTT(a) {
       const list = (a && Array.isArray(a.teachers) ? a.teachers : []).slice(0, 200).map(t => ({ name: S(t.name, 30).trim(), homeroom: S(t.homeroom, 10).trim(), cells: teacherCells(t.cells) })).filter(t => t.name);
       if (!list.length) fail("선생님 시간표가 비어 있어요.");
@@ -850,7 +858,7 @@
 
   // ---------- 새 학년도: 지난 학년도를 드라이브 'YYYY학년도' 폴더에 시트로 정리하고, Firebase 에도 한 부 보관 ----------
   const YEAR_TABLES = ["items", "events", "memos", "notes", "checks", "logs", "todos", "teachers", "classRosters", "attend", "pmsg", "spends"];
-  const YEAR_CFG = ["timetable", "kept", "ttTerm", "plans", "rosters", "students", "classTT", "periods", "studentTT", "stuPw", "classPw", "inputHash"];
+  const YEAR_CFG = ["timetable", "kept", "ttTerm", "plans", "rosters", "students", "classTT", "classTTs", "periods", "studentTT", "stuPw", "classPw", "inputHash"];
   const J = v => JSON.stringify(v ?? null);
   // parseBook 이 다시 읽을 수 있는 모양 (예전 교무수첩 시트와 같은 탭·칸)
   function bookTabs(db, meta) {

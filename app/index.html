@@ -653,6 +653,7 @@ tr.attfocus td{background:color-mix(in srgb,var(--ochre) 18%,var(--paper))}
 .tchips.hrmode{display:grid;grid-template-columns:minmax(0,1fr);max-height:none;gap:6px}
 .hrgrade{display:flex;gap:6px;align-items:center;min-width:0}.hrgrade>b{flex:none;width:3.2em;font-size:.8rem}
 .hrrow{display:flex;flex-wrap:wrap;gap:4px;min-width:0}
+.tgrid td.click{cursor:pointer}.tgrid td.click:hover{outline:2px solid var(--navy);outline-offset:-2px}
 .tchips .hrrow .chip{width:6.5em;flex:none;height:auto;line-height:1.2;padding:3px 4px;white-space:nowrap;display:block}
 .tchips .hrrow .chip small{display:block;font-size:.85em;opacity:.75;overflow:hidden;text-overflow:ellipsis}
 .tgrid .dstart{border-left:2px solid var(--muted)}
@@ -1154,7 +1155,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="backend.js?v=79f2308d"></script>
+<script src="backend.js?v=0161e860"></script>
 <style>
 #fbGate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--desk)}
 #fbGate .fbbox{background:var(--paper);border-radius:22px;padding:36px 32px;text-align:center;box-shadow:0 18px 40px -24px rgba(20,40,25,.35);max-width:340px}
@@ -1361,6 +1362,7 @@ function apply(data){
   students = Array.isArray(data?.students) ? data.students : [];
   classRosters = data?.classRosters && typeof data.classRosters === "object" ? data.classRosters : {};
   classTT = data?.classTT && Array.isArray(data.classTT.cells) ? data.classTT : null;
+  classTTs = data?.classTTs && typeof data.classTTs === "object" ? data.classTTs : {};
   sheetInfo = data?.sheet && safeUrl(data.sheet.url) ? data.sheet : null;
   allTT = data?.allTT && Array.isArray(data.allTT.teachers) && data.allTT.teachers.length ? data.allTT : null;
   if(allTT) allTT.teachers.forEach(t => { t.homeroom = normCode(t.homeroom); }); // 예전에 날짜 글자로 저장된 담임 반 고침
@@ -4262,7 +4264,7 @@ function openStudents(){
 }
 
 // ---------- 학교 시간표 읽기: 교사 시간표 · 학반 시간표 · 전체 교사 시간표 ----------
-let classTT = null, allTT = null;
+let classTT = null, allTT = null, classTTs = {}; // classTTs: 모든 반 학반 시간표 { "3-3": { who, periods, cells } }
 const CLASS_RE = /^\d+\s*-\s*\d+$/;
 // 엑셀·구글 시트가 반 번호(3-9)를 날짜로 바꿔 버린 칸을 다시 반 번호로 (3월 9일, 3/9, 3. 9. 꼴)
 const MON3 = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -4303,6 +4305,22 @@ function classBlockStart(rows, code){
 }
 setTimeout(() => console.assert(classBlockStart([["1-1 담임"],["","월","화","수","목","금"],["1","a"],["2026 학년도","","","","","3-3 정유진"],["","월","화","수","목","금"],["1","b"]], "3-3") === 4
   && classBlockStart([["13-3"],["","월","화","수","목","금"]], "3-3") === 0), 0);
+// 모든 반 학반 시간표: 요일 머리줄마다 바로 위 세 줄에서 '3-3 정유진' 같은 반 이름을 찾고, 다음 표 전까지를 그 반 시간표로
+function parseClassTTs(rows){
+  const isHead = r => DAYS.filter(d => (r || []).some(c => { const s = String(c ?? "").replace(/\s/g, ""); return s === d || s === d + "요일"; })).length >= 3;
+  const heads = rows.map((r, i) => isHead(r) ? i : -1).filter(i => i >= 0), out = [];
+  heads.forEach((h, i) => {
+    let code = "", who = "";
+    for(let k = h - 1; k >= Math.max(0, h - 3) && !code; k--) (rows[k] || []).forEach((_, c) => { if(code) return; const m = cellLines(rows[k], c).join(" ").match(/(?:^|\s)(\d{1,2})\s*-\s*(\d{1,2})(?:\s+(\S+))?\s*$/); if(m){ code = +m[1] + "-" + +m[2]; who = m[3] || ""; } });
+    if(!code) return;
+    const g = parseWeekGrid(rows.slice(h, heads[i + 1] ?? rows.length), 0);
+    if(g) out.push({ code, who, cells:g.map(r => r.map(l => l.slice(0, 2).join("\n").slice(0, 60))) });
+  });
+  return out;
+}
+setTimeout(() => { const p = parseClassTTs([["학반 시간표"],["2026 학년도","","","","","3-3 정유진"],["","월","화","수","목","금"],["1","언매","D지구Ⅱ","","",""],["","김진아","정유진","","",""],["2","화작B","","","",""],["","주영민","","","",""],
+  ["학반 시간표"],["2026 학년도","","","","","3-4 박선생"],["","월","화","수","목","금"],["1","수학","","","",""],["","이수학","","","",""]]);
+  console.assert(p.length === 2 && p[0].code === "3-3" && p[0].who === "정유진" && p[0].cells.length === 2 && p[0].cells[0][1] === "D지구Ⅱ\n정유진" && p[0].cells[1][0] === "화작B\n주영민" && p[1].code === "3-4" && p[1].cells.length === 1, p); }, 0);
 // 교사 시간표 칸(과목 / 반)을 내 시간표 형식('3-3 D지구Ⅱ' / 교실)으로
 function toMyCell(lines){
   const ls = (lines || []).filter(Boolean); if(!ls.length) return "";
@@ -4362,6 +4380,7 @@ setTimeout(() => {
 function classGrid(){
   if(classTT && Array.isArray(classTT.cells) && classTT.cells.length) return { src:"올린 학반 시간표", cells:classTT.cells };
   const code = String(config.homeroomClass || "").replace(/\s/g, "");
+  if(code && classTTs[code]) return { src:"올린 학반 시간표", cells:classTTs[code].cells };
   if(!code || !allTT?.teachers?.length) return null;
   const P = allTT.periods || 7, cells = Array.from({length:P}, () => Array(5).fill(""));
   allTT.teachers.forEach(t => t.cells.forEach((day, d) => day.forEach((v, p) => {
@@ -4416,8 +4435,27 @@ function openClassTTEdit(){
     err, el("div",{className:"actions"}, minus, plus, el("span",{className:"spacer"}), save));
 }
 
+// 학반 시간표: 학년별 반 단추 → 그 반 주간 시간표. 칸의 선생님을 누르면 그 선생님 시간표
+const byCode = (a, b) => a.split("-")[0] - b.split("-")[0] || a.split("-")[1] - b.split("-")[1];
+function openClassTTs(tabs, sel, T){
+  const codes = Object.keys(classTTs).sort(byCode);
+  if(!codes.length) return modal("선생님 시간표", tabs, el("p",{className:"note"}, "설정 → 학기 초 세팅 → '모든 반 학반 시간표'에서 엑셀을 올려 주세요. 여러 반이 이어진 파일 하나면 돼요."));
+  const hc = String(config.homeroomClass || "").replace(/s/g, "");
+  const cur = [sel, ttClassSel, hc].find(c => c && classTTs[c]) || codes[0], t = classTTs[cur]; ttClassSel = cur;
+  const byG = {}; codes.forEach(c => (byG[c.split("-")[0]] ||= []).push(c));
+  const chip = (c, on) => { const b = el("button",{type:"button",className:"chip","aria-pressed":String(on)}, c); b.onclick = () => openTeacherTT("class", c); if(classTTs[c].who) b.append(el("small",{}, classTTs[c].who)); return b; };
+  const picks = el("div",{className:"chips tchips hrmode"}, ...Object.keys(byG).sort((a, b) => a - b).map(g => el("div",{className:"hrgrade"}, el("b",{}, g + "학년"), el("div",{className:"hrrow"}, ...byG[g].map(c => chip(c, c === cur))))));
+  picks.style.setProperty("--c", "var(--navy)");
+  const tbl = gridTable(t.cells), names = new Set(T.map(x => x.name));
+  tbl.querySelectorAll("tbody tr").forEach((tr, p) => [...tr.children].slice(1).forEach((td, d) => {
+    const who = String(t.cells[p]?.[d] || "").split("\n")[1]?.trim(); if(!who || !names.has(who)) return;
+    td.classList.add("click"); td.title = who + " 선생님 시간표 보기"; td.onclick = () => openTeacherTT("teacher", who);
+  }));
+  return modal("선생님 시간표", tabs, el("div",{className:"pickrow"}, el("b",{}, "반"), picks),
+    el("p",{className:"hint"}, cur + (t.who ? " · 담임 " + t.who : "") + (names.size ? " · 칸을 누르면 그 선생님 시간표" : "")), el("div",{className:"tt-wrap"}, tbl));
+}
 // 선생님 시간표: 전체 선생님 시간표(여러 요일·여러 선생님, 모두 비는 시간 표시) / 한 선생님 주간 시간표(내 시간표로 가져오기)
-let ttSelDays = null, ttSelTeachers = new Set(), ttTeacherQ = "", ttHrOnly = false;
+let ttSelDays = null, ttSelTeachers = new Set(), ttTeacherQ = "", ttHrOnly = false, ttClassSel = "";
 let ttSort = (() => { try{ const v = localStorage.getItem("ttSort"); return ["name", "file", "homeroom"].includes(v) ? v : "name"; }catch{ return "name"; } })();
 // 가장 많이 맡은 과목 (교과별 보기에서 이름 옆에 표시)
 const mainSubject = t => { const c = {}; t.cells.flat().forEach(v => { const s = String(v || "").split("\n")[0]; if(s) c[s] = (c[s] || 0) + 1; }); return Object.entries(c).sort((a, b) => b[1] - a[1])[0]?.[0] || ""; };
@@ -4474,13 +4512,15 @@ function teacherSearch(onPick, onType, onPickAll){
 const refocusFind = () => setTimeout(() => autoFocus($("tFind")), 0);
 function openTeacherTT(mode, sel){
   const T = allTT?.teachers || [];
-  if(!T.length) return modal("선생님 시간표", el("p",{className:"note"}, "설정 → 학기 초 세팅에서 전체 교사 시간표를 올리거나 구글 시트로 연결해 주세요."));
-  mode = mode || "compare";
+  const hasClass = Object.keys(classTTs).length > 0;
+  if(!T.length && !hasClass) return modal("선생님 시간표", el("p",{className:"note"}, "설정 → 학기 초 세팅에서 전체 교사 시간표나 학반 시간표를 올리거나 구글 시트로 연결해 주세요."));
+  mode = T.length ? mode || "compare" : "class";
   ttMatchDays = mode === "compare" ? ttSelDays : null;
   const P = allTT.periods || 7, sorted = orderedTeachers();
   // 보기 전환: 고른 쪽이 진하게
   const segBtn = (label, m) => { const b = el("button",{type:"button","aria-pressed":String(mode === m)}, label); b.onclick = () => { if(mode !== m) openTeacherTT(m); }; return b; };
-  const tabs = el("div",{className:"seg tseg"}, segBtn("전체 선생님 시간표", "compare"), segBtn("한 선생님 주간 시간표", "teacher"));
+  const tabs = el("div",{className:"seg tseg"}, ...(T.length ? [segBtn("전체 선생님 시간표", "compare"), segBtn("한 선생님 주간 시간표", "teacher")] : []), segBtn("학반 시간표", "class"));
+  if(mode === "class") return openClassTTs(tabs, sel, T);
   const label = t => t.name + (t.homeroom ? " · " + t.homeroom + " 담임" : "") + (ttSort === "file" && tagOf(t) ? " · " + tagOf(t) : ""); // 담임 반은 늘 보임
   const wd = new Date().getDay();
   if(!ttSelDays) ttSelDays = new Set([wd >= 1 && wd <= 5 ? wd - 1 : 0]);
@@ -4771,6 +4811,7 @@ let sheetInfo = null; // 교무수첩 시트 주소와 입력 탭 번호 (앱스
 const SETUP = [
   { key:"my", label:"내 시간표", tpl:"시간표 양식.xlsx", note:() => tt.cells.some(r => r.some(Boolean)) ? tt.periods + "교시까지 들어 있어요" : "아직 없어요" },
   { key:"class", label:"우리 반 시간표 (학반)", tpl:"학반 시간표 양식.xlsx", note:() => classTT?.cells?.length ? "들어 있어요" : (allTT?.teachers?.length && config.homeroomClass ? "전체 교사 시간표에서 자동으로 만들어요" : "아직 없어요") },
+  { key:"classes", label:"모든 반 학반 시간표", noTab:true, multi:true, note:() => { const k = Object.keys(classTTs); return k.length ? k.length + "개 반 · 선생님 시간표 창의 '학반 시간표'에서 봐요" : "아직 없어요 · 여러 반이 이어진 학반 시간표 엑셀을 그대로 올려요"; } },
   { key:"all", label:"전체 교사 시간표", note:() => allTT?.teachers?.length ? "선생님 " + allTT.teachers.length + "명" : "아직 없어요" },
   { key:"events", label:"학사일정", tpl:"학사일정 양식.xlsx", note:() => { const n = events.filter(e => !e.cat).length; return n ? n + "개" : "아직 없어요"; } },
   { key:"neis", label:"교과별 명렬표 (나이스 출석부)", noTab:true, multi:true,
@@ -4794,6 +4835,12 @@ async function importRows(key, sheets){
     const list = sheets.flatMap(s => parseNeisRoster(s.rows));
     if(!list.length) throw new Error("나이스 출석부 모양을 찾지 못했어요. '교과 : ○○ 1학년 1-5' 줄과 '번호·성명' 머리줄이 있는 파일인지 확인해 주세요.");
     await store.saveClassRosters(list); return "명렬표 " + list.length + "개 반 (" + list.map(c => c.code).join(", ") + ")";
+  }
+  if(key === "classes"){
+    const by = {}; sheets.flatMap(s => parseClassTTs(s.rows)).forEach(c => { by[c.code] = c; });
+    const list = Object.values(by);
+    if(!list.length) throw new Error("학반 시간표 모양을 찾지 못했어요. 요일 머리줄 바로 위에 '3-3 담임' 처럼 반이 적힌 표인지 확인해 주세요.");
+    await store.saveClassTTs(list); return "학반 시간표 " + list.length + "개 반";
   }
   if(key === "students"){
     const list = sheets.map(s => parseRoster(s.rows)).find(Boolean);
@@ -5250,6 +5297,7 @@ const store = {
   saveClassRosters: async list => apply(await call("saveClassRosters", list)),
   importArchive: async (year, parts) => apply(await call("importFromArchive", year, parts)),
   saveClassTT: async t => apply(await call("saveClassTT", t)),
+  saveClassTTs: async (l, replace) => apply(await call("saveClassTTs", l, replace)),
   saveAllTT: async t => apply(await call("saveAllTT", t)),
   readSheet: url => call("readSheet", url),
   inputTab: key => call("inputTab", key),
@@ -5301,6 +5349,7 @@ wrapUndo("saveLog", (date, period, cls) => { const o = structuredClone(logOf(dat
 wrapUndo("saveStudents", () => { const old = structuredClone(students); return ["학생 명단", () => store.saveStudents(old)]; });
 wrapUndo("saveRoster", cls => { const old = { roster:"", photo:"", key:"", ...structuredClone(rosters[cls] || {}) }; return ["명렬표 연결", () => store.saveRoster(cls, old)]; });
 wrapUndo("savePlan", subj => { const old = structuredClone(plans[subj] || []); return ["진도표 계획", () => store.savePlan(subj, old)]; });
+wrapUndo("saveClassTTs", () => { const old = structuredClone(classTTs); return Object.keys(old).length ? ["학반 시간표", () => store.saveClassTTs(Object.entries(old).map(([code, c]) => ({ code, ...c })), true)] : null; });
 wrapUndo("saveClassTT", () => { const old = structuredClone(classTT); return old ? ["우리 반 시간표", () => store.saveClassTT(old)] : null; });
 wrapUndo("saveConfigPatch", p => { const old = before(config, p); return ["설정", () => store.saveConfigPatch(old)]; });
 wrapUndo("pin", it => ["바로 가기", () => store.pin(it)]);
