@@ -4431,15 +4431,25 @@ function orderedTeachers(){
 }
 const tagOf = t => ttSort === "homeroom" ? (t.homeroom ? t.homeroom : "") : ttSort === "file" ? mainSubject(t) : "";
 const roomOf = q => { const m = String(q).replace(/\s/g, "").match(/^(\d)(?:학년|-)?(\d{1,2})반?$/) || String(q).match(/^(\d)\s*-\s*(\d{1,2})$/); return m ? [Number(m[1]), Number(m[2])] : null; };
-const teachesIn = (t, g, c) => { const re = new RegExp("(^|[^0-9])" + g + "\\s*-\\s*0?" + c + "(?![0-9])"); return t.cells.some((day, d) => (!ttMatchDays || ttMatchDays.has(d)) && (day || []).some(v => re.test(String(v || "")))); };
+const gradeQ = q => Number((String(q || "").replace(/\s/g, "").match(/^([1-6])학년(전체|모두)?$/) || [])[1]) || 0;
+// 교실(3-3)·학년(2학년)·교실 이름이나 과목(음악실·국어) 찾기: 시간표 칸이 맞는지 보는 함수. 선생님 이름이면 null
+const placeTest = q => { q = String(q || "").trim(); const r = roomOf(q), g = gradeQ(q);
+  if(r){ const re = new RegExp("(^|[^0-9])" + r[0] + "\\s*-\\s*0?" + r[1] + "(?![0-9])"); return v => re.test(v); }
+  if(g){ const re = new RegExp("(^|[^0-9])" + g + "\\s*-\\s*\\d{1,2}(?![0-9])"); return v => re.test(v); }
+  return q.length >= 2 && !(allTT?.teachers || []).some(t => t.name.includes(q)) ? v => v.includes(q) : null; };
+const placeHr = (q, t) => { const r = roomOf(q), g = gradeQ(q); return r ? hrKey(t.homeroom) === r[0] * 100 + r[1] : g ? Math.floor(hrKey(t.homeroom) / 100) === g : false; };
+const placeName = q => { const r = roomOf(q), g = gradeQ(q); return r ? r[0] + "-" + r[1] : g ? g + "학년" : String(q).trim(); };
+// 고른 요일에 그 칸에서 수업하는지
+const teachesWhere = (t, test) => t.cells.some((day, d) => (!ttMatchDays || ttMatchDays.has(d)) && (day || []).some(v => test(String(v || ""))));
 let ttMatchDays = null; // 전체 선생님 시간표에서는 고른 요일에 그 반 수업이 있는 선생님만
 const teacherMatch = (t, q) => {
   if(ttHrOnly && !t.homeroom) return false;
   if(!q) return true;
-  const r = roomOf(q);
-  if(r) return hrKey(t.homeroom) === r[0] * 100 + r[1] || teachesIn(t, r[0], r[1]);
-  return t.name.includes(q) || tagOf(t).includes(q) || String(t.homeroom || "").includes(q) || (q.length >= 2 && t.cells.flat().some(v => String(v || "").includes(q)));
+  const test = placeTest(q);
+  if(roomOf(q) || gradeQ(q)) return placeHr(q, t) || teachesWhere(t, test);
+  return t.name.includes(q) || tagOf(t).includes(q) || String(t.homeroom || "").includes(q) || (!!test && teachesWhere(t, test));
 };
+console.assert(gradeQ("2학년") === 2 && gradeQ("2 학년 전체") === 2 && gradeQ("2-3") === 0 && placeTest("2학년")("국어 2-11") && !placeTest("2학년")("국어 12-1") && placeTest("3-3")("3-03 수학") && !placeTest("3-3")("3-13"));
 console.assert(JSON.stringify(roomOf("3학년 3반")) === "[3,3]" && JSON.stringify(roomOf("3-10")) === "[3,10]" && JSON.stringify(roomOf("303")) === "[3,3]" && roomOf("김민수") === null);
 // 담임만 보기 체크
 const hrOnlyBox = mode => { const c = el("input",{type:"checkbox",checked:ttHrOnly}); c.onchange = () => { ttHrOnly = c.checked; openTeacherTT(mode); }; return el("label",{className:"inline hronly",title:"담임 선생님만 보기"}, c, " 담임만"); };
@@ -4451,13 +4461,13 @@ function sortSelect(mode){
 }
 // 찾기 칸: Enter 를 누르면 첫 번째로 맞는 선생님을 고르고 칸을 비움 (한글 입력이 끝난 뒤의 Enter 를 받으려고 keyup 사용)
 function teacherSearch(onPick, onType, onPickAll){
-  const q = el("input",{type:"search",className:"field",id:"tFind",placeholder:"이름·교실(예: 3-3) 찾기 · Enter 로 고르기",value:ttTeacherQ});
+  const q = el("input",{type:"search",className:"field",id:"tFind",placeholder:"이름·교실(3-3)·학년(2학년)·음악실 찾기 · Enter 로 고르기",value:ttTeacherQ});
   q.oninput = () => { ttTeacherQ = q.value; onType && onType(); };
   q.onkeyup = e => {
     if(e.key !== "Enter" || e.isComposing) return;
     const s = q.value.trim(), list = orderedTeachers().filter(t => teacherMatch(t, s));
     if(!s || !list.length) return;
-    ttTeacherQ = ""; if(roomOf(s) && onPickAll) return onPickAll(list); onPick(list.find(t => t.name === s) || list[0]);
+    ttTeacherQ = ""; if(placeTest(s) && onPickAll) return onPickAll(list); onPick(list.find(t => t.name === s) || list[0]);
   };
   return q;
 }
@@ -4486,12 +4496,13 @@ function openTeacherTT(mode, sel){
       ttMatchDays = ttSelDays;
       const q = ttTeacherQ.trim(), list = sorted.filter(x => teacherMatch(x, q) || x.name === cur);
       pick.replaceChildren(...list.map(x => el("option",{value:x.name,selected:x.name === cur}, optLabel(x))));
-      const r = roomOf(q);
-      if(!r) return roomBox.replaceChildren();
-      // 그 교실에 들어오는 선생님(고른 요일) + 몇 교시인지, 그 반 담임은 맨 앞
-      const re = new RegExp("(^|[^0-9])" + r[0] + "\\s*-\\s*0?" + r[1] + "(?![0-9])"), days = [...ttSelDays].sort();
-      const when = x => days.flatMap(d => (x.cells[d] || []).map((v, p) => re.test(String(v || "")) ? (days.length > 1 ? DAYS[d] : "") + (p + 1) : null).filter(Boolean));
-      const isHr = x => hrKey(x.homeroom) === r[0] * 100 + r[1];
+      const test = placeTest(q);
+      if(!test) return roomBox.replaceChildren();
+      // 그 교실·학년에 들어오는 선생님(고른 요일) + 몇 교시인지, 그 반(학년) 담임은 맨 앞
+      const days = [...ttSelDays].sort(), at = (d, p) => (days.length > 1 ? DAYS[d] : "") + (p + 1);
+      const hitsOf = x => days.flatMap(d => (x.cells[d] || []).map((v, p) => test(String(v || "")) ? { d, p, v:String(v) } : null).filter(Boolean));
+      const when = x => hitsOf(x).map(h => at(h.d, h.p));
+      const isHr = x => placeHr(q, x);
       const inRoom = sorted.map(x => ({ x, w: when(x) })).filter(o => o.w.length || isHr(o.x)).sort((a, b) => isHr(b.x) - isHr(a.x));
       const dayChips = el("div",{className:"chips"}, ...DAYS.map((d, j) => chip(d, ttSelDays.has(j), () => {
         if(ttSelDays.has(j)){ if(ttSelDays.size > 1) ttSelDays.delete(j); } else ttSelDays.add(j);
@@ -4500,11 +4511,12 @@ function openTeacherTT(mode, sel){
       const tChips = el("div",{className:"chips tchips hrmode"}, el("div",{className:"hrrow"}, ...(inRoom.length ? inRoom.map(o => {
         const b = chip(o.x.name, o.x.name === cur, () => openTeacherTT("teacher", o.x.name));
         b.append(el("small",{}, (isHr(o.x) ? "담임 " : "") + (o.w.length ? o.w.join("·") + "교시" : "")));
+        b.title = o.x.name + (o.x.homeroom ? " · " + o.x.homeroom + " 담임" : "") + "\n" + hitsOf(o.x).map(h => DAYS[h.d] + " " + (h.p + 1) + "교시 " + h.v.replace(/\n/g, " ")).join("\n");
         return b;
-      }) : [el("span",{className:"hint"}, "이 요일엔 " + r[0] + "-" + r[1] + " 수업이 없어요.")])));
+      }) : [el("span",{className:"hint"}, "이 요일엔 " + placeName(q) + " 수업이 없어요.")])));
       roomBox.replaceChildren(
         el("div",{className:"pickrow"}, el("b",{}, "요일"), dayChips),
-        el("div",{className:"pickrow"}, el("b",{}, r[0] + "-" + r[1]), tChips));
+        el("div",{className:"pickrow"}, el("b",{}, placeName(q)), tChips));
       dayChips.style.setProperty("--c", "var(--navy)"); tChips.style.setProperty("--c", "var(--navy)");
     };
     fill();
