@@ -5090,7 +5090,8 @@ const phoneOf = v => { let s = String(v ?? "").trim(); if(/^1\d{9}$/.test(s)) s 
 // 머리줄에서 번호·이름·학생 연락처·보호자 관계/연락처·비고 칸을 찾아 읽음
 let guardianMsg = "";
 const DEF_GMSG = "안녕하세요, {학부모}.\n아직 {학생 이름}가 등교하지 않았습니다.\n확인 후 지도 부탁드립니다.";
-const gTitle = p => (p && (p.title || { 어머니:"어머님", 아버지:"아버님", 엄마:"어머님", 아빠:"아버님", 모:"어머님", 부:"아버님", 할머니:"할머님", 할아버지:"할아버님" }[String(p.rel || "").trim()] || (p.rel ? p.rel + "님" : ""))) || "보호자님";
+const gTitle = p => (p && (p.title || { 어머니:"어머님", 아버지:"아버님", 엄마:"어머님", 아빠:"아버님", 모:"어머님", 부:"아버님", 할머니:"할머님", 할아버지:"할아버님" }[String(p.rel || "").trim()] || (p.rel ? String(p.rel).trim().replace(/님$/, "") + "님" : ""))) || "보호자님"; // 관계에 이미 '님'이 있으면(어머님) 또 붙이지 않음
+console.assert(gTitle({ rel:"어머님" }) === "어머님" && gTitle({ rel:"어머니" }) === "어머님" && gTitle({ rel:"이모" }) === "이모님" && gTitle({ rel:"할머니" }) === "할머님");
 const callName = s => s.call || String(s.name || "").slice(String(s.name || "").length >= 3 ? 1 : 0);
 const hasBatchim = w => { const c = String(w).charCodeAt(String(w).length - 1); return c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 !== 0; };
 const fillGMsg = (s, p) => { const n = callName(s); return (guardianMsg || DEF_GMSG).replace(/\{학생 ?이름\}(이가|가)/g, n + (hasBatchim(n) ? "이가" : "가")).replace(/\{학생 ?이름\}/g, n).replace(/\{이름\}/g, s.name || "").replace(/\{학부모\}|\{보호자\}/g, gTitle(p)); };
