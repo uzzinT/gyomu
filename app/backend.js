@@ -821,6 +821,29 @@
   const readTab = async key => (await batchGet(await inputBookFor(key), ["'" + INPUT_TABS[key].name + "'!A1:CB400"], "FORMATTED_VALUE"))[0].map(r => r.map(v => String(v ?? "")));
   const hash = rows => { const s = JSON.stringify(rows.map(r => { const c = r.slice(); while (c.length && c[c.length - 1] === "") c.pop(); return c; }).filter(r => r.length)); let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return s.length + ":" + h; };
   const keepHash = p => cfgPut({ inputHash: { ...(cfgGet("inputHash") || {}), ...p } });
+  const colA1 = c => (c >= 26 ? String.fromCharCode(64 + Math.floor(c / 26)) : "") + String.fromCharCode(65 + c % 26);
+  // 고친 학생(nos)의 '부르는 이름'·'보호자N 호칭' 칸만 씀. 칸이 없으면 머리줄 끝에 더함. 보호자는 연락처로 짝지음
+  // 시트에 아직 교무수첩에 안 들어온 고침이 있으면 그 표시는 그대로 둠 (다음에 열 때 들여옴)
+  API.studentsToSheet = async nos => {
+    const book = (cfgGet("inputBooks") || {})[AREA_OF_KEY.students], def = INPUT_TABS.students; if (!book) return 0;
+    if (!(await tabsOf(book)).some(s => s.title === def.name)) return 0;
+    const rows = await readTab("students"), clean = (cfgGet("inputHash") || {}).students === hash(rows), norm = c => String(c || "").replace(/\s/g, "");
+    const h = rows.findIndex(r => r.some(c => /^(번호|번)$/.test(norm(c))) && r.some(c => /^(이름|성명|학생명|학생이름)$/.test(norm(c)))); if (h < 0) return 0;
+    const head = rows[h].map(norm), data = [], at = (r, c) => "'" + def.name + "'!" + colA1(c) + (r + 1);
+    ["부르는 이름", "보호자1 호칭", "보호자2 호칭"].forEach(x => { if (!head.includes(norm(x))) { data.push({ range: at(h, head.length), values: [[x]] }); head.push(norm(x)); } });
+    const noC = head.findIndex(c => /^(번호|번)$/.test(c)), dig = v => String(v || "").replace(/\D/g, "");
+    const pCols = head.map((c, k) => /(연락처|전화|휴대폰|핸드폰|휴대전화)/.test(c) && /(보호자|학부모|부모|어머니|아버지)/.test(c) ? k : -1).filter(k => k >= 0);
+    const want = new Set((Array.isArray(nos) ? nos : []).map(Number));
+    for (const s of (cfgGet("students") || []).filter(s => want.has(s.no))) {
+      const r = rows.findIndex((x, i) => i > h && parseInt(String(x[noC] || "").trim(), 10) === s.no); if (r < 0) continue;
+      const set = (c, v) => { if (c >= 0 && String(rows[r][c] ?? "") !== v) data.push({ range: at(r, c), values: [[v]] }); };
+      set(head.indexOf("부르는이름"), s.call || "");
+      (s.parents || []).forEach(p => { const k = pCols.find(k => dig(rows[r][k]) && dig(rows[r][k]) === dig(p.phone)), n = k >= 0 ? (head[k].match(/(\d)/) || [])[1] : ""; if (n) set(head.indexOf("보호자" + n + "호칭"), p.title || ""); });
+    }
+    if (data.length) await G(SHEETS + "/" + book + "/values:batchUpdate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ valueInputOption: "RAW", data }) });
+    if (clean) await keepHash({ students: hash(await readTab("students")) });
+    return data.length;
+  };
   // 설정 맨 아래 바로 열기: 영역 폴더 · 학기 초 입력 시트 · 처음 쓰던 교무수첩 시트
   function driveLinks() {
     const y = curYear(), d = cfgGet("drive") || {}, books = cfgGet("inputBooks") || {}, ids = ((cfgGet("config") || {}).areas || []).map(a => a.id);

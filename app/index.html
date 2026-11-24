@@ -1160,7 +1160,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="backend.js?v=78afaad2"></script>
+<script src="backend.js?v=6b73abb7"></script>
 <style>
 #fbGate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--desk)}
 #fbGate .fbbox{background:var(--paper);border-radius:22px;padding:36px 32px;text-align:center;box-shadow:0 18px 40px -24px rgba(20,40,25,.35);max-width:340px}
@@ -3209,19 +3209,23 @@ function openStudentSettings(){
   const ta = el("textarea",{className:"field",rows:3,maxLength:500,value:guardianMsg || DEF_GMSG,"aria-label":"보호자 문자 문구"});
   const saveMsg = navBtn("문구 저장", async () => { try{ apply(await call("saveGuardianMsg", ta.value.trim())); say("✓ 문자 문구를 저장했어요."); openStudentSettings(); }catch(e){ say(e?.message || "저장하지 못했어요."); } }, "문자 문구 저장");
   const sample = students[0] ? fillGMsg({ ...students[0] }, students[0].parents?.[0] || { rel:"어머니" }) : "";
-  // 부르는 이름: 칸에서 바로 고치고, 칸을 벗어나거나 Enter 면 저장 (비우면 성을 뺀 이름)
-  const callBox = s => { if(!canWrite()) return callName(s);
-    const i = el("input",{type:"text",className:"field callin",maxLength:20,value:s.call || "",placeholder:callName({ ...s, call:"" }),"aria-label":s.name + " 부르는 이름"});
+  // 부르는 이름·보호자 호칭: 칸에서 바로 고치고, 칸을 벗어나거나 Enter 면 저장 (비우면 기본값). 학급 입력 시트의 그 칸에도 씀
+  const box = (s, label, cur, def, fix) => { if(!canWrite()) return cur || def;
+    const i = el("input",{type:"text",className:"field callin",maxLength:label === "부르는 이름" ? 20 : 10,value:cur || "",placeholder:def,"aria-label":s.name + " " + label});
     i.onkeydown = e => { if(e.key === "Enter" && !e.isComposing){ e.preventDefault(); i.blur(); } };
-    i.onchange = async () => { const v = i.value.trim(); if(v === (s.call || "")) return;
-      try{ await store.saveStudents(students.map(x => x.no === s.no ? { ...x, call:v } : x)); say("✓ " + s.name + " → '" + (v || callName({ ...s, call:"" })) + "'(으)로 불러요."); openStudentSettings(); }
+    i.onchange = async () => { const v = i.value.trim(); if(v === (cur || "")) return;
+      try{ await store.saveStudents(students.map(x => x.no === s.no ? fix(structuredClone(x), v) : x)); say("✓ " + s.name + " " + label + ": " + (v || def)); openStudentSettings();
+        call("studentsToSheet", [s.no]).then(n => { if(n) say("✓ " + s.name + " " + label + ": " + (v || def) + " · 학급 입력 시트에도 적었어요."); }).catch(() => say("교무수첩에는 저장했어요. 학급 입력 시트에는 적지 못했어요.")); }
       catch(e){ say(e?.message || "저장하지 못했어요."); } };
     return i; };
-  const rows = students.map(s => { const p1 = s.parents?.[0], p2 = s.parents?.[1];
+  const callBox = s => box(s, "부르는 이름", s.call, callName({ ...s, call:"" }), (x, v) => ({ ...x, call:v }));
+  const pBox = (s, i) => { const p = s.parents?.[i]; if(!p) return "—";
+    return [el("span",{}, (p.rel || "?") + " · "), box(s, "보호자" + (i + 1) + " 호칭", p.title, gTitle({ ...p, title:"" }), (x, v) => { x.parents[i] = { ...x.parents[i], title:v }; return x; }), el("br",{}), el("small",{className:"hint"}, p.phone || "")]; };
+  const rows = students.map(s => {
     return el("tr",{}, el("td",{}, String(s.no)), el("td",{title:s.name}, s.name), el("td",{}, callBox(s)), el("td",{}, s.phone || "—"),
-      el("td",{}, p1 ? (p1.rel || "?") + " · " + gTitle(p1) : "—", el("br",{}), el("small",{className:"hint"}, p1?.phone || "")),
-      el("td",{}, p2 ? (p2.rel || "?") + " · " + gTitle(p2) : "—", el("br",{}), el("small",{className:"hint"}, p2?.phone || "")),
-      el("td",{}, mid4(p1?.phone) || "—")); });
+      el("td",{}, ...[pBox(s, 0)].flat()),
+      el("td",{}, ...[pBox(s, 1)].flat()),
+      el("td",{}, mid4(s.parents?.[0]?.phone) || "—")); });
   modal("학생별 설정",
     el("p",{className:"hint"}, "학기 초에 '학급 입력' 시트의 '입력_학생명단' 탭에 적고 [시트에서 불러오기]를 눌러요. 문자·전화와 알림 앱 비밀번호가 모두 여기서 나와요."),
     el("div",{className:"tt-tools"}, ...(st ? setupButtons(st, () => openStudentSettings()) : [])),
@@ -3229,7 +3233,7 @@ function openStudentSettings(){
     el("p",{className:"hint"}, "{학부모} = 호칭(어머니→어머님, 아버지→아버님, 그 밖은 시트의 '보호자 호칭' 칸), {학생 이름} = 부르는 이름(비우면 성을 뺀 이름). '{학생 이름}가'는 받침에 맞춰 '이가/가'로 바뀌어요."),
     ta, sample ? el("p",{className:"hint"}, "예) " + sample) : null, el("div",{className:"actions"}, navBtn("기본 문구로", () => { ta.value = DEF_GMSG; }, "기본 문구로"), el("span",{className:"spacer"}), saveMsg),
     el("h3",{className:"nt-title"}, "학생 " + students.length + "명"),
-    students.length && canWrite() ? el("p",{className:"hint"}, "부르는 이름은 칸에서 바로 고칠 수 있어요 (예: 유진이). 비워 두면 성을 뺀 이름으로 불러요. 학급 입력 시트에서 다시 불러오면 시트의 '부르는 이름' 칸으로 바뀌어요.") : null,
+    students.length && canWrite() ? el("p",{className:"hint"}, "부르는 이름(예: 유진이)과 보호자 호칭(예: 어머님)은 칸에서 바로 고쳐요. 비워 두면 기본값(성을 뺀 이름, 관계에 맞춘 호칭)이에요. 학급 입력 시트의 같은 칸에도 저절로 적히고, 시트에서 고치면 다음에 교무수첩을 열 때 들어와요.") : null,
     students.length ? el("div",{className:"tt-wrap"}, el("table",{className:"plan stuset"}, el("thead",{}, el("tr",{}, ...["번호","이름","부르는 이름","학생 연락처","보호자1","보호자2","앱 비밀번호"].map(h => el("th",{}, h)))), el("tbody",{}, ...rows)))
       : el("p",{className:"note"}, "아직 학생 명단이 없어요. [시트에 입력]으로 적고 [시트에서 불러오기]를 눌러요."));
 }
@@ -5086,7 +5090,7 @@ const phoneOf = v => { let s = String(v ?? "").trim(); if(/^1\d{9}$/.test(s)) s 
 // 머리줄에서 번호·이름·학생 연락처·보호자 관계/연락처·비고 칸을 찾아 읽음
 let guardianMsg = "";
 const DEF_GMSG = "안녕하세요, {학부모}.\n아직 {학생 이름}가 등교하지 않았습니다.\n확인 후 지도 부탁드립니다.";
-const gTitle = p => (p && (p.title || { 어머니:"어머님", 아버지:"아버님", 엄마:"어머님", 아빠:"아버님", 모:"어머님", 부:"아버님" }[String(p.rel || "").trim()] || (p.rel ? p.rel + "님" : ""))) || "보호자님";
+const gTitle = p => (p && (p.title || { 어머니:"어머님", 아버지:"아버님", 엄마:"어머님", 아빠:"아버님", 모:"어머님", 부:"아버님", 할머니:"할머님", 할아버지:"할아버님" }[String(p.rel || "").trim()] || (p.rel ? p.rel + "님" : ""))) || "보호자님";
 const callName = s => s.call || String(s.name || "").slice(String(s.name || "").length >= 3 ? 1 : 0);
 const hasBatchim = w => { const c = String(w).charCodeAt(String(w).length - 1); return c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 !== 0; };
 const fillGMsg = (s, p) => { const n = callName(s); return (guardianMsg || DEF_GMSG).replace(/\{학생 ?이름\}(이가|가)/g, n + (hasBatchim(n) ? "이가" : "가")).replace(/\{학생 ?이름\}/g, n).replace(/\{이름\}/g, s.name || "").replace(/\{학부모\}|\{보호자\}/g, gTitle(p)); };
