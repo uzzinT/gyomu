@@ -147,6 +147,7 @@ dialog label.check input{width:auto}
 .card .frame{position:relative;z-index:1}
 
 /* settings */
+.attach>.actions{gap:8px;margin-top:8px}.linkbox{display:flex;flex-direction:column;gap:8px;margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:8px}.linkbox[hidden]{display:none}.linkbox>*{margin:0}
 .nto{color:var(--navy);font-weight:700;margin-right:2px}.notto{display:flex;flex-direction:column;gap:6px}.notto>*{margin:0}
 .setgrp{border:1px solid var(--line);border-radius:8px;margin-bottom:12px;background:var(--paper)}
 .setgrp>summary{cursor:pointer;padding:12px 16px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;list-style-position:inside;font:700 1.05rem var(--display)}
@@ -3349,14 +3350,16 @@ function attachBox(init, edit, onChange){
         catch(e){ msg.textContent = e?.message && !e.code ? e.message : "파일을 올리지 못했어요."; break; }
       }
     };
-    // 링크: 주소를 붙여 넣고 Enter 또는 '링크 넣기' (이름은 사이트 주소로)
-    const link = el("input",{type:"url",className:"field",placeholder:"링크 붙여 넣기 (https://…)","aria-label":"링크 주소"});
-    const addLink = () => { let v = link.value.trim(); if(!v) return; if(!/^https?:\/\//i.test(v)) v = "https://" + v;
-      let h = ""; try{ const u = new URL(v); if(u.protocol !== "https:" && u.protocol !== "http:") throw 0; h = u.hostname.replace(/^www\./, ""); v = u.href.replace(/^http:/, "https:"); }catch{ return msg.textContent = "링크 주소가 올바르지 않아요."; }
+    // 링크: '링크 넣기'를 누르면 주소·이름 칸이 나옴. 이름을 비우면 링크 주소 그대로
+    const link = el("input",{type:"url",className:"field",placeholder:"링크 주소 (https://…)","aria-label":"링크 주소"});
+    const lname = el("input",{type:"text",className:"field",maxLength:100,placeholder:"이름 (안 쓰면 링크 주소로)","aria-label":"링크 이름"});
+    const addLink = () => { let v = link.value.trim(); if(!v) return msg.textContent = "링크 주소를 넣어 주세요."; if(!/^https?:\/\//i.test(v)) v = "https://" + v;
+      try{ const u = new URL(v); if(u.protocol !== "https:" && u.protocol !== "http:") throw 0; v = u.href.replace(/^http:/, "https:"); }catch{ return msg.textContent = "링크 주소가 올바르지 않아요."; }
       if(files.length >= 10) return msg.textContent = "파일·링크는 10개까지 넣을 수 있어요.";
-      files.push({ name:"🔗 " + h, url:v, fileId:"" }); link.value = ""; msg.textContent = ""; changed(); };
-    link.onkeydown = e => { if(e.key === "Enter" && !e.isComposing){ e.preventDefault(); addLink(); } };
-    kids.push(pick, el("div",{className:"actions"}, navBtn("파일·사진 올리기", () => pick.click(), "파일·사진 올리기")), el("div",{className:"actions"}, link, navBtn("링크 넣기", addLink, "링크 넣기")), msg);
+      files.push({ name:"🔗 " + (lname.value.trim() || v.replace(/^https:\/\//, "")), url:v, fileId:"" }); link.value = lname.value = ""; msg.textContent = ""; linkBox.hidden = true; changed(); };
+    [link, lname].forEach(x => x.onkeydown = e => { if(e.key === "Enter" && !e.isComposing){ e.preventDefault(); addLink(); } });
+    const linkBox = el("div",{className:"linkbox",hidden:true}, link, lname, el("div",{className:"actions"}, navBtn("취소", () => { linkBox.hidden = true; msg.textContent = ""; }, "링크 넣기 취소"), el("span",{className:"spacer"}), navBtn("넣기", addLink, "링크 넣기")));
+    kids.push(pick, el("div",{className:"actions"}, navBtn("파일·사진 올리기", () => pick.click(), "파일·사진 올리기"), navBtn("🔗 링크 넣기", () => { linkBox.hidden = !linkBox.hidden; if(!linkBox.hidden) link.focus(); }, "링크 넣기")), linkBox, msg);
   }
   return { node: el("div",{className:"attach"}, ...kids), files: () => files.slice() };
 }
