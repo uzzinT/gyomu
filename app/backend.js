@@ -10,7 +10,7 @@
   firebase.initializeApp(FB);
   const auth = firebase.auth(), fs = firebase.firestore();
 
-  const TABLES = ["cfg", "items", "events", "memos", "notes", "checks", "logs", "todos", "teachers", "classRosters", "attend", "pmsg", "evnotes", "budgets", "spends"];
+  const TABLES = ["cfg", "items", "events", "memos", "notes", "checks", "logs", "todos", "teachers", "classRosters", "attend", "pmsg", "evnotes", "budgets", "spends", "attRecs", "attTrash"];
   const EMPTY = { cfg: {}, classRosters: {} };
   let uid = null, DB = null;
   try { localStorage.removeItem("gtok"); } catch (e) {} // 예전 1시간짜리 구글 열쇠 (이제 안 씀)
@@ -20,7 +20,7 @@
   // 두 기기(휴대폰·PC)에서 따로 고쳐도 사라지지 않게: 이 기기에서 바꾼 것만 기록해 두었다가, 저장할 때 드라이브의 최신본에 그것만 얹음
   // 표마다 줄을 찾는 열쇠 (열쇠가 없는 표는 표 통째로)
   const KEY = { items: r => r.id, notes: r => r.id, checks: r => r.id, todos: r => r.id, logs: r => r.date + "|" + r.period, evnotes: r => r.key, pmsg: r => r.id + "|" + r.no,
-    memos: r => r.date, events: r => r.date + "|" + r.title + "|" + (r.cat || ""), attend: r => r.date + "|" + r.code + "|" + r.no, budgets: r => r.id, spends: r => r.id };
+    memos: r => r.date, events: r => r.date + "|" + r.title + "|" + (r.cat || ""), attend: r => r.date + "|" + r.code + "|" + r.no, budgets: r => r.id, spends: r => r.id, attRecs: r => r.id, attTrash: r => r.tid };
   const freshPend = () => ({ t: {}, cfg: {} });
   let pend = freshPend(); // t[표] = true(통째로) 또는 { ch: {열쇠:1}, gone: {열쇠:1} }, cfg[설정 이름] = 1
   function track(p, t, old, v) {
@@ -358,7 +358,7 @@
       archives: Object.entries(cfgGet("archives") || {}).sort().reverse().map(([y, id]) => ({ year: Number(y), url: "https://docs.google.com/spreadsheets/d/" + id + "/edit" })),
       folder: (() => { const y = curYear(), id = ((cfgGet("drive") || {}).years || {})[y]; return id ? { year: y, url: "https://drive.google.com/drive/folders/" + id } : null; })(),
       links: driveLinks(),
-      plans: cfgGet("plans") || {}, rosters: cfgGet("rosters") || {}, students: cfgGet("students") || [], classTT: cfgGet("classTT"), classTTs: cfgGet("classTTs") || {},
+      plans: cfgGet("plans") || {}, rosters: cfgGet("rosters") || {}, students: cfgGet("students") || [], classTT: cfgGet("classTT"), classTTs: cfgGet("classTTs") || {}, attLocal: !!cfgGet("attMoved"),
       classRosters: get("classRosters"), allTT: teachers.length ? { periods: Number(cfgGet("periods")) || 7, teachers } : null, sheet: null,
       events: get("events"), memos, dues, memoFiles,
       // 학사일정 행사 하나마다 글·마감·사진·파일 ('날짜|행사 이름' 으로 찾음: 학사일정을 다시 불러와도 그대로 남게)
@@ -585,7 +585,7 @@
     },
     // 알림 앱 쪽 (학생 계정 만들기·보내기는 3단계에서 학생 앱과 함께)
     noticeInfo() { const tt = cfgGet("studentTT") || {}, ttNames = {}; Object.keys(tt).forEach(no => { ttNames[no] = tt[no].name; }); const c = cfgGet("classPw");
-      const au = ((cfgGet("config") || {}).attend || {}).url || "";
+      const au = cfgGet("attMoved") ? "" : ((cfgGet("config") || {}).attend || {}).url || ""; // 출결을 교무수첩으로 옮긴 뒤엔 시트에서 읽지 않음
       return { set: !!(c && c.hash), at: c ? c.at : 0, pw: { ...(cfgGet("stuPw") || {}) }, tt: ttNames, sheetUrl: au ? au.replace(/[#?].*$/, "") + (cfgGet("rosterGid") != null ? "#gid=" + cfgGet("rosterGid") : "") : "" }; },
     // 출결 시트 '학생명부'(학번·이름 … 비밀번호 H열)에서 읽어 교무수첩 비밀번호로 (시트가 기준: 빈칸이면 비밀번호 없음)
     async pwFromSheet() {
@@ -606,7 +606,8 @@
       list.forEach(x => { const no = Number(x && x.no), v = String(x && x.pw || "").trim(); if (!(no >= 1 && no <= 99)) return;
         if (v && (v.length < 4 || v.length > 30)) fail(no + "번 비밀번호는 4~30자로 정해 주세요."); if (v) pw[no] = v; else delete pw[no]; });
       await cfgPut({ stuPw: pw });
-      try { const id = attId(), rows = (await batchGet(id, ["'학생명부'!A2:A200"], "FORMATTED_VALUE"))[0] || [];
+      if (cfgGet("attMoved")) { const rows = tabRows("학생명부"); if (rows.length) await setTab("학생명부", rows.map(r => { const no = Number(String(r[0] || "").replace(/\D/g, "").slice(-2)), o = Array.from({ length: 8 }, (_, k) => String(r[k] ?? "")); o[7] = no >= 1 && no <= 99 ? pw[no] || "" : ""; return o; })); }
+      else try { const id = attId(), rows = (await batchGet(id, ["'학생명부'!A2:A200"], "FORMATTED_VALUE"))[0] || [];
         if (rows.length) await putRange(id, "'학생명부'!H2:H" + (rows.length + 1), rows.map(r => { const no = Number(String(r[0] || "").replace(/\D/g, "").slice(-2)); return [no >= 1 && no <= 99 ? pw[no] || "" : ""]; }));
       } catch (e) { console.warn("비밀번호 시트에 쓰기", e); } // 출결 시트가 없으면 교무수첩에만
       return API.noticeInfo();
@@ -920,7 +921,13 @@
       await put("budgets", get("budgets").map(g => ({ ...g, items: (g.items || []).map(i => ({ ...i, amount: 0 })) })));
       // 학급 출결 시트: 같은 모양으로 새 학년도 것을 복제 (출결 종류·알림 규칙·교시·화면 설정은 그대로, 기록·휴지통·명부·학사일정은 비움). 지난 시트는 그대로 남음
       let attend = c.attend;
-      if (c.attend && c.attend.url) try {
+      if (cfgGet("attMoved")) {
+        const tabs = attTabsNow(), names = Object.keys(tabs);
+        const ss = await (await G(SHEETS, { method: "POST", headers: JSONH, body: JSON.stringify({ properties: { title: "학급 출결 " + prev + "학년도" }, sheets: names.map(title => ({ properties: { title, gridProperties: { frozenRowCount: 1 } } })) }) })).json();
+        await G(SHEETS + "/" + ss.spreadsheetId + "/values:batchUpdate", { method: "POST", headers: JSONH, body: JSON.stringify({ valueInputOption: "RAW", data: names.map(n => ({ range: "'" + n + "'!A1", values: tabs[n] })) }) });
+        await moveTo(ss.spreadsheetId, oldFolder);
+        await put("attRecs", []); await put("attTrash", []); await cfgPut({ [attKey("학생명부")]: [], [attKey("학사일정")]: [] });
+      } else if (c.attend && c.attend.url) try {
         const oldId = sheetId(c.attend.url), oldName = (await (await G(DRIVE + "/" + oldId + "?fields=name")).json()).name || "스마트 출결 관리 DB";
         const name = /\(\d{4}\)/.test(oldName) ? oldName.replace(/\(\d{4}\)/, "(" + newYear + ")") : "(" + newYear + ") " + oldName;
         const nid = (await (await G(DRIVE + "/" + oldId + "/copy?fields=id", { method: "POST", headers: JSONH, body: JSON.stringify({ name, parents: [await yearFolder(newYear)] }) })).json()).id;
@@ -970,39 +977,59 @@
   const clearRange = (id, range) => G(SHEETS + "/" + id + "/values/" + q(range) + ":clear", { method: "POST" });
   const sheetUpdate = (id, requests) => G(SHEETS + "/" + id + ":batchUpdate", { method: "POST", headers: JSONH, body: JSON.stringify({ requests }) });
   const nowStamp = () => { const d = new Date(), p = n => String(n).padStart(2, "0"); return ymd(d) + " " + p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds()); };
-  // 없는 탭은 그 앱처럼 머리줄과 함께 만듦
-  const attTabsMemo = {}; // 탭 목록은 한 번 읽으면 이 창에서 기억 (불러오기를 빠르게)
-  async function attTabs(id) {
-    if (attTabsMemo[id]) return attTabsMemo[id];
-    let tabs = await tabsOf(id); const miss = Object.keys(ATT_HEAD).filter(n => !tabs.some(t => t.title === n));
-    if (miss.length) { await sheetUpdate(id, miss.map(n => ({ addSheet: { properties: { title: n } } }))); for (const n of miss) await putRange(id, "'" + n + "'!A1", [ATT_HEAD[n]]); tabs = await tabsOf(id); }
-    return (attTabsMemo[id] = tabs);
-  }
-  // 기록ID(11번째 칸)로 줄 찾기 (머리줄 = 1)
-  async function recRow(id, recId) {
-    const col = (await batchGet(id, ["'출결기록'!K1:K8000"], "FORMATTED_VALUE"))[0];
-    const i = col.findIndex(r => String(r[0] || "") === String(recId)); if (i < 1) fail("기록을 찾지 못했어요. 이미 지워졌거나 다른 곳에서 바뀌었어요. 새로 고침 해 주세요."); return i + 1;
-  }
-  // 그 앱처럼 시작일 최근 순 → 학번 순으로 정렬
-  const sortReq = t => ({ sortRange: { range: { sheetId: t.sheetId, startRowIndex: 1, startColumnIndex: 0, endColumnIndex: 11 }, sortSpecs: [{ dimensionIndex: 0, sortOrder: "DESCENDING" }, { dimensionIndex: 2, sortOrder: "ASCENDING" }] } });
-  async function sortRecs(id, tabs) { const t = tabs.find(x => x.title === "출결기록"); if (t) await sheetUpdate(id, [sortReq(t)]); }
   const cleanRec = r => [S(r.startDate, 10), S(r.endDate, 10), S(r.num, 10), S(r.name, 30), S(r.type, 40), S(r.period, 60), S(r.reason, 300), S(r.doc, 300), JSON.stringify(r.docStatus && typeof r.docStatus === "object" ? r.docStatus : {})];
+  // ---------- 학급 출결: 교무수첩 자료(드라이브 JSON)에 저장 ----------
+  // 예전 출결 시트는 처음 한 번 그대로 읽어 옮겨 오고, 시트는 고치지 않고 남겨 둠 (백업)
+  // 기록·휴지통은 표(attRecs·attTrash, 두 기기에서 고쳐도 줄 단위로 합침), 나머지 탭은 cfg 'att:탭이름'
+  const ATT_CFG_TABS = ["학생명부", "교시설정", "출결알림", "화면설정", "출결종류", "학사일정"];
+  const attKey = n => "att:" + n;
+  const tabRows = n => structuredClone(cfgGet(attKey(n)) || []);
+  const setTab = (n, rows) => cfgPut({ [attKey(n)]: rows });
+  const recRow = r => [r.s, r.e, r.num, r.name, r.type, r.period, r.reason, r.doc, r.st, r.at, r.id];
+  const recOf = (c, at, id) => ({ s: c[0], e: c[1], num: c[2], name: c[3], type: c[4], period: c[5], reason: c[6], doc: c[7], st: c[8], at, id });
+  const byRec = (a, b) => (normD(b.s) || String(b.s)).localeCompare(normD(a.s) || String(a.s)) || (Number(a.num) || 0) - (Number(b.num) || 0); // 시작일 최근 순 → 학번 순 (그 앱과 같게)
+  function attTabsNow() {
+    const out = {}; ATT_CFG_TABS.forEach(n => { out[n] = [ATT_HEAD[n]].concat(tabRows(n)); });
+    out["출결기록"] = [ATT_HEAD["출결기록"]].concat(get("attRecs").slice().sort(byRec).map(recRow));
+    out["휴지통"] = [ATT_HEAD["휴지통"]].concat(get("attTrash").map(t => [t.tid].concat(recRow(t).slice(0, 10), [t.del])));
+    return out;
+  }
+  const findRec = id => { const r = get("attRecs").find(x => String(x.id) === String(id)); if (!r) fail("기록을 찾지 못했어요. 이미 지워졌거나 다른 기기에서 바뀌었어요. 새로 고침 해 주세요."); return r; };
+  const putRecs = list => put("attRecs", list);
+  // 예전 출결 시트 → 교무수첩 (한 번만). 시트에는 아무것도 쓰지 않음
+  let attMoving = null;
+  function attMigrate() {
+    return attMoving || (attMoving = (async () => {
+      if (cfgGet("attMoved")) return;
+      const c = cfgGet("config") || {}, url = (c.attend && c.attend.url) || "";
+      const out = {};
+      if (url) {
+        const id = sheetId(url), have = new Set((await tabsOf(id)).map(t => t.title)), names = Object.keys(ATT_TABS).filter(n => have.has(n));
+        const vals = names.length ? await batchGet(id, names.map(n => "'" + n + "'!" + ATT_TABS[n]), "FORMATTED_VALUE") : [];
+        names.forEach((n, i) => { out[n] = (vals[i] || []).map(r => r.map(v => String(v ?? ""))); });
+      }
+      const body = n => (out[n] || []).slice(1).filter(r => r.some(v => String(v).trim()));
+      const ids = new Set(), uniq = (v, alt) => { let k = String(v || "") || alt; while (ids.has(k)) k += "_"; ids.add(k); return k; };
+      const recs = body("출결기록").map((r, i) => recOf(Array.from({ length: 9 }, (_, k) => r[k] || ""), r[9] || "", uniq(r[10], "Rm" + (i + 1))));
+      const trash = body("휴지통").map((r, i) => ({ ...recOf(Array.from({ length: 9 }, (_, k) => r[k + 1] || ""), r[10] || "", ""), tid: uniq(r[0], "Tm" + (i + 1)), del: r[11] || "" }));
+      // 이 기기에 이미 옮겨 둔 것(다른 기기가 먼저 옮겼을 때)과 겹치지 않게 열쇠로 합침
+      const mine = new Set(get("attRecs").map(r => r.id)), mineT = new Set(get("attTrash").map(t => t.tid));
+      await put("attRecs", get("attRecs").concat(recs.filter(r => !mine.has(r.id))));
+      await put("attTrash", get("attTrash").concat(trash.filter(t => !mineT.has(t.tid))));
+      const patch = {}; ATT_CFG_TABS.forEach(n => { patch[attKey(n)] = body(n); });
+      await cfgPut(patch);
+      if (get("attRecs").length < recs.length) fail("출결 기록을 옮기다 멈췄어요. 새로 고침 해 주세요. (출결 시트는 그대로 있어요)");
+      await flush(); // 드라이브에 저장된 뒤에만 '옮김'으로 적음
+      await cfgPut({ attMoved: { url, at: Date.now(), recs: recs.length, trash: trash.length } }); await flush();
+    })().finally(() => { attMoving = null; }));
+  }
   Object.assign(API, {
-    // after: 쓰기 부탁들 [[주소, 옵션]...] 을 먼저 하고 바로 이어서 읽음 (창구 한 번에)
-    async attLoad(after) {
-      const id = attId(), names = Object.keys(ATT_TABS); await attTabs(id);
-      const u = SHEETS + "/" + id + "/values:batchGet?valueRenderOption=FORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING&" + names.map(n => "ranges=" + q("'" + n + "'!" + ATT_TABS[n])).join("&");
-      const rs = await GM([...(Array.isArray(after) ? after : []), [u]]);
-      const vals = ((await rs[rs.length - 1].json()).valueRanges || []).map(v => v.values || []), out = {};
-      names.forEach((n, i) => { out[n] = vals[i].map(r => r.map(v => String(v ?? ""))); });
-      // 기록ID 가 빈 줄에는 ID 를 붙여 둠 (그 앱과 같은 방식)
-      const recs = out["출결기록"] || [], fix = [];
-      recs.forEach((r, i) => { if (i && (r[0] || r[3]) && !r[10]) { const rid = "R" + Date.now() + "_" + i; while (r.length < 11) r.push(""); r[10] = rid; fix.push({ range: "'출결기록'!K" + (i + 1), values: [[rid]] }); } });
-      if (fix.length) await G(SHEETS + "/" + id + "/values:batchUpdate", { method: "POST", headers: JSONH, body: JSON.stringify({ valueInputOption: "RAW", data: fix }) });
-      lastAtt = { id, tabs: out };
-      return { url: "https://docs.google.com/spreadsheets/d/" + id + "/edit", tabs: out };
+    async attLoad() {
+      if (!cfgGet("attMoved")) await attMigrate();
+      const tabs = attTabsNow(); lastAtt = { tabs };
+      return { url: "", local: true, oldUrl: (cfgGet("attMoved") || {}).url || "", tabs };
     },
-    // 출결 백업은 시트 하나: 하루 한 번 출결 시트 내용을 '출결 백업 (지우지 마세요)' 시트에 덮어씀 (올해 폴더)
+    // 출결 백업은 시트 하나: 하루 한 번 출결 내용을 '출결 백업 (지우지 마세요)' 시트에 덮어씀 (올해 폴더)
     // 지난 날 내용은 그 시트의 '버전 기록'에 남음 → 날마다 새 시트가 생기지 않음
     async attBackup() {
       if (!lastAtt) return false;
@@ -1024,97 +1051,83 @@
       finally { attBackingUp = false; }
     },
     async attAdd(list) {
-      const id = attId(), tabs = await attTabs(id), at = nowStamp(), base = Date.now();
-      const rows = (Array.isArray(list) ? list : []).slice(0, 60).map((r, i) => cleanRec(r).concat([at, "R" + base + "_" + i + "_" + Math.floor(Math.random() * 1000)]));
-      if (!rows.length) fail("넣을 기록이 없어요.");
-      const t = tabs.find(x => x.title === "출결기록");
-      return API.attLoad([[SHEETS + "/" + id + "/values/" + q("'출결기록'!A1") + ":append?valueInputOption=RAW&insertDataOption=INSERT_ROWS", { method: "POST", headers: JSONH, body: JSON.stringify({ values: rows }) }],
-        ...(t ? [[SHEETS + "/" + id + ":batchUpdate", { method: "POST", headers: JSONH, body: JSON.stringify({ requests: [sortReq(t)] }) }]] : [])]);
+      const at = nowStamp(), base = Date.now();
+      const recs = (Array.isArray(list) ? list : []).slice(0, 60).map((r, i) => recOf(cleanRec(r), at, "R" + base + "_" + i + "_" + Math.floor(Math.random() * 1000)));
+      if (!recs.length) fail("넣을 기록이 없어요.");
+      await putRecs(get("attRecs").concat(recs)); return API.attLoad();
     },
-    async attUpdate(recId, r) { const id = attId(), row = await recRow(id, recId); return API.attLoad([[SHEETS + "/" + id + "/values/" + q("'출결기록'!A" + row + ":I" + row) + "?valueInputOption=RAW", { method: "PUT", headers: JSONH, body: JSON.stringify({ values: [cleanRec(r)] }) }]]); },
-    async attDoc(recId, status) { const id = attId(), row = await recRow(id, recId); return API.attLoad([[SHEETS + "/" + id + "/values/" + q("'출결기록'!I" + row) + "?valueInputOption=RAW", { method: "PUT", headers: JSONH, body: JSON.stringify({ values: [[JSON.stringify(status || {})]] }) }]]); },
-    // 지우면 휴지통 탭으로 (돌려받은 휴지통ID 로 되살릴 수 있음)
+    async attUpdate(recId, r) { const o = findRec(recId), c = cleanRec(r); await putRecs(get("attRecs").map(x => x === o ? recOf(c, o.at, o.id) : x)); return API.attLoad(); },
+    async attDoc(recId, status) { const o = findRec(recId); await putRecs(get("attRecs").map(x => x === o ? { ...o, st: JSON.stringify(status || {}) } : x)); return API.attLoad(); },
+    // 지우면 휴지통으로 (돌려받은 휴지통ID 로 되살릴 수 있음)
     async attTrash(recId) {
-      // 기록 줄 찾기와 그 줄 내용을 한 번에 읽고, 휴지통에 넣기·줄 지우기·다시 읽기도 창구 한 번에
-      const id = attId(), tabs = await attTabs(id), t = tabs.find(x => x.title === "출결기록");
-      const all = (await batchGet(id, ["'출결기록'!A1:K8000"], "FORMATTED_VALUE"))[0], i = all.findIndex(r => String(r[10] || "") === String(recId));
-      if (i < 1) fail("기록을 찾지 못했어요. 이미 지워졌거나 다른 곳에서 바뀌었어요. 새로 고침 해 주세요.");
-      const row = i + 1, d = (all[i] || []).map(String), tid = String(Date.now());
-      const data = await API.attLoad([
-        [SHEETS + "/" + id + "/values/" + q("'휴지통'!A1") + ":append?valueInputOption=RAW&insertDataOption=INSERT_ROWS", { method: "POST", headers: JSONH, body: JSON.stringify({ values: [[tid, d[0] || "", d[1] || "", d[2] || "", d[3] || "", d[4] || "", d[5] || "", d[6] || "", d[7] || "", d[8] || "", d[9] || "", nowStamp()]] }) }],
-        [SHEETS + "/" + id + ":batchUpdate", { method: "POST", headers: JSONH, body: JSON.stringify({ requests: [{ deleteDimension: { range: { sheetId: t.sheetId, dimension: "ROWS", startIndex: row - 1, endIndex: row } } }] }) }]]);
-      data.trashId = tid; return data;
+      const o = findRec(recId), have = new Set(get("attTrash").map(t => t.tid)); let tid = String(Date.now()); while (have.has(tid)) tid += "_";
+      await put("attTrash", get("attTrash").concat({ ...o, tid, del: nowStamp() }));
+      await putRecs(get("attRecs").filter(x => x !== o));
+      const data = await API.attLoad(); data.trashId = tid; return data;
     },
     async attRestore(tid) {
-      const id = attId(), tabs = await attTabs(id), tr = (await batchGet(id, ["'휴지통'!A1:L3000"], "FORMATTED_VALUE"))[0], i = tr.findIndex((r, k) => k && String(r[0]) === String(tid));
-      if (i < 1) fail("휴지통에서 찾지 못했어요.");
-      const r = tr[i].map(String); await appendRows(id, "출결기록", [[r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10] || nowStamp(), "R" + Date.now() + "_restore"]]);
-      await sheetUpdate(id, [{ deleteDimension: { range: { sheetId: tabs.find(x => x.title === "휴지통").sheetId, dimension: "ROWS", startIndex: i, endIndex: i + 1 } } }]);
-      await sortRecs(id, tabs); return API.attLoad();
+      const t = get("attTrash").find(x => String(x.tid) === String(tid)); if (!t) fail("휴지통에서 찾지 못했어요.");
+      const { tid: _t, del: _d, ...r } = t;
+      await putRecs(get("attRecs").concat({ ...r, at: r.at || nowStamp(), id: "R" + Date.now() + "_restore" }));
+      await put("attTrash", get("attTrash").filter(x => x !== t)); return API.attLoad();
     },
     // 휴지통에서 아주 지움 (선생님이 누를 때만)
-    async attPurge(tid) {
-      const id = attId(), tabs = await attTabs(id), tr = (await batchGet(id, ["'휴지통'!A1:A3000"], "FORMATTED_VALUE"))[0];
-      const rows = tr.map((r, k) => (tid === "ALL" ? k > 0 && r[0] : k > 0 && String(r[0]) === String(tid)) ? k : -1).filter(k => k > 0).sort((a, b) => b - a);
-      const sid = tabs.find(x => x.title === "휴지통").sheetId;
-      if (rows.length) await sheetUpdate(id, rows.map(k => ({ deleteDimension: { range: { sheetId: sid, dimension: "ROWS", startIndex: k, endIndex: k + 1 } } })));
-      return API.attLoad();
-    },
+    async attPurge(tid) { await put("attTrash", get("attTrash").filter(x => !(tid === "ALL" || String(x.tid) === String(tid)))); return API.attLoad(); },
     // 학사일정(쉬는 날): 같은 명칭·시작·종료가 있으면 건너뛰고 끝에 더함 / 하나 지움
     async attHolidayAdd(list) {
-      const id = attId(); await attTabs(id); const old = (await batchGet(id, ["'학사일정'!A2:C800"], "FORMATTED_VALUE"))[0], key = (n, s, e) => String(n).trim() + "|" + s + "|" + (e || s), have = new Set(old.filter(r => r[0]).map(r => key(r[0], r[1], r[2])));
+      const old = tabRows("학사일정"), key = (n, s, e) => String(n).trim() + "|" + s + "|" + (e || s), have = new Set(old.filter(r => r[0]).map(r => key(r[0], r[1], r[2])));
       const rows = (Array.isArray(list) ? list : []).filter(h => h && h.name && DATE_RE.test(h.start)).filter(h => { const k = key(h.name, h.start, h.end); if (have.has(k)) return false; have.add(k); return true; })
         .map(h => [S(h.name, 60), h.start, h.end || h.start, h.end && h.end !== h.start ? "기간" : "단일"]);
-      if (rows.length) await appendRows(id, "학사일정", rows);
+      if (rows.length) await setTab("학사일정", old.concat(rows));
       const data = await API.attLoad(); data.added = rows.length; return data;
     },
     async attHolidayDel(h) {
-      const id = attId(), tabs = await attTabs(id), all = (await batchGet(id, ["'학사일정'!A1:C800"], "FORMATTED_VALUE"))[0];
-      const i = all.findIndex((r, k) => k && String(r[0]).trim() === String(h.name).trim() && normD(r[1]) === h.start && (normD(r[2]) || normD(r[1])) === (h.end || h.start));
-      if (i > 0) await sheetUpdate(id, [{ deleteDimension: { range: { sheetId: tabs.find(x => x.title === "학사일정").sheetId, dimension: "ROWS", startIndex: i, endIndex: i + 1 } } }]);
+      const all = tabRows("학사일정"), i = all.findIndex(r => String(r[0]).trim() === String(h.name).trim() && normD(r[1]) === h.start && (normD(r[2]) || normD(r[1])) === (h.end || h.start));
+      if (i >= 0) { all.splice(i, 1); await setTab("학사일정", all); }
       return API.attLoad();
     },
-    // 설정: 출결종류 · 출결알림 · 교시설정은 2행부터 통째로, 화면설정은 색상그룹·집계규칙 줄만 바꿈
+    // 설정: 출결종류 · 출결알림 · 교시설정은 통째로, 화면설정은 색상그룹·집계규칙 줄만 바꿈
     async attSaveTab(tab, rows) {
       const W = { 출결종류: 3, 출결알림: 7, 교시설정: 2 }[tab]; if (!W) fail("바꿀 수 없는 탭이에요.");
-      const id = attId(); await attTabs(id); const data = (Array.isArray(rows) ? rows : []).slice(0, 150).map(r => Array.from({ length: W }, (_, k) => S(r && r[k], 300)));
+      const data = (Array.isArray(rows) ? rows : []).slice(0, 150).map(r => Array.from({ length: W }, (_, k) => S(r && r[k], 300)));
       if (tab === "출결종류" && !data.length) fail("출결 종류가 비어 있어 저장하지 않았어요.");
-      await clearRange(id, "'" + tab + "'!A2:" + "ABCDEFG"[W - 1] + "1000"); if (data.length) await putRange(id, "'" + tab + "'!A2", data); return API.attLoad();
+      await setTab(tab, data); return API.attLoad();
     },
-    // 연락처는 출결 시트 '학생명부' 한 곳에: 학생 연락처(D)·학부모 관계(E)·학부모 연락처(F)만 고침 (학생 이름·메시지·비밀번호 칸은 그대로). 없는 학생은 줄을 더함
+    // 연락처는 '학생명부' 한 곳에: 학생 연락처(D)·학부모 관계(E)·학부모 연락처(F)만 고침 (학생 이름·메시지·비밀번호 칸은 그대로). 없는 학생은 줄을 더함
     async attSaveContacts(list) {
-      const id = attId(); await attTabs(id);
-      const old = (await batchGet(id, ["'학생명부'!A2:H200"], "FORMATTED_VALUE"))[0].map(r => Array.from({ length: 8 }, (_, k) => String(r[k] ?? "")));
+      const old = tabRows("학생명부").map(r => Array.from({ length: 8 }, (_, k) => String(r[k] ?? "")));
       for (const c of (Array.isArray(list) ? list : []).slice(0, 60)) {
         const no = String(Number(c && c.no) || ""); if (!no) continue;
         let r = old.find(x => String(Number(x[0]) || x[0]) === no); if (!r) { r = [no, S(c.name, 20), "", "", "", "", "", ""]; old.push(r); }
         r[3] = S(c.phone, 20); r[4] = S(c.rel, 10); r[5] = S(c.parentPhone, 20);
       }
       old.sort((a, b) => (Number(a[0]) || 999) - (Number(b[0]) || 999));
-      return API.attLoad([[SHEETS + "/" + id + "/values/" + q("'학생명부'!A2:H200") + ":clear", { method: "POST" }],
-        [SHEETS + "/" + id + "/values/" + q("'학생명부'!A2") + "?valueInputOption=RAW", { method: "PUT", headers: JSONH, body: JSON.stringify({ values: old }) }]]);
+      await setTab("학생명부", old); return API.attLoad();
     },
     async attSaveUi(p) {
-      const id = attId(); await attTabs(id); const old = (await batchGet(id, ["'화면설정'!A2:C200"], "FORMATTED_VALUE"))[0];
-      const keep = old.filter(r => r[0] && !(p.colors && r[0] === "색상그룹") && !(p.statRules && r[0] === "집계규칙"));
+      const keep = tabRows("화면설정").filter(r => r[0] && !(p.colors && r[0] === "색상그룹") && !(p.statRules && r[0] === "집계규칙"));
       if (p.colors) Object.keys(p.colors).slice(0, 30).forEach(k => keep.push(["색상그룹", S(k, 30), S(p.colors[k], 20)]));
       if (p.statRules) { keep.push(["집계규칙", "사유순서", JSON.stringify(p.statRules.reasonOrder || [])]); keep.push(["집계규칙", "종류순서", JSON.stringify(p.statRules.tieOrder || [])]); }
-      await clearRange(id, "'화면설정'!A2:C200"); if (keep.length) await putRange(id, "'화면설정'!A2", keep); return API.attLoad();
+      await setTab("화면설정", keep); return API.attLoad();
     },
-    // 교무수첩 → 출결 시트: 학생 명단(번호·이름·연락처, 메시지·비밀번호는 그대로), 쉬는 날(더하기만), 요일별 교시 수
+    // 교무수첩 → 출결: 학생 명단(번호·이름·연락처, 메시지·비밀번호는 그대로), 쉬는 날(더하기만), 요일별 교시 수
     async attSync(p) {
-      const id = attId(); await attTabs(id); const done = [];
+      if (!cfgGet("attMoved")) await attMigrate();
+      const done = [];
       if (Array.isArray(p.students) && p.students.length) {
-        const old = (await batchGet(id, ["'학생명부'!A2:H200"], "FORMATTED_VALUE"))[0], byNo = {}; old.forEach(r => { byNo[String(Number(r[0]) || r[0])] = r; });
+        const old = tabRows("학생명부"), byNo = {}; old.forEach(r => { byNo[String(Number(r[0]) || r[0])] = r; });
         const batchim = n => { const c = String(n).charCodeAt(String(n).length - 1); return c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 !== 0; };
-        // C열(학생 이름: 문자에 쓰는 친근한 이름)과 메시지는 선생님이 시트에서 고친 그대로 둠. 메시지가 비어 있을 때만 새로 씀
+        // C열(학생 이름: 문자에 쓰는 친근한 이름)과 메시지는 선생님이 고친 그대로 둠. 메시지가 비어 있을 때만 새로 씀
         const rows = p.students.slice(0, 60).map(s => { const o = byNo[String(s.no)] || [], rel = S(s.rel || o[4] || "", 10), name = S(s.name, 20), friendly = o[2] || "";
           const call = friendly || name, msg = o[6] || ("안녕하세요, " + (rel || "보호자님") + ".\n아직 " + call + (batchim(call) ? "이가" : "가") + " 등교하지 않았습니다.\n확인 후 지도 부탁드립니다.");
           return [String(s.no), name, friendly, S(s.phone, 20) || o[3] || "", rel, S(s.parentPhone, 20) || o[5] || "", msg, o[7] || ""]; });
-        await clearRange(id, "'학생명부'!A2:H200"); await putRange(id, "'학생명부'!A2", rows); done.push("학생 " + rows.length + "명");
+        await setTab("학생명부", rows); done.push("학생 " + rows.length + "명");
       }
       if (Array.isArray(p.holidays) && p.holidays.length) { const r = await API.attHolidayAdd(p.holidays); if (r.added) done.push("쉬는 날 " + r.added + "개 더함"); }
-      if (Array.isArray(p.periods) && p.periods.length === 5) { await putRange(id, "'교시설정'!A2:B6", p.periods.map((n, i) => [(i + 1) + " (" + "월화수목금"[i] + ")", String(Math.max(1, Math.min(10, Number(n) || 7)))])); done.push("요일별 교시 수"); }
+      if (Array.isArray(p.periods) && p.periods.length === 5) {
+        const per = tabRows("교시설정"); p.periods.forEach((n, i) => { per[i] = [(i + 1) + " (" + "월화수목금"[i] + ")", String(Math.max(1, Math.min(10, Number(n) || 7)))]; });
+        await setTab("교시설정", per); done.push("요일별 교시 수");
+      }
       await cfgPut({ attSyncAt: Date.now() });
       return { done, data: await API.attLoad() };
     }

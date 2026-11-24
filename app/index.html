@@ -1160,7 +1160,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="backend.js?v=5f2c58e2"></script>
+<script src="backend.js?v=f7d105b4"></script>
 <style>
 #fbGate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--desk)}
 #fbGate .fbbox{background:var(--paper);border-radius:22px;padding:36px 32px;text-align:center;box-shadow:0 18px 40px -24px rgba(20,40,25,.35);max-width:340px}
@@ -1368,6 +1368,7 @@ function apply(data){
   classRosters = data?.classRosters && typeof data.classRosters === "object" ? data.classRosters : {};
   classTT = data?.classTT && Array.isArray(data.classTT.cells) ? data.classTT : null;
   classTTs = data?.classTTs && typeof data.classTTs === "object" ? data.classTTs : {};
+  attLocal = !!data?.attLocal;
   sheetInfo = data?.sheet && safeUrl(data.sheet.url) ? data.sheet : null;
   allTT = data?.allTT && Array.isArray(data.allTT.teachers) && data.allTT.teachers.length ? data.allTT : null;
   if(allTT) allTT.teachers.forEach(t => { t.homeroom = normCode(t.homeroom); }); // 예전에 날짜 글자로 저장된 담임 반 고침
@@ -1523,8 +1524,8 @@ function attNeedsSync(p){
   return p.holidays.some(h => !haveH.has(h.name + "|" + h.start + "|" + h.end)) || [1, 2, 3, 4, 5].some((d, i) => D.per[d] !== p.periods[i])
     || (p.students.length && D.roster.map(r => Number(r.num) + "|" + r.name).join(",") !== p.students.map(s => s.no + "|" + s.name).join(","));
 }
-const attSet = r => { att.data = attParse(r.tabs); att.url = r.url; try{ localStorage.setItem(ATT_CACHE, JSON.stringify({ url:attCfg().url, r:{ url:r.url, tabs:r.tabs }, at:Date.now() })); }catch{} return r; };
-async function attSyncNow(quiet){ const r = await call("attSync", attPayload()); attSet(r.data); if(!quiet) say("출결 시트를 교무수첩과 맞췄어요" + (r.done.length ? ": " + r.done.join(", ") : "")); }
+const attSet = r => { att.data = attParse(r.tabs); att.url = r.url; if(r.local) attLocal = true; try{ localStorage.setItem(ATT_CACHE, JSON.stringify({ url:attCfg().url, r:{ url:r.url, tabs:r.tabs }, at:Date.now() })); }catch{} return r; };
+async function attSyncNow(quiet){ const r = await call("attSync", attPayload()); attSet(r.data); if(!quiet) say("출결을 교무수첩과 맞췄어요" + (r.done.length ? ": " + r.done.join(", ") : "")); }
 const ATT_CACHE = "attCache";
 // 머리띠 [⟳ 새로고침]: 교무수첩 자료와 (열어 봤으면) 출결 시트를 새로 받음
 document.addEventListener("click", async e => {
@@ -1607,10 +1608,10 @@ function renderAttend(){
   setTimeout(() => { const on = seg.querySelector('[aria-selected="true"]'); if(!on || seg.scrollWidth <= seg.clientWidth) return;
     seg.scrollLeft += on.getBoundingClientRect().left - seg.getBoundingClientRect().left - (seg.clientWidth - on.offsetWidth) / 2; }, 0);
   const tools = el("div",{className:"tt-tools"},
-    navBtn("새로 고침", () => { att.data = null; att.err = ""; renderAttend(); }, "출결 시트 다시 읽기"),
-    navBtn("교무수첩과 맞추기", async () => { try{ await attSyncNow(); renderAttend(); }catch(e){ say(e?.message || "맞추지 못했어요."); } }, "학생 명단·쉬는 날·교시 수를 출결 시트에 보내기", !canWrite()),
-    el("a",{className:"btn ghost small",href:att.url || A.url,target:"_blank",rel:"noopener noreferrer"}, "시트 열기"));
-  const body = att.err ? el("p",{className:"miss"}, att.err) : !D ? el("p",{className:"hint"}, "출결 시트를 읽는 중…")
+    navBtn("새로 고침", () => { att.data = null; att.err = ""; renderAttend(); }, "출결 다시 불러오기"),
+    navBtn("교무수첩과 맞추기", async () => { try{ await attSyncNow(); renderAttend(); }catch(e){ say(e?.message || "맞추지 못했어요."); } }, "학생 명단·쉬는 날·교시 수를 출결에 맞추기", !canWrite()),
+    attLocal ? "" : el("a",{className:"btn ghost small",href:att.url || A.url,target:"_blank",rel:"noopener noreferrer"}, "시트 열기"));
+  const body = att.err ? el("p",{className:"miss"}, att.err) : !D ? el("p",{className:"hint"}, attLocal ? "출결을 불러오는 중…" : "출결을 불러오는 중… (처음 한 번은 예전 출결 시트에서 교무수첩으로 옮겨 와요)")
     : ({ input:attInput, docs:attDocs, cal:attCal, stats:attStats, holi:attHoli, set:attSettings }[att.view] || attInput)();
   V.replaceChildren(el("section",{className:"attwrap"}, el("div",{className:"panel-head atthead"}, el("h2",{}, attName()), att.stale ? el("span",{className:"hint"}, "지난 내용을 먼저 보여 주는 중… 새로 읽고 있어요") : "", tools), seg, body));
 }
@@ -1983,11 +1984,11 @@ function renderAttendBox(){
   const on = el("input",{type:"checkbox",checked:A.on !== false}); on.onchange = () => save({ on:on.checked });
   const nm = el("input",{type:"text",className:"field",value:attName(),maxLength:12,"aria-label":"탭 이름"}); nm.onchange = () => save({ name:nm.value.trim() || "학급 출결" });
   const box = el("section",{className:"set-area noticebox"}, el("h3",{className:"nt-title"}, "학급 출결"),
-    el("p",{className:"hint"}, "'학급 올인원 워크스페이스' 출결 시트를 이어서 그 앱과 함께 써요. 학생 명단, 학사일정의 쉬는 날, 요일별 교시 수는 교무수첩 것으로 맞춰져요." + (homeroom() ? "" : " 지금은 담임 모드가 꺼져 있어서 탭이 보이지 않아요.")),
-    el("div",{className:"actions"}, url, navBtn("잇기", () => { const v = url.value.trim(); if(v && !/^https:\/\/docs\.google\.com\/spreadsheets\//.test(v)) return say("구글 시트 주소를 넣어 주세요."); save({ url:v }); }, "출결 시트 잇기", !canWrite()),
+    el("p",{className:"hint"}, (attLocal ? "출결 기록은 교무수첩에 저장돼요. 예전 출결 시트는 고치지 않고 백업으로 그대로 두었어요." : "'학급 올인원 워크스페이스' 출결 시트를 이어서 써요. 출결 탭을 처음 열 때 시트 내용을 교무수첩으로 옮겨 오고, 그 뒤로는 교무수첩에 저장해요.") + " 학생 명단, 학사일정의 쉬는 날, 요일별 교시 수는 교무수첩 것으로 맞춰져요." + (homeroom() ? "" : " 지금은 담임 모드가 꺼져 있어서 탭이 보이지 않아요.")),
+    attLocal ? el("div",{className:"actions"}, A.url ? el("a",{className:"btn ghost small",href:A.url,target:"_blank",rel:"noopener noreferrer"}, "예전 출결 시트 열기 (백업)") : "") : el("div",{className:"actions"}, url, navBtn("잇기", () => { const v = url.value.trim(); if(v && !/^https:\/\/docs\.google\.com\/spreadsheets\//.test(v)) return say("구글 시트 주소를 넣어 주세요."); save({ url:v }); }, "출결 시트 잇기", !canWrite()),
       A.url ? el("a",{className:"btn ghost small",href:A.url,target:"_blank",rel:"noopener noreferrer"}, "시트 열기") : ""),
     el("div",{className:"actions"}, el("label",{className:"inline"}, on, " 탭 보이기"), el("label",{className:"inline"}, "탭 이름 ", nm),
-      A.url && window.fbCall ? navBtn("지금 교무수첩과 맞추기", async () => { try{ await attSyncNow(); }catch(e){ say(e?.message || "맞추지 못했어요."); } }, "출결 시트 맞추기", !canWrite()) : ""));
+      A.url && window.fbCall ? navBtn("지금 교무수첩과 맞추기", async () => { try{ await attSyncNow(); }catch(e){ say(e?.message || "맞추지 못했어요."); } }, "학생 명단·쉬는 날·교시 수 맞추기", !canWrite()) : ""));
   box.style.setProperty("--c", "var(--green)");
   return box;
 }
@@ -4307,7 +4308,7 @@ function openStudents(){
 }
 
 // ---------- 학교 시간표 읽기: 교사 시간표 · 학반 시간표 · 전체 교사 시간표 ----------
-let classTT = null, allTT = null, classTTs = {}; // classTTs: 모든 반 학반 시간표 { "3-3": { who, periods, cells } }
+let classTT = null, allTT = null, classTTs = {}, attLocal = false; // classTTs: 모든 반 학반 시간표 { "3-3": { who, periods, cells } }
 const CLASS_RE = /^\d+\s*-\s*\d+$/;
 // 엑셀·구글 시트가 반 번호(3-9)를 날짜로 바꿔 버린 칸을 다시 반 번호로 (3월 9일, 3/9, 3. 9. 꼴)
 const MON3 = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -5151,7 +5152,7 @@ async function openRosterView(){
       $("dayDlg").close(); openRosterView();
     }catch(e){ saveBtn.disabled = false; err.textContent = e?.message && !e.code ? e.message : "저장하지 못했어요. 잠시 뒤 다시 시도해 주세요."; }
   };
-  const url = linked ? (att.url || attCfg().url) : "";
+  const url = linked && !attLocal ? (att.url || attCfg().url) : "";
   const sheetBtn = url ? el("a",{className:"btn ghost small",href:url,target:"_blank",rel:"noopener noreferrer",title:"출결 시트의 '학생명부' 탭에서 고칠 수 있어요"}, "구글 시트 열기") : null;
   draw();
   modal((config.homeroomClass ? config.homeroomClass + " " : "") + "학생 명단",
