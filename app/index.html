@@ -3335,9 +3335,9 @@ function fileList(files, onRemove){
 function attachBox(init, edit, onChange){
   const files = Array.isArray(init) ? init.slice() : [], box = el("div",{}), msg = el("div",{className:"err"});
   const changed = () => { draw(); if(onChange) onChange(files.slice()); };
-  const draw = () => box.replaceChildren(files.length ? fileList(files, edit ? i => { files.splice(i, 1); changed(); } : null) : el("p",{className:"note"}, "첨부한 파일·사진이 없어요."));
+  const draw = () => box.replaceChildren(files.length ? fileList(files, edit ? i => { files.splice(i, 1); changed(); } : null) : el("p",{className:"note"}, "첨부한 파일·사진·링크가 없어요."));
   draw();
-  const kids = [el("h3",{className:"sub"}, "파일·사진"), box];
+  const kids = [el("h3",{className:"sub"}, "파일·사진·링크"), box];
   if(edit){
     const pick = el("input",{type:"file",hidden:true,multiple:true});
     pick.onchange = async () => {
@@ -3349,7 +3349,14 @@ function attachBox(init, edit, onChange){
         catch(e){ msg.textContent = e?.message && !e.code ? e.message : "파일을 올리지 못했어요."; break; }
       }
     };
-    kids.push(pick, el("div",{className:"actions"}, navBtn("파일·사진 올리기", () => pick.click(), "파일·사진 올리기")), msg);
+    // 링크: 주소를 붙여 넣고 Enter 또는 '링크 넣기' (이름은 사이트 주소로)
+    const link = el("input",{type:"url",className:"field",placeholder:"링크 붙여 넣기 (https://…)","aria-label":"링크 주소"});
+    const addLink = () => { let v = link.value.trim(); if(!v) return; if(!/^https?:\/\//i.test(v)) v = "https://" + v;
+      let h = ""; try{ const u = new URL(v); if(u.protocol !== "https:" && u.protocol !== "http:") throw 0; h = u.hostname.replace(/^www\./, ""); v = u.href.replace(/^http:/, "https:"); }catch{ return msg.textContent = "링크 주소가 올바르지 않아요."; }
+      if(files.length >= 10) return msg.textContent = "파일·링크는 10개까지 넣을 수 있어요.";
+      files.push({ name:"🔗 " + h, url:v, fileId:"" }); link.value = ""; msg.textContent = ""; changed(); };
+    link.onkeydown = e => { if(e.key === "Enter" && !e.isComposing){ e.preventDefault(); addLink(); } };
+    kids.push(pick, el("div",{className:"actions"}, navBtn("파일·사진 올리기", () => pick.click(), "파일·사진 올리기")), el("div",{className:"actions"}, link, navBtn("링크 넣기", addLink, "링크 넣기")), msg);
   }
   return { node: el("div",{className:"attach"}, ...kids), files: () => files.slice() };
 }
