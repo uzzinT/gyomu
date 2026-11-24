@@ -732,9 +732,12 @@
       const blank = (await tabsOf(book)).filter(x => x.sheetId !== t.sheetId && /^(Sheet|시트)\d+$/.test(x.title));
       if (blank.length) await G(SHEETS + "/" + book + ":batchUpdate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requests: blank.map(x => ({ deleteSheet: { sheetId: x.sheetId } })) }) }).catch(() => {});
     }
-    if (key === "students") { // 예전에 만든 탭이면 새 칸 이름을 머리줄 끝에 더함
-      const h = ((await batchGet(book, ["'" + def.name + "'!A3:Z3"], "FORMATTED_VALUE"))[0] || [])[0] || [], add = ["부르는 이름", "보호자1 호칭", "보호자2 호칭"].filter(x => !h.includes(x));
-      if (add.length && h.length) await G(SHEETS + "/" + book + "/values/" + q("'" + def.name + "'!" + String.fromCharCode(65 + h.length) + "3") + "?valueInputOption=RAW", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ values: [add] }) });
+    if (key === "students") { // 예전에 만든 탭이면 새 칸 이름을 머리줄('번호'·'이름'이 있는 줄, 몇째 줄이든) 끝에 더함
+      const rows = (await batchGet(book, ["'" + def.name + "'!A1:Z30"], "FORMATTED_VALUE"))[0] || [], norm = c => String(c || "").replace(/\s/g, "");
+      const r = rows.findIndex(x => (x || []).some(c => /^(번호|번)$/.test(norm(c))) && (x || []).some(c => /^(이름|성명|학생명|학생이름)$/.test(norm(c)))), h = r >= 0 ? rows[r].map(norm) : [];
+      let w = h.length; while (w && !h[w - 1]) w--; // 끝의 빈 칸은 빼고 그 다음부터
+      const add = ["부르는 이름", "보호자1 호칭", "보호자2 호칭"].filter(x => !h.includes(norm(x)));
+      if (add.length && w) await G(SHEETS + "/" + book + "/values/" + q("'" + def.name + "'!" + colA1(w) + (r + 1)) + "?valueInputOption=RAW", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ values: [add] }) });
     }
     return "https://docs.google.com/spreadsheets/d/" + book + "/edit#gid=" + t.sheetId;
   }
@@ -824,6 +827,12 @@
   const colA1 = c => (c >= 26 ? String.fromCharCode(64 + Math.floor(c / 26)) : "") + String.fromCharCode(65 + c % 26);
   // 고친 학생(nos)의 '부르는 이름'·'보호자N 호칭' 칸만 씀. 칸이 없으면 머리줄 끝에 더함. 보호자는 연락처로 짝지음
   // 시트에 아직 교무수첩에 안 들어온 고침이 있으면 그 표시는 그대로 둠 (다음에 열 때 들여옴)
+  // 학생별 설정을 열 때: 이미 있는 학급 입력 시트의 학생명단 탭에 새 칸(부르는 이름·호칭)이 없으면 더함 (시트를 새로 만들지는 않음)
+  API.ensureStudentCols = async () => {
+    const book = (cfgGet("inputBooks") || {})[AREA_OF_KEY.students]; if (!book) return false;
+    if (!(await tabsOf(book)).some(s => s.title === INPUT_TABS.students.name)) return false;
+    await inputTab("students"); return true;
+  };
   API.studentsToSheet = async nos => {
     const book = (cfgGet("inputBooks") || {})[AREA_OF_KEY.students], def = INPUT_TABS.students; if (!book) return 0;
     if (!(await tabsOf(book)).some(s => s.title === def.name)) return 0;
