@@ -715,8 +715,20 @@
     class: { name: "입력_우리반시간표", head: [["※ 교시마다 두 줄: 위 칸은 과목, 아래 칸은 선생님이에요. 학반 시간표를 그대로 붙여 넣어도 돼요."], [], ["교시", "월", "화", "수", "목", "금"]], rows: 7, pair: true },
     all: { name: "입력_전체교사시간표", head: [["※ 학교 전체 교사 시간표를 A3 칸부터 그대로 붙여 넣으세요 (요일 줄, 교시 번호 줄, 선생님 줄)."]] },
     events: { name: "입력_학사일정", head: [["※ 한 줄에 하루씩. 기간은 2026.10.28~2026.10.30 처럼 써요."], [], ["날짜", "요일", "행사", "비고"]] },
-    students: { name: "입력_학생명단", head: [["※ 한 줄에 학생 한 명. 쓰지 않는 칸은 비워 두세요. 이 탭은 나만 볼 수 있어요."], [], ["번호", "이름", "학생 연락처", "보호자1 관계", "보호자1 연락처", "보호자2 관계", "보호자2 연락처", "비고", "부르는 이름", "보호자1 호칭", "보호자2 호칭"]] }
+    students: { name: "입력_학생명단", head: [["※ 한 줄에 학생 한 명. 쓰지 않는 칸은 비워 두세요. 이 탭은 나만 볼 수 있어요."], [], ["번호", "이름", "부르는 이름", "학생 연락처", "보호자1 관계", "보호자1 연락처", "보호자2 관계", "보호자2 연락처", "비고"]] }
   };
+  const stuHead = rows => { const norm = c => String(c || "").replace(/\s/g, ""), r = rows.findIndex(x => (x || []).some(c => /^(번호|번)$/.test(norm(c))) && (x || []).some(c => /^(이름|성명|학생명|학생이름)$/.test(norm(c))));
+    return { r, head: r >= 0 ? rows[r].map(norm) : [] }; };
+  async function callCol(book, sid) {
+    const name = INPUT_TABS.students.name, { r, head } = stuHead((await batchGet(book, ["'" + name + "'!A1:Z30"], "FORMATTED_VALUE"))[0] || []); if (r < 0) return false;
+    const nc = head.findIndex(c => /^(이름|성명|학생명|학생이름)$/.test(c)), k = head.findIndex(c => /^(부르는이름|애칭)$/.test(c)), to = nc + 1;
+    if (nc < 0 || k === to) return false;
+    const req = k >= 0 ? { moveDimension: { source: { sheetId: sid, dimension: "COLUMNS", startIndex: k, endIndex: k + 1 }, destinationIndex: to } }
+      : { insertDimension: { range: { sheetId: sid, dimension: "COLUMNS", startIndex: to, endIndex: to + 1 }, inheritFromBefore: true } };
+    await G(SHEETS + "/" + book + ":batchUpdate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requests: [req] }) });
+    if (k < 0) await G(SHEETS + "/" + book + "/values/" + q("'" + name + "'!" + colA1(to) + (r + 1)) + "?valueInputOption=RAW", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ values: [["부르는 이름"]] }) });
+    return true;
+  }
   async function inputTab(key) {
     const def = INPUT_TABS[key]; if (!def) fail("없는 입력 탭이에요.");
     const book = await inputBookFor(key); let t = (await tabsOf(book)).find(s => s.title === def.name);
@@ -732,13 +744,7 @@
       const blank = (await tabsOf(book)).filter(x => x.sheetId !== t.sheetId && /^(Sheet|시트)\d+$/.test(x.title));
       if (blank.length) await G(SHEETS + "/" + book + ":batchUpdate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requests: blank.map(x => ({ deleteSheet: { sheetId: x.sheetId } })) }) }).catch(() => {});
     }
-    if (key === "students") { // 예전에 만든 탭이면 새 칸 이름을 머리줄('번호'·'이름'이 있는 줄, 몇째 줄이든) 끝에 더함
-      const rows = (await batchGet(book, ["'" + def.name + "'!A1:Z30"], "FORMATTED_VALUE"))[0] || [], norm = c => String(c || "").replace(/\s/g, "");
-      const r = rows.findIndex(x => (x || []).some(c => /^(번호|번)$/.test(norm(c))) && (x || []).some(c => /^(이름|성명|학생명|학생이름)$/.test(norm(c)))), h = r >= 0 ? rows[r].map(norm) : [];
-      let w = h.length; while (w && !h[w - 1]) w--; // 끝의 빈 칸은 빼고 그 다음부터
-      const add = ["부르는 이름", "보호자1 호칭", "보호자2 호칭"].filter(x => !h.includes(norm(x)));
-      if (add.length && w) await G(SHEETS + "/" + book + "/values/" + q("'" + def.name + "'!" + colA1(w) + (r + 1)) + "?valueInputOption=RAW", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ values: [add] }) });
-    }
+    if (key === "students") await callCol(book, t.sheetId);
     return "https://docs.google.com/spreadsheets/d/" + book + "/edit#gid=" + t.sheetId;
   }
   Object.assign(API, {
@@ -825,29 +831,28 @@
   const hash = rows => { const s = JSON.stringify(rows.map(r => { const c = r.slice(); while (c.length && c[c.length - 1] === "") c.pop(); return c; }).filter(r => r.length)); let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return s.length + ":" + h; };
   const keepHash = p => cfgPut({ inputHash: { ...(cfgGet("inputHash") || {}), ...p } });
   const colA1 = c => (c >= 26 ? String.fromCharCode(64 + Math.floor(c / 26)) : "") + String.fromCharCode(65 + c % 26);
-  // 고친 학생(nos)의 '부르는 이름'·'보호자N 호칭' 칸만 씀. 칸이 없으면 머리줄 끝에 더함. 보호자는 연락처로 짝지음
+  // 고친 학생(nos)의 '부르는 이름' 칸만 씀 (칸은 이름 바로 오른쪽, 없으면 만듦)
   // 시트에 아직 교무수첩에 안 들어온 고침이 있으면 그 표시는 그대로 둠 (다음에 열 때 들여옴)
-  // 학생별 설정을 열 때: 이미 있는 학급 입력 시트의 학생명단 탭에 새 칸(부르는 이름·호칭)이 없으면 더함 (시트를 새로 만들지는 않음)
+  // 학생별 설정을 열 때: 이미 있는 학급 입력 시트의 학생명단 탭에 '부르는 이름' 칸을 이름 바로 오른쪽에 (시트를 새로 만들지는 않음)
   API.ensureStudentCols = async () => {
     const book = (cfgGet("inputBooks") || {})[AREA_OF_KEY.students]; if (!book) return false;
-    if (!(await tabsOf(book)).some(s => s.title === INPUT_TABS.students.name)) return false;
-    await inputTab("students"); return true;
+    const t = (await tabsOf(book)).find(s => s.title === INPUT_TABS.students.name); if (!t) return false;
+    const clean = (cfgGet("inputHash") || {}).students === hash(await readTab("students"));
+    if (await callCol(book, t.sheetId) && clean) await keepHash({ students: hash(await readTab("students")) }); return true;
   };
   API.studentsToSheet = async nos => {
     const book = (cfgGet("inputBooks") || {})[AREA_OF_KEY.students], def = INPUT_TABS.students; if (!book) return 0;
-    if (!(await tabsOf(book)).some(s => s.title === def.name)) return 0;
-    const rows = await readTab("students"), clean = (cfgGet("inputHash") || {}).students === hash(rows), norm = c => String(c || "").replace(/\s/g, "");
-    const h = rows.findIndex(r => r.some(c => /^(번호|번)$/.test(norm(c))) && r.some(c => /^(이름|성명|학생명|학생이름)$/.test(norm(c)))); if (h < 0) return 0;
-    const head = rows[h].map(norm), data = [], at = (r, c) => "'" + def.name + "'!" + colA1(c) + (r + 1);
-    ["부르는 이름", "보호자1 호칭", "보호자2 호칭"].forEach(x => { if (!head.includes(norm(x))) { data.push({ range: at(h, head.length), values: [[x]] }); head.push(norm(x)); } });
-    const noC = head.findIndex(c => /^(번호|번)$/.test(c)), dig = v => String(v || "").replace(/\D/g, "");
-    const pCols = head.map((c, k) => /(연락처|전화|휴대폰|핸드폰|휴대전화)/.test(c) && /(보호자|학부모|부모|어머니|아버지)/.test(c) ? k : -1).filter(k => k >= 0);
+    const t = (await tabsOf(book)).find(s => s.title === def.name); if (!t) return 0;
+    const clean = (cfgGet("inputHash") || {}).students === hash(await readTab("students"));
+    await callCol(book, t.sheetId);
+    const rows = await readTab("students"), { r: h, head } = stuHead(rows); if (h < 0) return 0;
+    const data = [], at = (r, c) => "'" + def.name + "'!" + colA1(c) + (r + 1);
+    const noC = head.findIndex(c => /^(번호|번)$/.test(c));
     const want = new Set((Array.isArray(nos) ? nos : []).map(Number));
     for (const s of (cfgGet("students") || []).filter(s => want.has(s.no))) {
       const r = rows.findIndex((x, i) => i > h && parseInt(String(x[noC] || "").trim(), 10) === s.no); if (r < 0) continue;
       const set = (c, v) => { if (c >= 0 && String(rows[r][c] ?? "") !== v) data.push({ range: at(r, c), values: [[v]] }); };
-      set(head.indexOf("부르는이름"), s.call || "");
-      (s.parents || []).forEach(p => { const k = pCols.find(k => dig(rows[r][k]) && dig(rows[r][k]) === dig(p.phone)), n = k >= 0 ? (head[k].match(/(\d)/) || [])[1] : ""; if (n) set(head.indexOf("보호자" + n + "호칭"), p.title || ""); });
+      set(head.findIndex(c => /^(부르는이름|애칭)$/.test(c)), s.call || "");
     }
     if (data.length) await G(SHEETS + "/" + book + "/values:batchUpdate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ valueInputOption: "RAW", data }) });
     if (clean) await keepHash({ students: hash(await readTab("students")) });
