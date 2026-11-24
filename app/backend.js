@@ -320,6 +320,8 @@
   const uuid = () => crypto.randomUUID();
   const fail = m => { throw new Error(m); };
   const termOf = t => TERM_RE.test(String(t || "")) ? String(t) : "";
+  // 조·종례를 알릴 학생 번호 (빈 목록 = 반 전체)
+  const cleanTo = v => Array.isArray(v) ? [...new Set(v.map(Number).filter(k => Number.isInteger(k) && k >= 1 && k <= 60))].sort((a, b) => a - b) : [];
   const cleanFiles = list => (Array.isArray(list) ? list : []).slice(0, 10).filter(f => f && /^https:\/\/[^\s]+$/.test(String(f.url || "")))
     .map(f => ({ name: S(f.name || "파일", 200), url: String(f.url), fileId: S(f.fileId, 200) }));
   const ymd = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
@@ -461,11 +463,11 @@
       if (!n || !DATE_RE.test(String(n.date))) fail("날짜가 올바르지 않아요.");
       const text = S(n.text, 120).trim(); if (!text) fail("내용을 적어 주세요.");
       await put("notes", get("notes").concat({ id: uuid(), date: n.date, type: ["조회", "종례"].indexOf(n.type) >= 0 ? n.type : "", text, done: false, createdAt: Date.now(),
-        detail: S(n.detail, 2000).trim(), share: n.share !== false, files: cleanFiles(n.files) })); return getAll();
+        detail: S(n.detail, 2000).trim(), share: n.share !== false, files: cleanFiles(n.files), to: cleanTo(n.to) })); return getAll();
     },
     async updateNote(id, p) { p = p || {}; await patchRow("notes", id, o => {
       if ("done" in p) o.done = !!p.done; if ("text" in p && String(p.text).trim()) o.text = S(p.text, 120).trim(); if ("detail" in p) o.detail = S(p.detail, 2000).trim();
-      if ("share" in p) o.share = p.share !== false; if ("files" in p) o.files = cleanFiles(p.files); return o; }); return getAll(); },
+      if ("share" in p) o.share = p.share !== false; if ("files" in p) o.files = cleanFiles(p.files); if ("to" in p) o.to = cleanTo(p.to); return o; }); return getAll(); },
     async deleteNote(id) { await dropRow("notes", id); return getAll(); },
     notesOn: date => DATE_RE.test(String(date)) ? structuredClone(get("notes").filter(n => n.date === date)) : [],
     searchNotes(q) { q = String(q || "").trim().toLowerCase(); if (!q) return []; return structuredClone(get("notes").filter(n => (n.text + " " + (n.detail || "")).toLowerCase().includes(q)).sort((a, b) => a.date < b.date ? 1 : -1).slice(0, 100)); },
@@ -870,7 +872,7 @@
       items: [HEAD].concat(g("items").map(o => HEAD.map(h => o[h] ?? ""))),
       events: [["date", "title", "cat"]].concat(g("events").map(e => [e.date, e.title, e.cat])),
       memos: [["date", "text", "due", "files"]].concat(g("memos").map(m => [m.date, m.text, !!m.due, J(m.files || [])])),
-      notes: [["id", "date", "type", "text", "done", "createdAt", "detail", "share", "files"]].concat(g("notes").map(n => [n.id, n.date, n.type, n.text, !!n.done, n.createdAt, n.detail, n.share !== false, J(n.files || [])])),
+      notes: [["id", "date", "type", "text", "done", "createdAt", "detail", "share", "files", "to"]].concat(g("notes").map(n => [n.id, n.date, n.type, n.text, !!n.done, n.createdAt, n.detail, n.share !== false, J(n.files || []), (n.to || []).join(",")])),
       checks: [["id", "title", "size", "done", "closed", "createdAt", "due", "files", "memo", "memoShare"]].concat(g("checks").map(x => [x.id, x.title, x.size, (x.done || []).join(","), !!x.closed, x.createdAt, x.due, J(x.files || []), x.memo || "", x.memoShare !== false])),
       logs: [["date", "period", "cls", "text", "lesson", "done", "files"]].concat(g("logs").map(l => [l.date, l.period, l.cls, l.text, l.lesson, !!l.done, J(l.files || [])])),
       todos: [["id", "text", "detail", "due", "done", "createdAt", "area", "cat", "files"]].concat(g("todos").map(t => [t.id, t.text, t.detail, t.due, !!t.done, t.createdAt, t.area, t.cat, J(t.files || [])])),
@@ -1154,7 +1156,7 @@
         o[h] = h === "size" || h === "createdAt" ? num(v) : h === "embed" || h === "pinned" ? tru(v) : str(v); }); return o; }),
       events: (tab.events || []).map(r => ({ date: dt(r[0]), title: str(r[1]), cat: str(r[2]) })).filter(e => DATE_RE.test(e.date) && e.title),
       memos: (tab.memos || []).map(r => ({ date: dt(r[0]), text: str(r[1]), due: tru(r[2]), files: fl(r[3]) })).filter(m => DATE_RE.test(m.date)),
-      notes: (tab.notes || []).filter(r => r[0]).map(r => ({ id: str(r[0]), date: dt(r[1]), type: str(r[2]), text: str(r[3]), done: tru(r[4]), createdAt: num(r[5]), detail: str(r[6]), share: r[7] === "" || r[7] == null || tru(r[7]), files: fl(r[8]) })),
+      notes: (tab.notes || []).filter(r => r[0]).map(r => ({ id: str(r[0]), date: dt(r[1]), type: str(r[2]), text: str(r[3]), done: tru(r[4]), createdAt: num(r[5]), detail: str(r[6]), share: r[7] === "" || r[7] == null || tru(r[7]), files: fl(r[8]), to: cleanTo(String(r[9] || "").split(",").filter(Boolean)) })),
       checks: (tab.checks || []).filter(r => r[0]).map(r => ({ id: str(r[0]), title: str(r[1]), size: num(r[2]) || 30, done: nums(r[3]), closed: tru(r[4]), createdAt: num(r[5]), due: DATE_RE.test(dt(r[6])) ? dt(r[6]) : "", files: fl(r[7]), memo: str(r[8]), memoShare: r[9] === "" || r[9] == null || tru(r[9]) })),
       logs: (tab.logs || []).map(r => ({ date: dt(r[0]), period: num(r[1]), cls: str(r[2]), text: str(r[3]), lesson: num(r[4]), done: tru(r[5]), files: fl(r[6]) })).filter(l => DATE_RE.test(l.date)),
       todos: (tab.todos || []).filter(r => r[0]).map(r => ({ id: str(r[0]), text: str(r[1]), detail: str(r[2]), due: DATE_RE.test(dt(r[3])) ? dt(r[3]) : "", done: tru(r[4]), createdAt: num(r[5]), area: str(r[6]), cat: str(r[7]), files: fl(r[8]) })),
@@ -1206,15 +1208,16 @@
     const c = cfgGet("config") || {}, ad = n => ymd(new Date(Date.now() + n * 864e5)), since = Date.now() - 60 * 864e5;
     const problems = []; // 학생 계정은 이제 Firebase 에 만들지 않음 (창구가 시트의 비밀번호 해시로 확인)
     const classCats = (Array.isArray(c.evCats) ? c.evCats : [{ id: "class", name: "학급" }]).filter(x => x.id === "class" || x.name === "학급").map(x => x.id);
-    const notes = get("notes").filter(n => n.share !== false && n.text && n.date >= ad(-21) && n.date <= ad(14))
-      .sort((a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : (a.createdAt || 0) - (b.createdAt || 0)).slice(0, 120).map(n => ({ date: n.date, type: n.type || "", text: n.text, detail: n.detail || "" }));
+    const allNotes = get("notes").filter(n => n.share !== false && n.text && n.date >= ad(-21) && n.date <= ad(14))
+      .sort((a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : (a.createdAt || 0) - (b.createdAt || 0)).slice(0, 120).map(n => ({ date: n.date, type: n.type || "", text: n.text, detail: n.detail || "", to: n.to || [] }));
+    const notes = allNotes.filter(n => !n.to.length).map(({ to, ...n }) => n), only = allNotes.filter(n => n.to.length);
     const events = get("events").filter(e => (!e.cat || classCats.includes(e.cat)) && e.date >= ad(-7) && e.date <= ad(120)).map(e => ({ date: e.date, title: e.title, mine: !!e.cat })).sort((a, b) => a.date < b.date ? -1 : 1).slice(0, 200);
     const recent = x => x.due || (x.createdAt ? ymd(new Date(x.createdAt)) : "");
     const chk = get("checks").filter(x => x.title && (!x.closed || (x.createdAt || 0) > since || (x.due && x.due >= ad(-60))));
     const checks = chk.map(x => ({ id: x.id, title: x.title, due: x.due || "", closed: !!x.closed, memo: x.memo && x.memoShare !== false ? x.memo : "" }))
       .sort((a, b) => a.closed !== b.closed ? (a.closed ? 1 : -1) : a.closed ? (recent(chk.find(x => x.id === b.id)) > recent(chk.find(x => x.id === a.id)) ? 1 : -1) : (a.due || "9999") < (b.due || "9999") ? -1 : 1);
     const tt = cfgGet("classTT"), bells = Array.isArray(c.bells) ? c.bells.map(b => ({ s: String(b && b.s || ""), e: String(b && b.e || "") })) : [];
-    await publishDrive({ cls: c.homeroomClass || "", notes, events, checks, tt: tt && Array.isArray(tt.cells) ? { periods: Number(tt.periods) || tt.cells.length, cells: tt.cells } : null, bells, ui: cfgGet("noticeUi") || null }, chk);
+    await publishDrive({ cls: c.homeroomClass || "", notes, events, checks, tt: tt && Array.isArray(tt.cells) ? { periods: Number(tt.periods) || tt.cells.length, cells: tt.cells } : null, bells, ui: cfgGet("noticeUi") || null }, chk, only);
     if (problems.length) console.warn("학생 계정을 만들지 못한 번호:", problems.join(", "));
     return problems;
   }
@@ -1223,7 +1226,7 @@
   const NOTICE_BOOK = "1Dfh1QpEk2-SsDOpQi07ZJHoZhSl7ORpLEXhZjTvG6uY";
   let noticeTabsOk = false;
   const sha = async s => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)))].map(x => x.toString(16).padStart(2, "0")).join("");
-  async function publishDrive(shared, chk) {
+  async function publishDrive(shared, chk, only) {
     if (!noticeTabsOk) { const have = (await tabsOf(NOTICE_BOOK)).map(x => x.title), miss = ["자료", "기기"].filter(n => !have.includes(n));
       if (miss.length) await sheetUpdate(NOTICE_BOOK, miss.map(n => ({ addSheet: { properties: { title: n } } })));
       if (miss.includes("기기")) await putRange(NOTICE_BOOK, "'기기'!A1", [["학번", "알림 열쇠", "등록 시각"]]);
@@ -1235,7 +1238,8 @@
       pw[hb] = await sha(salt + ":" + hb + ":" + String(pwAll[no]).trim());
       kids[hb] = { hb, no: n, name: (s && s.name) || (stt[no] && stt[no].name) || "", cells: stt[no] && Array.isArray(stt[no].cells) ? stt[no].cells : null,
         msgs: get("pmsg").filter(m => m.no === n && m.at > old).sort((x, y) => y.at - x.at).slice(0, 50).map(m => ({ text: m.text, at: m.at })),
-        done: chk.filter(x => (x.done || []).includes(n)).map(x => x.id), att: att[hb] || [] };
+        done: chk.filter(x => (x.done || []).includes(n)).map(x => x.id), att: att[hb] || [],
+        notes: (only || []).filter(x => x.to.includes(n)).map(({ to, ...x }) => x) };
     }
     const cp = cfgGet("classPw"); // 선생님 비밀번호: 창구가 sha256(salt + 비밀번호) 로 비교
     const text = JSON.stringify({ v: 1, at: Date.now(), salt, pw, teacher: cp && cp.hash ? { salt: cp.salt, hash: cp.hash } : null, shared, kids }), rows = [];

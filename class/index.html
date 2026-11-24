@@ -37,6 +37,7 @@ nav button[aria-selected="true"]{color:var(--navy)}
 nav button[aria-selected="true"]::after{content:"";width:22px;height:3px;border-radius:2px;background:var(--navy)}
 h2{font:700 1.35rem var(--display);margin:18px 0 8px;display:flex;align-items:baseline;gap:8px}
 h2 small{font:400 .78rem var(--body);color:var(--muted)}
+.pastnotes>summary{cursor:pointer;list-style:none}.pastnotes>summary::-webkit-details-marker{display:none}.pastnotes>summary h2::before{content:"▸";font-size:.9em}.pastnotes[open]>summary h2::before{content:"▾"}
 .card{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:8px 0}
 .card.today{border-color:var(--navy);box-shadow:inset 4px 0 0 var(--navy)}
 .date{font-weight:600;font-size:.9rem;color:var(--muted);margin-bottom:4px}
@@ -279,7 +280,8 @@ function got(d){
 function shape(raw){
   let my = raw.my || null; if(preview && raw.kids){ const k = raw.kids.find(x => x.hb === preview); if(k) my = k; }
   const done = new Set(my?.done || []);
-  return { ...raw, raw, today:today(), checks:(raw.checks || []).map(c => ({ ...c, mine:my ? done.has(c.id) : undefined })), my, kids:raw.kids || null };
+  const notes = [...(raw.notes || []), ...(my?.notes || []).map(n => ({ ...n, only:true }))];
+  return { ...raw, raw, notes, today:today(), checks:(raw.checks || []).map(c => ({ ...c, mine:my ? done.has(c.id) : undefined })), my, kids:raw.kids || null };
 }
 async function load(manual){
   const t = sess.get(); if(!t) return showLogin();
@@ -351,12 +353,12 @@ function drawNotes(){
   const by = {}; data.notes.forEach(n => (by[n.date] ||= []).push(n));
   const t = today(), keys = Object.keys(by);
   const card = k => el("div",{className:"card" + (k === t ? " today" : "")}, el("div",{className:"date",textContent:(k === t ? "오늘 · " : "") + label(k)}),
-    ...by[k].map(n => el("div",{className:"note"}, n.type ? el("span",{className:"tag",textContent:n.type}) : "", ...linkify(n.text), n.detail ? el("div",{className:"detail"}, ...linkify(n.detail)) : "")));
+    ...by[k].map(n => el("div",{className:"note"}, n.only ? el("span",{className:"tag",textContent:"나에게"}) : "", n.type ? el("span",{className:"tag",textContent:n.type}) : "", ...linkify(n.text), n.detail ? el("div",{className:"detail"}, ...linkify(n.detail)) : "")));
   const next = keys.filter(k => k > t).sort(), past = keys.filter(k => k < t).sort().reverse();
   return el("section",{}, drawMsgs(),
     el("h2",{textContent:"오늘 공지"}), by[t] ? card(t) : el("p",{className:"empty",textContent:"오늘은 공지가 없어요."}),
     next.length ? [el("h2",{textContent:"앞으로"}), ...next.map(card)] : "",
-    past.length ? [el("h2",{}, "지난 공지", el("small",{textContent:"최근 3주"})), ...past.map(card)] : "");
+    past.length ? el("details",{className:"pastnotes"}, el("summary",{}, el("h2",{}, "지난 공지", el("small",{textContent:"최근 3주 · " + past.length + "일 · 눌러서 보기"}))), ...past.map(card)) : ""); // 지난 것은 접어 둠
 }
 // 일정: 달력 (칸 안에 일정 이름 전부). 날짜를 누르면 그날 일정을 큰 창으로
 let evMon = 0;
