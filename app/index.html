@@ -3641,25 +3641,10 @@ function openCoolMsg(i, seen){
   else {
 
     if((i.links || []).length) kids.push(el("div",{className:"coollinks"}, el("b",{}, "링크"), ...i.links.map(l => el("a",{href:l,target:"_blank",rel:"noopener noreferrer"}, l))));
-    const isInline = f => /^본문 (그림|표) \d+\.(png|jpe?g|gif|bmp|webp)$/i.test(f.name); // PC 연결이 본문 속 그림·표를 그림으로 만든 것
+    const isInline = coolInline; // PC 연결이 본문 속 그림·표를 그림으로 만든 것
     const media = (i.files || []).filter(isInline), files = (i.files || []).filter(f => !isInline(f));
     // 첨부는 이름만. 누르면 그때 PC가 올림 (그 전엔 PC에만 있음)
-    const fetchBtn = f => {
-      const b = el("button",{type:"button",className:"linkbtn",title:"PC에서 가져와 교무수첩에서 보기"}, "📎 " + f.name), st = el("span",{className:"hint"});
-      b.onclick = async () => {
-        if(!canWrite()) return say("지금은 가져올 수 없어요.");
-        b.disabled = true; st.textContent = " — PC에서 가져오는 중이에요. 1~2분 걸려요 (PC가 켜져 있어야 해요).";
-        try{ await call("coolWant", i.key, f.name); }catch(e){ b.disabled = false; st.textContent = ""; return say(e?.message || "요청하지 못했어요."); }
-        for(let n = 0; n < 12; n++){ // 3분까지 기다림
-          await new Promise(r => setTimeout(r, 15000));
-          if(!b.isConnected) return;
-          try{ const d = await call("coolMessages"), x = (d.items || []).find(m => String(m.key) === String(i.key)), g = (x?.files || []).find(y => y.name === f.name && y.url);
-            if(g){ b.replaceWith(el("a",{href:g.url,target:"_blank",rel:"noopener noreferrer"}, "📎 " + f.name)); st.textContent = " — 왔어요. 눌러서 보세요."; return; } }catch{}
-        }
-        b.disabled = false; st.textContent = " — 아직 오지 않았어요. PC가 켜져 있는지 확인하고 다시 눌러 주세요.";
-      };
-      return el("span",{}, b, st);
-    };
+    const fetchBtn = f => coolFetchBtn(i.key, f);
     // 가져온 첨부: 드라이브 복사본 지우기 (PC 원본은 그대로, 다시 누르면 다시 가져옴)
     const gotFile = f => {
       const a = el("a",{href:f.url,target:"_blank",rel:"noopener noreferrer"}, "📎 " + f.name);
@@ -3740,6 +3725,39 @@ async function openCoolWords(){
   try{ const w = await call("coolWords"); ta.value = (w || []).join("\n"); }catch(e){ err.textContent = "불러오지 못했어요."; }
   save.onclick = async () => { save.disabled = true; try{ await call("saveCoolWords", ta.value.split(/\r?\n/)); say("✓ 금칙어를 저장했어요."); openCool(); }catch(e){ save.disabled = false; err.textContent = e?.message || "저장하지 못했어요."; } };
 }
+// 쿨메신저 첨부: 누르면 PC가 교무수첩(드라이브)에 올림 → 오면 링크로 (할 일에도 저절로 들어감)
+function coolFetchBtn(key, f){
+  const b = el("button",{type:"button",className:"linkbtn",title:"PC에서 가져와 교무수첩에서 보기"}, "📎 " + f.name), st = el("span",{className:"hint"});
+  b.onclick = async () => {
+    if(!canWrite()) return say("지금은 가져올 수 없어요.");
+    b.disabled = true; st.textContent = " — PC에서 가져오는 중이에요. 1~2분 걸려요 (PC가 켜져 있어야 해요).";
+    try{ await call("coolWant", key, f.name); }catch(e){ b.disabled = false; st.textContent = ""; return say(e?.message || "요청하지 못했어요."); }
+    for(let n = 0; n < 12; n++){ // 3분까지 기다림
+      await new Promise(r => setTimeout(r, 15000));
+      if(!b.isConnected) return;
+      try{ const d = await call("coolMessages"), x = (d.items || []).find(m => String(m.key) === String(key)), g = (x?.files || []).find(y => y.name === f.name && y.url);
+        if(g){ b.replaceWith(el("a",{href:g.url,target:"_blank",rel:"noopener noreferrer"}, "📎 " + f.name)); st.textContent = " — 왔어요. 눌러서 보세요."; return; } }catch{}
+    }
+    b.disabled = false; st.textContent = " — 아직 오지 않았어요. PC가 켜져 있는지 확인하고 다시 눌러 주세요.";
+  };
+  return el("span",{}, b, st);
+}
+const coolInline = f => /^본문 (그림|표) \d+\.(png|jpe?g|gif|bmp|webp)$/i.test(f.name);
+// 할 일 창: 쿨메신저에서 온 할 일이면, 아직 교무수첩에 안 올라온 첨부도 이름과 '가져오기'로 보여 줌
+function coolTodoFiles(t){
+  const box = el("div",{className:"coollinks"});
+  if(t.src !== "cool" || !window.fbCall) return box;
+  const key = t.coolKey || String(t.id).replace(/^cool-/, ""), have = new Set((t.files || []).map(f => f.name));
+  call("coolMessages").then(d => {
+    const i = (d.items || []).find(m => String(m.key) === String(key)); if(!i || i.private) return;
+    const rest = (i.files || []).filter(f => !coolInline(f) && !have.has("📎 " + f.name)); if(!rest.length) return;
+    box.replaceChildren(el("b",{}, "쿨메신저 첨부 (아직 PC에만 있어요)"), ...rest.map(f => f.url ? el("a",{href:f.url,target:"_blank",rel:"noopener noreferrer"}, "📎 " + f.name)
+      : f.onPC && !f.pcOnly ? coolFetchBtn(key, f)
+      : el("span",{className:"hint"}, "📎 " + f.name + (f.pcOnly ? " (25MB가 넘어 PC에만 있어요)" : " — PC 쿨메신저에서 아직 받지 않은 파일이에요. 쿨메신저에서 [받기]를 누르면 가져올 수 있어요."))),
+      el("p",{className:"hint"}, "누르면 PC에서 가져와요. 가져온 파일은 이 할 일의 파일 칸에도 저절로 들어가요."));
+  }).catch(() => {});
+  return box;
+}
 function openTodo(id){
   const t = todos.find(x => x.id === id); if(!t) return;
   const edit = canWrite() && !String(t.id).startsWith("tmp");
@@ -3754,7 +3772,7 @@ function openTodo(id){
   const doneCb = el("input",{type:"checkbox",checked:!!t.done,disabled:!edit,"aria-label":"끝냄"});
   doneCb.onchange = async () => { try{ await store.updateTodo(t.id, { done:doneCb.checked }); say(doneCb.checked ? "✓ 끝냄으로 바꿨어요." : "안 끝낸 것으로 바꿨어요."); }catch(e){ doneCb.checked = !doneCb.checked; say(e?.message || "바꾸지 못했어요."); } };
   const kids = [el("div",{className:"tt-tools"}, el("label",{className:"inline tdone","data-autosave":"1"}, doneCb, " 끝냈어요"), t.src === "cool" && window.fbCall ? navBtn("💬 쿨메신저 원문", () => openCoolFor(t), "쿨메신저에서 온 원래 메시지 보기") : null,
-    t.src === "cool" && window.fbCall && edit ? navBtn("정보 제공으로", async () => { try{ apply(await call("coolToInfo", t.coolKey || String(t.id).replace(/^cool-/, ""))); $("dayDlg").close(); say("✓ 정보 제공으로 옮겼어요. [쿨메신저] 창에서 볼 수 있어요."); }catch(e){ say(e?.message || "옮기지 못했어요."); } }, "할 일에서 빼고 쿨메신저 창의 정보 제공으로") : null), el("label",{className:"memo-label"}, "할 일", text), ...(window.fbCall ? [el("label",{className:"memo-label"}, "분류", tc)] : []), el("label",{className:"memo-label"}, "마감일", due), el("label",{className:"memo-label"}, "세부 내용", detail), att.node, err];
+    t.src === "cool" && window.fbCall && edit ? navBtn("정보 제공으로", async () => { try{ apply(await call("coolToInfo", t.coolKey || String(t.id).replace(/^cool-/, ""))); $("dayDlg").close(); say("✓ 정보 제공으로 옮겼어요. [쿨메신저] 창에서 볼 수 있어요."); }catch(e){ say(e?.message || "옮기지 못했어요."); } }, "할 일에서 빼고 쿨메신저 창의 정보 제공으로") : null), el("label",{className:"memo-label"}, "할 일", text), ...(window.fbCall ? [el("label",{className:"memo-label"}, "분류", tc)] : []), el("label",{className:"memo-label"}, "마감일", due), el("label",{className:"memo-label"}, "세부 내용", detail), att.node, coolTodoFiles(t), err];
   if(edit){
     const save = el("button",{className:"btn",type:"button"}, "저장");
     save.onclick = () => {
