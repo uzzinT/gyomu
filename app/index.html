@@ -2896,9 +2896,14 @@ function openCheck(id){
     }, "지우기");
     // 다 안 걷혔어도 끝낼 수 있음 (학생 앱에서는 '마감된 제출물'로 접혀 보임)
     const close = c.closed ? navBtn("다시 걷기 (목록에 올리기)", () => { saveMemo(); store.updateCheck(c.id, { closed:false }); $("dayDlg").close(); }, "다시 목록에 올리기")
-      : el("button",{type:"button",className:"btn"}, miss.length ? "완료 (미제출 " + miss.length + "명 남김)" : "완료");
-    if(!c.closed) close.onclick = () => { saveMemo(); store.updateCheck(c.id, { closed:true }); $("dayDlg").close(); say("'" + c.title + "' 완료했어요. Ctrl+Z로 되돌릴 수 있어요."); };
-    kids.push(el("div",{className:"actions"}, del, el("span",{className:"spacer"}), close));
+      : navBtn(miss.length ? "걷기 끝내기 (미제출 " + miss.length + "명)" : "걷기 끝내기", () => {
+          // 미제출이 남았으면 한 번 더 눌러야 끝냄 (저장과 헷갈리지 않게)
+          if(miss.length && !close.dataset.armed){ close.dataset.armed = "1"; close.textContent = "미제출 " + miss.length + "명 남았어요 · 한 번 더 누르면 끝내요"; return; }
+          saveMemo(); store.updateCheck(c.id, { closed:true }); $("dayDlg").close(); say("'" + c.title + "' 걷기를 끝냈어요. Ctrl+Z로 되돌릴 수 있어요.");
+        }, "목록에서 내리기 (학생 앱엔 마감된 제출물로)");
+    const save = el("button",{type:"button",className:"btn"}, "저장");
+    save.onclick = () => { saveMemo(); $("dayDlg").close(); say("✓ 저장했어요."); };
+    kids.push(el("div",{className:"actions"}, del, close, el("span",{className:"spacer"}), save));
   }
   modal(c.title, ...kids);
 }
