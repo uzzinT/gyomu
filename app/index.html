@@ -591,7 +591,7 @@ dialog label.inline,.set-area label.inline{display:flex;flex-direction:row;gap:8
 .att td:nth-child(3){width:6.5em}
 .att tr.attmark td{background:color-mix(in srgb,var(--sun) 10%,var(--paper))}
 .qrbox{display:grid;place-items:center;padding:12px;background:#fff;border-radius:8px}
-.stuset td,.stuset th{font-size:.8rem;white-space:nowrap}.stuset td:nth-child(2){max-width:5.5em;overflow:hidden;text-overflow:ellipsis}
+.stuset td,.stuset th{font-size:.8rem;white-space:nowrap}.stuset .callin{width:6.5em;min-width:0;margin:0;padding:4px 6px;font-size:.8rem}.stuset td:nth-child(2){max-width:5.5em;overflow:hidden;text-overflow:ellipsis}
 .plan.pwtbl{min-width:0;table-layout:fixed}.pwtbl th:nth-child(1){width:4.2em}.pwtbl th:nth-child(2){width:5.5em}.pwtbl td:nth-child(2){white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pwtbl th:nth-child(4){width:4.6em}.pwtbl .field{width:100%;min-width:0;margin:0}
 .pmsgpick{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:4px 10px;margin:8px 0}
 .pmsg{display:flex;gap:8px;align-items:flex-start;justify-content:space-between;padding:8px 0;border-top:1px solid var(--line)}.pmsg .pre{white-space:pre-wrap}
@@ -1160,7 +1160,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="backend.js?v=f7d105b4"></script>
+<script src="backend.js?v=78afaad2"></script>
 <style>
 #fbGate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--desk)}
 #fbGate .fbbox{background:var(--paper);border-radius:22px;padding:36px 32px;text-align:center;box-shadow:0 18px 40px -24px rgba(20,40,25,.35);max-width:340px}
@@ -3209,8 +3209,16 @@ function openStudentSettings(){
   const ta = el("textarea",{className:"field",rows:3,maxLength:500,value:guardianMsg || DEF_GMSG,"aria-label":"보호자 문자 문구"});
   const saveMsg = navBtn("문구 저장", async () => { try{ apply(await call("saveGuardianMsg", ta.value.trim())); say("✓ 문자 문구를 저장했어요."); openStudentSettings(); }catch(e){ say(e?.message || "저장하지 못했어요."); } }, "문자 문구 저장");
   const sample = students[0] ? fillGMsg({ ...students[0] }, students[0].parents?.[0] || { rel:"어머니" }) : "";
+  // 부르는 이름: 칸에서 바로 고치고, 칸을 벗어나거나 Enter 면 저장 (비우면 성을 뺀 이름)
+  const callBox = s => { if(!canWrite()) return callName(s);
+    const i = el("input",{type:"text",className:"field callin",maxLength:20,value:s.call || "",placeholder:callName({ ...s, call:"" }),"aria-label":s.name + " 부르는 이름"});
+    i.onkeydown = e => { if(e.key === "Enter" && !e.isComposing){ e.preventDefault(); i.blur(); } };
+    i.onchange = async () => { const v = i.value.trim(); if(v === (s.call || "")) return;
+      try{ await store.saveStudents(students.map(x => x.no === s.no ? { ...x, call:v } : x)); say("✓ " + s.name + " → '" + (v || callName({ ...s, call:"" })) + "'(으)로 불러요."); openStudentSettings(); }
+      catch(e){ say(e?.message || "저장하지 못했어요."); } };
+    return i; };
   const rows = students.map(s => { const p1 = s.parents?.[0], p2 = s.parents?.[1];
-    return el("tr",{}, el("td",{}, String(s.no)), el("td",{title:s.name}, s.name), el("td",{}, callName(s)), el("td",{}, s.phone || "—"),
+    return el("tr",{}, el("td",{}, String(s.no)), el("td",{title:s.name}, s.name), el("td",{}, callBox(s)), el("td",{}, s.phone || "—"),
       el("td",{}, p1 ? (p1.rel || "?") + " · " + gTitle(p1) : "—", el("br",{}), el("small",{className:"hint"}, p1?.phone || "")),
       el("td",{}, p2 ? (p2.rel || "?") + " · " + gTitle(p2) : "—", el("br",{}), el("small",{className:"hint"}, p2?.phone || "")),
       el("td",{}, mid4(p1?.phone) || "—")); });
@@ -3221,6 +3229,7 @@ function openStudentSettings(){
     el("p",{className:"hint"}, "{학부모} = 호칭(어머니→어머님, 아버지→아버님, 그 밖은 시트의 '보호자 호칭' 칸), {학생 이름} = 부르는 이름(비우면 성을 뺀 이름). '{학생 이름}가'는 받침에 맞춰 '이가/가'로 바뀌어요."),
     ta, sample ? el("p",{className:"hint"}, "예) " + sample) : null, el("div",{className:"actions"}, navBtn("기본 문구로", () => { ta.value = DEF_GMSG; }, "기본 문구로"), el("span",{className:"spacer"}), saveMsg),
     el("h3",{className:"nt-title"}, "학생 " + students.length + "명"),
+    students.length && canWrite() ? el("p",{className:"hint"}, "부르는 이름은 칸에서 바로 고칠 수 있어요 (예: 유진이). 비워 두면 성을 뺀 이름으로 불러요. 학급 입력 시트에서 다시 불러오면 시트의 '부르는 이름' 칸으로 바뀌어요.") : null,
     students.length ? el("div",{className:"tt-wrap"}, el("table",{className:"plan stuset"}, el("thead",{}, el("tr",{}, ...["번호","이름","부르는 이름","학생 연락처","보호자1","보호자2","앱 비밀번호"].map(h => el("th",{}, h)))), el("tbody",{}, ...rows)))
       : el("p",{className:"note"}, "아직 학생 명단이 없어요. [시트에 입력]으로 적고 [시트에서 불러오기]를 눌러요."));
 }
