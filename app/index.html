@@ -2322,9 +2322,7 @@ function renderNotes(){
   const rows = list.length ? list.map(n => {
     const cb = el("input",{type:"checkbox",checked:!!n.done,disabled:!edit,"aria-label":"전달함"});
     cb.onchange = () => store.updateNote(n.id, { done: cb.checked });
-    const more = el("button",{className:"ttback more",type:"button",title:"자세히"}, (n.files?.length ? "📎" + n.files.length + " " : "") + "자세히");
-    more.onclick = e => { e.preventDefault(); openNote(n.id); };
-    const act = el("span",{className:"nact"}, more);
+    const act = el("span",{className:"nact"}, n.files?.length ? el("small",{className:"hint",title:"파일 " + n.files.length + "개"}, "📎" + n.files.length) : "");
     if(edit){
       const cp = el("button",{className:"ttback",type:"button",title:"다음 날로 복사","aria-label":"다음 날로 복사"}, "↷");
       cp.onclick = e => { e.preventDefault(); copyTo([n]); };
@@ -2332,7 +2330,10 @@ function renderNotes(){
       x.onclick = e => { e.preventDefault(); store.deleteNote(n.id); };
       act.append(cp, x);
     }
-    return el("label",{className:"nrow" + (n.done ? " done" : "")}, cb, el("span",{className:"ntext"}, n.to?.length ? el("small",{className:"nto",title:toLabel(n.to) + "에게만"}, "👤" + n.to.length + " ") : "", n.text), act);
+    // 글자를 눌러도 체크되지 않게 (label 대신 div): 글자는 자세히 열기, 체크는 상자를 눌렀을 때만
+    const tx = el("span",{className:"ntext",style:"cursor:pointer",title:"자세히 보기"}, n.to?.length ? el("small",{className:"nto",title:toLabel(n.to) + "에게만"}, "👤" + n.to.length + " ") : "", n.text);
+    tx.onclick = () => openNote(n.id);
+    return el("div",{className:"nrow" + (n.done ? " done" : "")}, cb, tx, act);
   }) : [el("div",{className:"empty"}, "전달할 내용이 없어요")];
   const parts = [head, ...rows];
   if(edit){
