@@ -147,7 +147,8 @@ dialog label.check input{width:auto}
 .card .frame{position:relative;z-index:1}
 
 /* settings */
-.attach>.actions{gap:8px;margin-top:8px}.linkbox{display:flex;flex-direction:column;gap:8px;margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:8px}.linkbox[hidden]{display:none}.linkbox>*{margin:0}
+.attach>.actions{gap:8px;margin-top:8px}.files li.fedit{display:flex;flex-direction:column;gap:6px;align-items:stretch;padding:6px 0}.files li.fedit>*{margin:0}
+.linkbox{display:flex;flex-direction:column;gap:8px;margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:8px}.linkbox[hidden]{display:none}.linkbox>*{margin:0}
 .nto{color:var(--navy);font-weight:700;margin-right:2px}.notto{display:flex;flex-direction:column;gap:6px}.notto>*{margin:0}
 .setgrp{border:1px solid var(--line);border-radius:8px;margin-bottom:12px;background:var(--paper)}
 .setgrp>summary{cursor:pointer;padding:12px 16px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;list-style-position:inside;font:700 1.05rem var(--display)}
@@ -3324,15 +3325,23 @@ function filePreviews(files, onRemove){
     return card;
   }));
 }
+// 링크 주소 고르기: 앞에 https:// 가 없으면 붙이고, http·https 가 아니면 "" (http 는 https 로)
+const normLink = s => { let v = String(s || "").trim(); if(!v) return ""; if(!/^[a-z][\w+.-]*:/i.test(v)) v = "https://" + v;
+  try{ const x = new URL(v); return x.protocol === "https:" || x.protocol === "http:" ? x.href.replace(/^http:/, "https:") : ""; }catch{ return ""; } };
+console.assert(normLink("docs.google.com/a") === "https://docs.google.com/a" && normLink("javascript:alert(1)") === "" && normLink("http://x.kr/") === "https://x.kr/");
 function fileList(files, onRemove, onRename){
   return el("ul",{className:"files"}, ...files.map((f, i) => {
     const href = fileHref(f), li = el("li",{}, href ? el("a",{href,target:"_blank",rel:"noopener noreferrer"}, f.name) : el("span",{}, f.name));
-    // 이름 고치기: 그 자리에 칸이 나오고 Enter·저장으로 바꿈 (링크의 🔗 는 그대로 붙임)
-    if(onRename){ const pen = el("button",{className:"ttback",type:"button","aria-label":f.name + " 이름 고치기",title:"이름 고치기"}, "✎");
-      pen.onclick = () => { const link = f.name.startsWith("🔗 "), inp = el("input",{type:"text",className:"field",maxLength:100,value:link ? f.name.slice(2).trim() : f.name,"aria-label":"새 이름"});
-        const done = () => { const v = inp.value.trim(); onRename(i, v ? (link ? "🔗 " + v : v) : f.name); };
-        inp.onkeydown = e => { if(e.key === "Enter" && !e.isComposing){ e.preventDefault(); done(); } else if(e.key === "Escape"){ e.preventDefault(); e.stopPropagation(); onRename(i, f.name); } };
-        li.replaceChildren(inp, navBtn("저장", done, "이름 저장")); inp.focus(); inp.select(); };
+    // 고치기: 그 자리에 칸이 나오고 Enter·저장으로 바꿈. 링크는 주소도 (🔗 는 그대로 붙임)
+    if(onRename){ const pen = el("button",{className:"ttback",type:"button","aria-label":f.name + " 고치기",title:"이름·주소 고치기"}, "✎");
+      pen.onclick = () => { const link = f.name.startsWith("🔗 ") && !f.fileId && !/^\/_blob\//.test(f.url || ""), auto = String(f.url || "").replace(/^https:\/\//, "");
+        const inp = el("input",{type:"text",className:"field",maxLength:100,value:link ? f.name.slice(2).trim() : f.name,"aria-label":"새 이름"});
+        const url = link ? el("input",{type:"url",className:"field",value:f.url,"aria-label":"링크 주소"}) : null, bad = el("span",{className:"err"});
+        const done = () => { const nu = url ? normLink(url.value) : f.url; if(!nu) return bad.textContent = "링크 주소가 올바르지 않아요.";
+          let v = inp.value.trim(); if(link && (!v || v === auto)) v = nu.replace(/^https:\/\//, ""); // 이름을 안 정했으면 새 주소로
+          onRename(i, v ? (link ? "🔗 " + v : v) : f.name, nu); };
+        [inp, url].filter(Boolean).forEach(x => x.onkeydown = e => { if(e.key === "Enter" && !e.isComposing){ e.preventDefault(); done(); } else if(e.key === "Escape"){ e.preventDefault(); e.stopPropagation(); onRename(i, f.name, f.url); } });
+        li.classList.add("fedit"); li.replaceChildren(inp, ...(url ? [url] : []), el("div",{className:"actions"}, bad, el("span",{className:"spacer"}), navBtn("취소", () => onRename(i, f.name, f.url), "고치기 취소"), navBtn("저장", done, "저장"))); inp.focus(); inp.select(); };
       li.append(pen); }
     if(onRemove){ const x = el("button",{className:"ttback",type:"button","aria-label":f.name + " 빼기",title:"목록에서 빼기"}, "×"); x.onclick = () => onRemove(i); li.append(x); }
     return li;
@@ -3343,7 +3352,7 @@ function fileList(files, onRemove, onRename){
 function attachBox(init, edit, onChange){
   const files = Array.isArray(init) ? init.slice() : [], box = el("div",{}), msg = el("div",{className:"err"});
   const changed = () => { draw(); if(onChange) onChange(files.slice()); };
-  const draw = () => box.replaceChildren(files.length ? fileList(files, edit ? i => { files.splice(i, 1); changed(); } : null, edit ? (i, name) => { if(name === files[i].name) return draw(); files[i] = { ...files[i], name }; changed(); } : null) : el("p",{className:"note"}, "첨부한 파일·사진·링크가 없어요."));
+  const draw = () => box.replaceChildren(files.length ? fileList(files, edit ? i => { files.splice(i, 1); changed(); } : null, edit ? (i, name, url) => { if(name === files[i].name && (url || files[i].url) === files[i].url) return draw(); files[i] = { ...files[i], name, url:url || files[i].url }; changed(); } : null) : el("p",{className:"note"}, "첨부한 파일·사진·링크가 없어요."));
   draw();
   const kids = [el("h3",{className:"sub"}, "파일·사진·링크"), box];
   if(edit){
@@ -3360,8 +3369,7 @@ function attachBox(init, edit, onChange){
     // 링크: '링크 넣기'를 누르면 주소·이름 칸이 나옴. 이름을 비우면 링크 주소 그대로
     const link = el("input",{type:"url",className:"field",placeholder:"링크 주소 (https://…)","aria-label":"링크 주소"});
     const lname = el("input",{type:"text",className:"field",maxLength:100,placeholder:"이름 (안 쓰면 링크 주소로)","aria-label":"링크 이름"});
-    const addLink = () => { let v = link.value.trim(); if(!v) return msg.textContent = "링크 주소를 넣어 주세요."; if(!/^https?:\/\//i.test(v)) v = "https://" + v;
-      try{ const u = new URL(v); if(u.protocol !== "https:" && u.protocol !== "http:") throw 0; v = u.href.replace(/^http:/, "https:"); }catch{ return msg.textContent = "링크 주소가 올바르지 않아요."; }
+    const addLink = () => { if(!link.value.trim()) return msg.textContent = "링크 주소를 넣어 주세요."; const v = normLink(link.value); if(!v) return msg.textContent = "링크 주소가 올바르지 않아요.";
       if(files.length >= 10) return msg.textContent = "파일·링크는 10개까지 넣을 수 있어요.";
       files.push({ name:"🔗 " + (lname.value.trim() || v.replace(/^https:\/\//, "")), url:v, fileId:"" }); link.value = lname.value = ""; msg.textContent = ""; linkBox.hidden = true; changed(); };
     [link, lname].forEach(x => x.onkeydown = e => { if(e.key === "Enter" && !e.isComposing){ e.preventDefault(); addLink(); } });
