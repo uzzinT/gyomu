@@ -831,7 +831,7 @@
   const hash = rows => { const s = JSON.stringify(rows.map(r => { const c = r.slice(); while (c.length && c[c.length - 1] === "") c.pop(); return c; }).filter(r => r.length)); let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return s.length + ":" + h; };
   const keepHash = p => cfgPut({ inputHash: { ...(cfgGet("inputHash") || {}), ...p } });
   const colA1 = c => (c >= 26 ? String.fromCharCode(64 + Math.floor(c / 26)) : "") + String.fromCharCode(65 + c % 26);
-  // 고친 학생(nos)의 '부르는 이름' 칸만 씀 (칸은 이름 바로 오른쪽, 없으면 만듦)
+  // 고친 학생(nos)의 '부르는 이름'·학생 연락처·첫 보호자 관계·연락처 칸만 씀 (부르는 이름 칸은 이름 바로 오른쪽, 없으면 만듦)
   // 시트에 아직 교무수첩에 안 들어온 고침이 있으면 그 표시는 그대로 둠 (다음에 열 때 들여옴)
   // 학생별 설정을 열 때: 이미 있는 학급 입력 시트의 학생명단 탭에 '부르는 이름' 칸을 이름 바로 오른쪽에 (시트를 새로 만들지는 않음)
   API.ensureStudentCols = async () => {
@@ -853,6 +853,11 @@
       const r = rows.findIndex((x, i) => i > h && parseInt(String(x[noC] || "").trim(), 10) === s.no); if (r < 0) continue;
       const set = (c, v) => { if (c >= 0 && String(rows[r][c] ?? "") !== v) data.push({ range: at(r, c), values: [[v]] }); };
       set(head.findIndex(c => /^(부르는이름|애칭)$/.test(c)), s.call || "");
+      const dig = v => String(v || "").replace(/\D/g, ""), setP = (c, v) => { if (c >= 0 && dig(rows[r][c]) !== dig(v)) data.push({ range: at(r, c), values: [[v]] }); };
+      setP(head.indexOf("학생연락처"), s.phone || "");
+      // 첫 보호자 = 보호자1 칸 (보호자1 연락처가 비고 보호자2만 있으면 보호자2 칸)
+      const p = (s.parents || [])[0], c1 = head.indexOf("보호자1연락처"), c2 = head.indexOf("보호자2연락처"), k = c1 >= 0 && !dig(rows[r][c1]) && c2 >= 0 && dig(rows[r][c2]) ? 2 : 1;
+      if (p) { setP(head.indexOf("보호자" + k + "연락처"), p.phone || ""); set(head.indexOf("보호자" + k + "관계"), p.rel || ""); }
     }
     if (data.length) await G(SHEETS + "/" + book + "/values:batchUpdate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ valueInputOption: "RAW", data }) });
     if (clean) await keepHash({ students: hash(await readTab("students")) });
@@ -1060,11 +1065,27 @@
       await cfgPut({ attMoved: { url, at: Date.now(), recs: recs.length, trash: trash.length } }); await flush();
     })().finally(() => { attMoving = null; }));
   }
+  async function attRosterMerge() {
+    if (cfgGet("attRosterMerged") || !cfgGet("attMoved")) return 0;
+    const rows = tabRows("학생명부"), list = structuredClone(cfgGet("students") || []), dig = v => String(v || "").replace(/\D/g, ""), diff = new Set(); let filled = 0;
+    for (const r of rows) {
+      const n = Number(dig(r[0]).slice(-2)), nm = String(r[1] || "").trim(), sp = String(r[3] || "").trim(), pr = String(r[4] || "").trim(), pp = String(r[5] || "").trim();
+      const s = list.find(x => x.no === n && (!nm || x.name === nm)) || (nm ? list.find(x => x.name === nm) : null); if (!s) continue;
+      if (sp) { if (!s.phone) { s.phone = sp; filled++; } else if (dig(sp) !== dig(s.phone)) diff.add(s.no); }
+      if (pp) { const ps = s.parents || (s.parents = []), p = ps.find(x => dig(x.phone) === dig(pp));
+        if (p) { if (pr && !p.rel) { p.rel = pr; filled++; } } else if (!ps.length) { ps.push({ rel: pr, title: "", phone: pp }); filled++; } else diff.add(s.no); }
+    }
+    // 학생 앱 비밀번호(stuPw)는 건드리지 않음
+    await cfgPut({ attRosterBackup: rows, attRosterMerged: { at: Date.now(), filled, diff: [...diff] }, ...(filled ? { students: list } : {}) });
+    return filled;
+  }
   Object.assign(API, {
     async attLoad() {
       if (!cfgGet("attMoved")) await attMigrate();
+      const filled = await attRosterMerge().catch(e => { console.warn("학생명부 연락처 합치기", e); return 0; });
+      if (filled && window.apply) window.apply(getAll());
       const tabs = attTabsNow(); lastAtt = { tabs };
-      return { url: "", local: true, oldUrl: (cfgGet("attMoved") || {}).url || "", tabs };
+      return { url: "", local: true, oldUrl: (cfgGet("attMoved") || {}).url || "", tabs, rosterFilled: filled || 0 };
     },
     // 출결 백업은 시트 하나: 하루 한 번 출결 내용을 '출결 백업 (지우지 마세요)' 시트에 덮어씀 (올해 폴더)
     // 지난 날 내용은 그 시트의 '버전 기록'에 남음 → 날마다 새 시트가 생기지 않음

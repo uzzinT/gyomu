@@ -482,7 +482,7 @@ nav{margin-bottom:14px}
 .crow .t{flex:1;min-width:0;overflow-wrap:anywhere}
 .crow .m{font-size:.78rem;color:var(--sun);font-weight:600;flex:none}
 .crow.ok .m{color:var(--green)}
-.numgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(42px,1fr));gap:6px}
+.numgrid{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:6px}
 .numgrid button{font:inherit;font-variant-numeric:tabular-nums;padding:8px 0;border:1px solid var(--line);border-radius:6px;background:var(--paper2);color:var(--ink);cursor:pointer}
 .numgrid button[aria-pressed="true"]{background:color-mix(in srgb,var(--green) 35%,var(--paper));border-color:var(--green);font-weight:700}
 .miss{margin:0;font-weight:600;color:var(--sun)}
@@ -624,7 +624,9 @@ tr.attfocus td{background:color-mix(in srgb,var(--ochre) 18%,var(--paper))}
 .roster{justify-content:flex-end}
 .lesson-info{font-size:.8rem;color:var(--accent);font-weight:600}
 
-.numgrid.named{grid-template-columns:repeat(auto-fill,minmax(96px,1fr))}
+.numgrid.named{grid-template-columns:repeat(5,minmax(0,1fr))}@media (max-width:420px){.numgrid{grid-template-columns:repeat(5,minmax(0,1fr))}}
+.numgrid.named button{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.numgrid.pick button[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff;font-weight:700;text-decoration:none}
 .numgrid.named button{font-size:.82rem;padding:8px 4px}
 #studentText{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--paper2);color:var(--ink);width:100%;resize:vertical}
 
@@ -1160,7 +1162,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="backend.js?v=1ad39a0f"></script>
+<script src="backend.js?v=6a93971f"></script>
 <style>
 #fbGate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--desk)}
 #fbGate .fbbox{background:var(--paper);border-radius:22px;padding:36px 32px;text-align:center;box-shadow:0 18px 40px -24px rgba(20,40,25,.35);max-width:340px}
@@ -1433,11 +1435,11 @@ const groupOf = n => AD().types.find(t => t.name === n)?.group || (/체험학습
 const typeColor = n => AD().colors[groupOf(n)] || "#94a3b8";
 // 연락처는 한 곳에서: 출결 시트를 이었으면 그 '학생명부'(학생 연락처·학부모 관계·학부모 연락처), 아니면 교무수첩 학생 명단
 const attLinked = () => !!(window.fbCall && attCfg().url);
-const contactOf = no => { const r = AD()?.roster.find(k => Number(k.num) === Number(no)), s = students.find(x => x.no === Number(no));
-  return r ? { phone:r.sPhone || "", rel:r.pRel || "", pPhone:r.pPhone || "" } : { phone:s?.phone || "", rel:s?.parents?.[0]?.rel || "", pPhone:s?.parents?.[0]?.phone || "" }; };
+const contactOf = no => { const s = students.find(x => x.no === Number(no)), r = s ? null : AD()?.roster.find(k => Number(k.num) === Number(no));
+  return s ? { phone:s.phone || "", rel:s.parents?.[0]?.rel || "", pPhone:s.parents?.[0]?.phone || "" } : { phone:r?.sPhone || "", rel:r?.pRel || "", pPhone:r?.pPhone || "" }; };
 // 출결 시트를 아직 안 읽었으면 읽고 옴 (이 기기에 둔 것이 있으면 그것 먼저)
 async function ensureAtt(){ if(!attLinked() || att.data) return; say("연락처를 불러오는 중…"); try{ await loadAtt(); }finally{ say(""); } }
-const attKids = () => AD()?.roster.length ? AD().roster : students.map(s => ({ num:s.no, name:s.name, sPhone:s.phone || "", pRel:s.parents?.[0]?.rel || "", pPhone:s.parents?.[0]?.phone || "", msg:"" }));
+const attKids = () => !students.length && AD()?.roster.length ? AD().roster : students.map(s => ({ num:s.no, name:s.name, sPhone:s.phone || "", pRel:s.parents?.[0]?.rel || "", pPhone:s.parents?.[0]?.phone || "", msg:"" }));
 // 수업일: 주말·교무수첩 쉬는 날·출결 시트 학사일정 제외
 function holiName(k){
   const w = parseYmd(k).getDay(); if(w === 0 || w === 6) return "주말";
@@ -1524,7 +1526,8 @@ function attNeedsSync(p){
   return p.holidays.some(h => !haveH.has(h.name + "|" + h.start + "|" + h.end)) || [1, 2, 3, 4, 5].some((d, i) => D.per[d] !== p.periods[i])
     || (p.students.length && D.roster.map(r => Number(r.num) + "|" + r.name).join(",") !== p.students.map(s => s.no + "|" + s.name).join(","));
 }
-const attSet = r => { att.data = attParse(r.tabs); att.url = r.url; if(r.local) attLocal = true; try{ localStorage.setItem(ATT_CACHE, JSON.stringify({ url:attCfg().url, r:{ url:r.url, tabs:r.tabs }, at:Date.now() })); }catch{} return r; };
+const attSet = r => { att.data = attParse(r.tabs); att.url = r.url; if(r.local) attLocal = true;
+  if(r.rosterFilled) say("출결 학생명부에만 있던 연락처 " + r.rosterFilled + "개를 교무수첩 학생 명단에 채웠어요. 이제 학생 명단은 하나예요."); try{ localStorage.setItem(ATT_CACHE, JSON.stringify({ url:attCfg().url, r:{ url:r.url, tabs:r.tabs }, at:Date.now() })); }catch{} return r; };
 async function attSyncNow(quiet){ const r = await call("attSync", attPayload()); attSet(r.data); if(!quiet) say("출결을 교무수첩과 맞췄어요" + (r.done.length ? ": " + r.done.join(", ") : "")); }
 const ATT_CACHE = "attCache";
 // 머리띠 [⟳ 새로고침]: 교무수첩 자료와 (열어 봤으면) 출결 시트를 새로 받음
@@ -1736,7 +1739,8 @@ function attSms(list){
   if(!list.length) return say("연락할 학생을 골라 주세요.");
   const link = (href, label) => el("a",{className:"btn ghost small",href}, label);
   list = list.map(k => { const s = students.find(x => String(x.no) === String(Number(k.num) || k.num)); return s ? { ...k, stu:s } : k; });
-  if(list.some(k => k.stu)) return modal("학생·학부모 연락", el("p",{className:"hint"}, "휴대폰에서 누르면 문자 앱·전화가 열려요. 번호·호칭은 설정 → 학기 초 세팅의 '학생 명단'(학급 입력 시트), 문구는 '학생별 설정'에서 바꿔요."),
+  const fixMsg = navBtn("문구 고치기", () => modal("보호자 문자 문구", guardianMsgBox(() => attSms(list)), el("div",{className:"actions"}, navBtn("← 연락하기로", () => attSms(list), "연락하기 창으로"))), "보호자 문자 문구 고치기", !canWrite());
+  if(list.some(k => k.stu)) return modal("학생·학부모 연락", el("div",{className:"actions"}, el("span",{className:"spacer"}), fixMsg), el("p",{className:"hint"}, "휴대폰에서 누르면 문자 앱·전화가 열려요. 번호·호칭은 설정 → 학기 초 세팅의 '학생 명단'(학급 입력 시트), 문구는 '학생별 설정'에서 바꿔요."),
     ...list.map(k => {
       const s = k.stu || { name:k.name, phone:k.sPhone, parents:k.pPhone ? [{ rel:k.pRel, phone:k.pPhone }] : [] };
       const off = label => el("span",{className:"btn ghost small",style:"opacity:.35;pointer-events:none","aria-disabled":"true"}, label);
@@ -1967,6 +1971,7 @@ function attSettings(){
       el("p",{className:"hint"}, "하루에 기록이 여러 개면: ① 결석이 있으면 결석 ② 사유 순서가 앞선 것 ③ 빠진 교시가 많은 것 ④ 종류 순서가 앞선 것 하나만 세요."),
       el("div",{className:"attcols"}, el("div",{}, el("b",{}, "사유 순서"), orderList(ro, "r")), el("div",{}, el("b",{}, "종류 순서 (교시 수가 같을 때)"), orderList(to, "t"))),
       el("div",{className:"actions"}, navBtn("기본값으로", () => attDo("attSaveUi", [{ statRules:{ reasonOrder:DEF_REASON, tieOrder:DEF_TIE } }], "기본값으로 되돌렸어요.").catch(() => {}), "기본값으로", !canWrite()))),
+    guardianMsgBox(),
     (() => { // 학생에게 보낼 알림 문구
       const box = (k, label) => { const t = el("textarea",{className:"field",rows:2,maxLength:300,value:attCfg()["msg_" + k] || ATT_MSG[k],"aria-label":label + " 문구"}); return [el("b",{}, label), t]; };
       const [l1, t1] = box("today", "오늘 출결 알림"), [l2, t2] = box("alert", "누적 통계 알림");
@@ -3156,7 +3161,9 @@ function renderModeBox(){
     catch(e){ cb.checked = !cb.checked; say("저장하지 못했어요. 잠시 뒤 다시 시도해 주세요."); }
   };
   const box = el("section",{className:"set-area"}, el("h3",{className:"nt-title"}, "담임 모드"),
-    el("label",{className:"inline"}, cb, " 담임이에요 (홈에 조·종례와 제출물 칸이 나와요)"));
+    el("label",{className:"inline"}, cb, " 담임이에요 (홈에 조·종례와 제출물 칸이 나와요)"),
+    el("div",{className:"actions"}, navBtn("학생 명단", () => openRosterView(), "학생·학부모 연락처 보기·고치기"), navBtn("학생별 설정", () => openStudentSettings(), "부르는 이름·연락처·알림 앱 비밀번호", !canWrite()),
+      el("span",{className:"hint"}, "학생 정보는 이 명단 하나를 출결·알림 앱·제출물이 함께 써요.")));
   box.style.setProperty("--c", "var(--green)");
   return box;
 }
@@ -3205,12 +3212,20 @@ async function uploadStudentTT(file){
 // 학생별 설정: 학급 입력 시트 '입력_학생명단'이 기준 (번호·이름·부르는 이름·학생/보호자1·2 연락처·관계·호칭)
 // 문자 문구는 여기서, 알림 앱 비밀번호는 보호자1 연락처 가운데 4자리로 저절로
 let stuColsOk = false; // 학급 입력 시트에 부르는 이름·호칭 칸 만들기는 한 번만
+// 보호자 미등교 문자 문구 (출결 탭 → 설정, 연락하기 창의 '문구 고치기'에서 같은 칸)
+function guardianMsgBox(after){
+  const ta = el("textarea",{className:"field",rows:3,maxLength:500,value:guardianMsg || DEF_GMSG,"aria-label":"보호자 문자 문구"}), ex = el("p",{className:"hint"});
+  const s0 = students[0], show = () => { ex.textContent = s0 ? "예) " + fillGMsg({ ...s0 }, s0.parents?.[0] || { rel:"어머니" }, ta.value) : ""; };
+  ta.oninput = show; show();
+  const save = el("button",{type:"button",className:"btn",disabled:!canWrite()}, "문구 저장");
+  save.onclick = async () => { try{ apply(await call("saveGuardianMsg", ta.value.trim())); say("✓ 보호자 문자 문구를 저장했어요."); if(after) after(); }catch(e){ say(e?.message || "저장하지 못했어요."); } };
+  return el("section",{className:"notes attform"}, el("h3",{className:"nt-title"}, "보호자에게 보내는 문자 문구 (미등교 연락)"),
+    el("p",{className:"hint"}, "{학부모} = 보호자 호칭(어머니→어머님, 아버지→아버님), {학생 이름} = 부르는 이름(학생별 설정에서 정해요). '{학생 이름}가'는 부르는 이름을 정했으면 '가'만, 안 정했으면 받침에 맞춰 '이가/가'로 바뀌어요."),
+    ta, ex, el("div",{className:"actions"}, navBtn("기본 문구로", () => { ta.value = DEF_GMSG; show(); }, "기본 문구로"), navBtn("학생별 설정", () => openStudentSettings(), "부르는 이름 정하기"), el("span",{className:"spacer"}), save));
+}
 function openStudentSettings(){
   if(!stuColsOk && window.fbCall && canWrite()){ stuColsOk = true; call("ensureStudentCols").catch(() => { stuColsOk = false; }); }
   const st = SETUP.find(x => x.key === "students"), mid4 = v => { const g = String(v || "").split(/\D+/).filter(Boolean); if(g.length === 3) return g[1].slice(-4); const d = String(v || "").replace(/\D/g, ""); return d.length >= 10 ? d.slice(-8, -4) : ""; };
-  const ta = el("textarea",{className:"field",rows:3,maxLength:500,value:guardianMsg || DEF_GMSG,"aria-label":"보호자 문자 문구"});
-  const saveMsg = navBtn("문구 저장", async () => { try{ apply(await call("saveGuardianMsg", ta.value.trim())); say("✓ 문자 문구를 저장했어요."); openStudentSettings(); }catch(e){ say(e?.message || "저장하지 못했어요."); } }, "문자 문구 저장");
-  const sample = students[0] ? fillGMsg({ ...students[0] }, students[0].parents?.[0] || { rel:"어머니" }) : "";
   // 부르는 이름·보호자 호칭: 칸에서 바로 고치고, 칸을 벗어나거나 Enter 면 저장 (비우면 기본값). 학급 입력 시트의 그 칸에도 씀
   const box = (s, label, cur, def, fix) => { if(!canWrite()) return cur || def;
     const i = el("input",{type:"text",className:"field callin",maxLength:label === "부르는 이름" ? 20 : 10,value:cur || "",placeholder:def,"aria-label":s.name + " " + label});
@@ -3228,11 +3243,8 @@ function openStudentSettings(){
       el("td",{}, ...[pBox(s, 1)].flat()),
       el("td",{}, mid4(s.parents?.[0]?.phone) || "—")); });
   modal("학생별 설정",
-    el("p",{className:"hint"}, "학기 초에 '학급 입력' 시트의 '입력_학생명단' 탭에 적고 [시트에서 불러오기]를 눌러요. 문자·전화와 알림 앱 비밀번호가 모두 여기서 나와요."),
+    el("p",{className:"hint"}, "학기 초에 '학급 입력' 시트의 '입력_학생명단' 탭에 적고 [시트에서 불러오기]를 눌러요. 출결 연락(문자·전화)과 알림 앱 비밀번호가 모두 이 명단에서 나와요. 보호자 문자 문구는 출결 탭 → 설정에 있어요."),
     el("div",{className:"tt-tools"}, ...(st ? setupButtons(st, () => openStudentSettings()) : [])),
-    el("h3",{className:"nt-title"}, "보호자 문자 문구"),
-    el("p",{className:"hint"}, "{학부모} = 보호자 호칭(어머니→어머님, 아버지→아버님), {학생 이름} = 부르는 이름. '{학생 이름}가'는 부르는 이름을 정했으면 '가'만, 안 정했으면 받침에 맞춰 '이가/가'로 바뀌어요."),
-    ta, sample ? el("p",{className:"hint"}, "예) " + sample) : null, el("div",{className:"actions"}, navBtn("기본 문구로", () => { ta.value = DEF_GMSG; }, "기본 문구로"), el("span",{className:"spacer"}), saveMsg),
     el("h3",{className:"nt-title"}, "학생 " + students.length + "명"),
     students.length && canWrite() ? el("p",{className:"hint"}, "부르는 이름(예: 유진이, 용구)은 칸에서 바로 고쳐요. 정해 두면 문자에 '유진이가', '용구가'처럼 '가'만 붙어요. 비워 두면 성을 뺀 이름에 받침을 맞춰 붙여요(유진 → 유진이가). 학급 입력 시트의 '부르는 이름' 칸(이름 오른쪽)에도 저절로 적히고, 시트에서 고치면 다음에 교무수첩을 열 때 들어와요.") : null,
     students.length ? el("div",{className:"tt-wrap"}, el("table",{className:"plan stuset"}, el("thead",{}, el("tr",{}, ...["번호","이름","부르는 이름","학생 연락처","보호자1","보호자2","앱 비밀번호"].map(h => el("th",{}, h)))), el("tbody",{}, ...rows)))
@@ -3301,7 +3313,6 @@ function renderNoticeBox(){
   const ttFile = el("input",{type:"file",accept:".xlsx,.xls",hidden:true});
   ttFile.onchange = async () => { const f = ttFile.files[0]; ttFile.value = ""; if(!f) return; try{ showStu(await uploadStudentTT(f)); }catch(e){ say(e?.message || "시간표 파일을 읽지 못했어요."); } };
   const stuRow = el("div",{className:"actions"}, ttFile,
-    navBtn("학생별 설정", () => openStudentSettings(), "학생 연락처·보호자·문자 문구·비밀번호", !canWrite()),
     navBtn("개인 시간표 올리기", () => ttFile.click(), "나이스 학생별 시간표 엑셀 올리기", !canWrite()),
     navBtn("개별 알림", () => openStudentMsg(), "학생별로 알림 보내기", !canWrite()));
   const pw = el("input",{type:"text",className:"field",id:"noticePw",maxLength:30,placeholder:"선생님 비밀번호 (4자 이상)",autocomplete:"off","aria-label":"알림 앱 선생님 비밀번호"});
@@ -3407,7 +3418,7 @@ function openNote(id){
   const to = new Set(n.to || []), toBox = el("div",{className:"notto"}), size = students.length ? Math.max(...students.map(s => s.no)) : 30;
   const drawTo = () => {
     const seg = el("div",{className:"seg"}, ...[["all", "반 전체"], ["pick", "골라서"]].map(([k, l]) => { const b = el("button",{type:"button","aria-pressed":String(k === "pick" ? toPick : !toPick),disabled:!edit}, l); b.onclick = () => { toPick = k === "pick"; if(!toPick) to.clear(); drawTo(); }; return b; }));
-    const grid = toPick ? el("div",{className:"numgrid" + (students.length ? " named" : "")}, ...Array.from({length:size}, (_, i) => { const k = i + 1, b = el("button",{type:"button","aria-pressed":String(to.has(k)),disabled:!edit}, nameOf(k) ? k + " " + nameOf(k) : String(k)); b.onclick = () => { to.has(k) ? to.delete(k) : to.add(k); drawTo(); }; return b; })) : "";
+    const grid = toPick ? el("div",{className:"numgrid pick" + (students.length ? " named" : "")}, ...Array.from({length:size}, (_, i) => { const k = i + 1, b = el("button",{type:"button","aria-pressed":String(to.has(k)),disabled:!edit}, nameOf(k) ? k + " " + nameOf(k) : String(k)); b.onclick = () => { to.has(k) ? to.delete(k) : to.add(k); drawTo(); }; return b; })) : "";
     toBox.replaceChildren(el("h3",{className:"sub"}, "알릴 학생"), seg, grid, el("p",{className:"hint"}, !toPick ? "반 전체가 알림 앱에서 봐요." : to.size ? toLabel([...to].sort((a, b) => a - b)) + " 학생만 자기 알림 앱에서 봐요." : "번호를 눌러 골라 주세요."));
   };
   let toPick = to.size > 0; drawTo();
@@ -5095,7 +5106,7 @@ const gTitle = p => (p && (p.title || { 어머니:"어머님", 아버지:"아버
 console.assert(gTitle({ rel:"어머님" }) === "어머님" && gTitle({ rel:"어머니" }) === "어머님" && gTitle({ rel:"이모" }) === "이모님" && gTitle({ rel:"할머니" }) === "할머님");
 const callName = s => s.call || String(s.name || "").slice(String(s.name || "").length >= 3 ? 1 : 0);
 const hasBatchim = w => { const c = String(w).charCodeAt(String(w).length - 1); return c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 !== 0; };
-const fillGMsg = (s, p) => { const n = callName(s); return (guardianMsg || DEF_GMSG).replace(/\{학생 ?이름\}(이가|가)/g, n + (String(s.call || "").trim() || !hasBatchim(n) ? "가" : "이가")).replace(/\{학생 ?이름\}/g, n).replace(/\{이름\}/g, s.name || "").replace(/\{학부모\}|\{보호자\}/g, gTitle(p)); };
+const fillGMsg = (s, p, msg) => { const n = callName(s); return (msg || guardianMsg || DEF_GMSG).replace(/\{학생 ?이름\}(이가|가)/g, n + (String(s.call || "").trim() || !hasBatchim(n) ? "가" : "이가")).replace(/\{학생 ?이름\}/g, n).replace(/\{이름\}/g, s.name || "").replace(/\{학부모\}|\{보호자\}/g, gTitle(p)); };
 console.assert(fillGMsg({ name:"김민수", parents:[] }, { rel:"어머니" }).startsWith("안녕하세요, 어머님.\n아직 민수가"), fillGMsg({ name:"이유진", call:"유진" }, { rel:"할머니", title:"할머님" }).includes("유진이가"));
 function parseRoster(rows){
   const norm = s => String(s ?? "").replace(/\s/g, "");
@@ -5136,7 +5147,6 @@ setTimeout(() => {
 async function openRosterView(){
   if(!students.length) return modal("학생 명단", el("p",{className:"note"}, "아직 학생 명단이 없어요. 설정 → 학기 초 세팅에서 올리거나 입력해 주세요."));
   await ensureAtt().catch(() => {});
-  const linked = attLinked() && !!AD();
   let q = "", editing = false;
   const body = el("tbody"), err = el("div",{className:"err"});
   const tel = p => p ? el("a",{href:"tel:" + String(p).replace(/[^\d+]/g, "")}, p) : "";
@@ -5160,19 +5170,17 @@ async function openRosterView(){
     saveBtn.disabled = true; err.textContent = "";
     const list = students.filter(x => edits[x.no]).map(x => { const e = edits[x.no]; return { no:x.no, name:x.name, phone:phoneOf(e[0].value), parentPhone:phoneOf(e[1].value), rel:e[2].value.trim() }; });
     try{
-      if(linked){ say("저장하는 중…"); attSet(await call("attSaveContacts", list)); say("✓ 연락처를 출결 시트 '학생명부'에 저장했어요."); }
-      else { await store.saveStudents(students.map(x => { const c = list.find(y => y.no === x.no); if(!c) return x; const ps = [...(x.parents || [])];
+      { await store.saveStudents(students.map(x => { const c = list.find(y => y.no === x.no); if(!c) return x; const ps = [...(x.parents || [])];
           ps[0] = { rel:c.rel || ps[0]?.rel || "", phone:c.parentPhone }; return { ...x, phone:c.phone, parents:ps.filter(p => p.phone || p.rel) }; }));
-        say("연락처를 저장했어요."); }
+        say("✓ 연락처를 저장했어요.");
+        call("studentsToSheet", list.map(x => x.no)).then(n => { if(n) say("✓ 연락처를 저장했어요 · 학급 입력 시트에도 적었어요."); }).catch(() => {}); }
       $("dayDlg").close(); openRosterView();
     }catch(e){ saveBtn.disabled = false; err.textContent = e?.message && !e.code ? e.message : "저장하지 못했어요. 잠시 뒤 다시 시도해 주세요."; }
   };
-  const url = linked && !attLocal ? (att.url || attCfg().url) : "";
-  const sheetBtn = url ? el("a",{className:"btn ghost small",href:url,target:"_blank",rel:"noopener noreferrer",title:"출결 시트의 '학생명부' 탭에서 고칠 수 있어요"}, "구글 시트 열기") : null;
   draw();
   modal((config.homeroomClass ? config.homeroomClass + " " : "") + "학생 명단",
-    el("p",{className:"hint"}, linked ? "연락처는 출결 시트 '학생명부' 한 곳에 있어요. 여기서 고치거나 시트에서 고치면 출결 연락·학생 창에 똑같이 보여요." : "학생과 학부모 연락처는 내 교무수첩에만 있어요. 설정 → 학급 출결에서 출결 시트를 이으면 그 시트의 '학생명부'와 하나로 써요."),
-    el("div",{className:"tt-tools rostertools"}, find, editBtn, sheetBtn, cancelBtn, saveBtn), err,
+    el("p",{className:"hint"}, "학생·학부모 연락처는 교무수첩 학생 명단 한 곳에 있어요. 출결 연락, 학생별 설정, 학급 입력 시트가 모두 이 명단을 써요. 여기서 고치면 학급 입력 시트에도 적혀요."),
+    el("div",{className:"tt-tools rostertools"}, find, editBtn, cancelBtn, saveBtn), err,
     el("div",{className:"tt-wrap"}, el("table",{className:"plan rostertbl"}, cols, el("thead",{}, head), body)));
   setTimeout(() => autoFocus(find), 0);
 }
