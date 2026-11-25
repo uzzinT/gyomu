@@ -482,6 +482,8 @@ nav{margin-bottom:14px}
 .crow .t{flex:1;min-width:0;overflow-wrap:anywhere}
 .crow .m{font-size:.78rem;color:var(--sun);font-weight:600;flex:none}
 .crow.ok .m{color:var(--green)}
+.ckind{display:inline-block;font-size:.7rem;font-weight:700;padding:0 6px;margin-right:5px;border-radius:999px;vertical-align:1px;color:#fff;background:var(--ochre)}.ckind.tell{background:var(--navy)}
+.ckadd{display:flex;gap:6px;align-items:center}.ckadd .field{flex:1;min-width:0}.ckseg{flex:none}.ckseg button{padding:4px 8px;font-size:.78rem}
 .numgrid{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:6px}
 .numgrid button{font:inherit;font-variant-numeric:tabular-nums;padding:8px 0;border:1px solid var(--line);border-radius:6px;background:var(--paper2);color:var(--ink);cursor:pointer}
 .numgrid button[aria-pressed="true"]{background:color-mix(in srgb,var(--green) 35%,var(--paper));border-color:var(--green);font-weight:700}
@@ -1162,7 +1164,7 @@ nav .tabback:hover{background:rgba(255,255,255,.12);color:#fff}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="backend.js?v=6a93971f"></script>
+<script src="backend.js?v=a419124e"></script>
 <style>
 #fbGate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--desk)}
 #fbGate .fbbox{background:var(--paper);border-radius:22px;padding:36px 32px;text-align:center;box-shadow:0 18px 40px -24px rgba(20,40,25,.35);max-width:340px}
@@ -2837,6 +2839,13 @@ console.assert(notesText("2026-10-26", [{text:"a"},{text:"b"}]) === "[10/26 (월
 
 // 제출물 체크판: 번호만 누르면 미제출 번호가 정리됨 (이름은 저장하지 않음). 마감일과 정렬 선택
 let checkSort = (() => { try{ return localStorage.getItem("checkSort") === "due" ? "due" : "new"; }catch{ return "new"; } })();
+// 제출물 · 배부 · 개별 안내: 같은 번호 체크판, 말만 다름
+const CKIND = {
+  submit:{ tag:"제출", miss:"미제출", ok:"다 냈어요", on:"냄", off:"안 냄", ph:"걷을 것 (예: 체험학습 동의서) 쓰고 Enter", done:"걷기 끝내기", closed:"다 걷음", again:"다시 걷기 (목록에 올리기)" },
+  give:{ tag:"배부", miss:"미배부", ok:"다 줬어요", on:"받음", off:"안 받음", ph:"나눠 줄 것 (예: 가정통신문) 쓰고 Enter", done:"배부 끝내기", closed:"다 줌", again:"다시 배부 (목록에 올리기)" },
+  tell:{ tag:"안내", miss:"안내 안 함", ok:"다 알렸어요", on:"알림", off:"안 알림", ph:"개별로 알릴 것 (예: 상담 일정) 쓰고 Enter", done:"안내 끝내기", closed:"다 알림", again:"다시 안내 (목록에 올리기)" } };
+const ckOf = c => CKIND[c?.kind] || CKIND.submit;
+let checkKind = "submit";
 const missingOf = c => { const d = new Set(c.done || []); return Array.from({length:c.size || 30}, (_, i) => i + 1).filter(n => !d.has(n)); };
 console.assert(missingOf({size:5, done:[2,4]}).join() === "1,3,5");
 const byCreated = (a, b) => (a.createdAt || 0) - (b.createdAt || 0);
@@ -2847,35 +2856,38 @@ function renderChecks(){
   const rows = open.length ? open.map(c => {
     const miss = missingOf(c);
     const b = el("button",{type:"button",className:"crow" + (miss.length ? "" : " ok")},
-      el("span",{className:"t"}, c.title, c.memo ? el("span",{className:"cm"}, c.memo) : ""),
+      el("span",{className:"t"}, c.kind && c.kind !== "submit" ? el("small",{className:"ckind " + c.kind}, ckOf(c).tag) : "", c.title, c.memo ? el("span",{className:"cm"}, c.memo) : ""),
       c.due ? el("span",{className:"tdue" + (c.due <= today && miss.length ? " soon" : "")}, dueLabel(c.due)) : "",
-      el("span",{className:"m"}, miss.length ? "미제출 " + miss.length : "다 냈어요"));
+      el("span",{className:"m"}, miss.length ? ckOf(c).miss + " " + miss.length : ckOf(c).ok));
     b.onclick = () => openCheck(c.id);
     return el("div",{className:"crowwrap"}, b);
-  }) : [el("div",{className:"empty"}, "걷을 것이 없어요")];
+  }) : [el("div",{className:"empty"}, "걷을 것·나눠 줄 것·알릴 것이 없어요")];
   const sortBtn = navBtn(checkSort === "due" ? "마감 임박 순" : "만든 순", () => {
     checkSort = checkSort === "due" ? "new" : "due";
     try{ localStorage.setItem("checkSort", checkSort); }catch{}
     renderHome();
   }, "정렬 바꾸기 (만든 순 / 마감 임박 순)");
   sortBtn.title = "눌러서 정렬 바꾸기";
-  const parts = [el("div",{className:"panel-head"}, el("h2",{}, "제출물"), el("div",{className:"tt-tools"}, navBtn("전체", () => openCheckAll(), "다 걷은 것까지 제출물 전체 보기"), navBtn("찾기", openCheckFind, "제출물 검색"), sortBtn)), ...rows];
+  const parts = [el("div",{className:"panel-head"}, el("h2",{}, "제출·배부·안내"), el("div",{className:"tt-tools"}, navBtn("전체", () => openCheckAll(), "끝낸 것까지 전체 보기"), navBtn("찾기", openCheckFind, "제출물 검색"), sortBtn)), ...rows];
   if(edit){
-    const inp = el("input",{className:"field",id:"checkTitle",maxLength:40,placeholder:"걷을 것 (예: 체험학습 동의서) 쓰고 Enter"});
+    const inp = el("input",{className:"field",id:"checkTitle",maxLength:40,placeholder:CKIND[checkKind].ph});
     inp.onkeyup = e => {
       if(e.key !== "Enter" || e.isComposing || !inp.value.trim()) return;
       const title = inp.value.trim(); inp.value = "";
-      store.addCheck(title);
+      store.addCheck(title, checkKind);
     };
-    parts.push(el("div",{className:"nadd"}, inp));
+    // 무엇을 더할지: 제출 · 배부 · 안내
+    const seg = el("div",{className:"seg ckseg",role:"group","aria-label":"종류"}, ...Object.entries(CKIND).map(([k, v]) => { const b = el("button",{type:"button","aria-pressed":String(checkKind === k)}, v.tag);
+      b.onclick = () => { checkKind = k; [...seg.children].forEach(x => x.setAttribute("aria-pressed", String(x === b))); inp.placeholder = v.ph; inp.focus(); }; return b; }));
+    parts.push(el("div",{className:"nadd ckadd"}, seg, inp));
   }
   return el("section",{className:"panel notes checks"}, ...parts);
 }
 function openCheck(id){
   const c = checks.find(x => x.id === id); if(!c) return;
-  const edit = canWrite() && !String(c.id).startsWith("tmp"), done = new Set(c.done || []), miss = missingOf(c);
+  const edit = canWrite() && !String(c.id).startsWith("tmp"), done = new Set(c.done || []), miss = missingOf(c), K = ckOf(c);
   const grid = el("div",{className:"numgrid" + (students.length ? " named" : "")}, ...Array.from({length:c.size || 30}, (_, i) => {
-    const n = i + 1, b = el("button",{type:"button","aria-pressed":String(done.has(n)),disabled:!edit,"aria-label":n + "번 " + (done.has(n) ? "냄" : "안 냄")}, nameOf(n) ? n + " " + nameOf(n) : String(n));
+    const n = i + 1, b = el("button",{type:"button","aria-pressed":String(done.has(n)),disabled:!edit,"aria-label":n + "번 " + (done.has(n) ? K.on : K.off)}, nameOf(n) ? n + " " + nameOf(n) : String(n));
     b.onclick = () => {
       done.has(n) ? done.delete(n) : done.add(n);
       store.updateCheck(c.id, { done:[...done].sort((a, b) => a - b) });
@@ -2883,23 +2895,31 @@ function openCheck(id){
     };
     return b;
   }));
-  const missText = miss.length ? "미제출: " + miss.join(", ") + "번" : "모두 냈어요.";
+  const missText = miss.length ? K.miss + ": " + miss.join(", ") + "번" : K.ok + ".";
   const size = el("input",{type:"number",className:"field",id:"checkSize",min:1,max:50,value:c.size || 30,disabled:!edit,"aria-label":"인원"});
   size.onchange = () => { const v = Math.min(50, Math.max(1, Number(size.value) || 30)); store.updateCheck(c.id, { size:v, done:(c.done || []).filter(n => n <= v) }); openCheck(c.id); };
   const due = el("input",{type:"date",className:"field",id:"checkDue",value:c.due || "",disabled:!edit,"aria-label":"마감일"});
   due.onchange = () => { store.updateCheck(c.id, { due:/^\d{4}-\d{2}-\d{2}$/.test(due.value) ? due.value : "" }); openCheck(c.id); };
-  const copy = navBtn("미제출 번호 복사", () => copyText("[" + c.title + (c.due ? " · " + dayLabel(parseYmd(c.due)) + "까지" : "") + "] " + missText, "미제출 번호"), "미제출 번호 복사", !miss.length);
-  const tools = el("div",{className:"actions","data-autosave":"1"}, el("label",{className:"inline"}, "인원 ", size), el("label",{className:"inline"}, "마감 ", due), el("span",{className:"spacer"}), copy);
+  const copy = navBtn(K.miss + " 번호 복사", () => copyText("[" + c.title + (c.due ? " · " + dayLabel(parseYmd(c.due)) + "까지" : "") + "] " + missText, K.miss + " 번호"), K.miss + " 번호 복사", !miss.length);
+  // 개별 안내: 아직 안 알린 학생에게 알림 앱으로 보내고, 보낸 학생은 '알림'으로 체크
+  const send = c.kind === "tell" && edit && window.fbCall ? navBtn("안 알린 " + miss.length + "명에게 알림 보내기", async () => {
+    if(!send.dataset.armed){ send.dataset.armed = "1"; send.textContent = miss.length + "명에게 보내요 · 한 번 더 누르면 보내요"; return; }
+    const text = c.title + (c.memo ? "\n" + c.memo : "");
+    send.disabled = true; say("보내는 중…");
+    try{ await call("sendStudentMessages", miss, text, true); store.updateCheck(c.id, { done:[...new Set([...done, ...miss])].sort((a, b) => a - b) }); say("✓ " + miss.length + "명에게 알림을 보냈어요. (알림 앱에 로그인한 학생만 받아요)"); openCheck(c.id); }
+    catch(e){ send.disabled = false; say(e?.message || "보내지 못했어요."); }
+  }, "아직 안 알린 학생들의 알림 앱으로 이 내용 보내기", !miss.length) : null;
+  const tools = el("div",{className:"actions","data-autosave":"1"}, el("label",{className:"inline"}, "인원 ", size), el("label",{className:"inline"}, c.kind === "tell" ? "날짜 " : "마감 ", due), el("span",{className:"spacer"}), copy, send);
   const att = attachBox(c.files, edit, files => store.updateCheck(c.id, { files }));
   // 안내·메모: 칸을 벗어나면 저장. '학생 앱에 보이기'를 켜 두면 알림 앱의 제출물 아래에 나옴
   const memo = el("textarea",{className:"field",id:"checkMemo",rows:3,maxLength:2000,value:c.memo || "",disabled:!edit,
-    placeholder:"안내나 메모 (예: 뒷면에 보호자 서명 받아 오기, 분실한 학생은 교무실에서 새로 받기)","aria-label":"제출물 안내·메모"});
+    placeholder:c.kind === "tell" ? "알릴 내용 (알림 보내기를 누르면 이름과 함께 이 내용이 가요)" : "안내나 메모 (예: 뒷면에 보호자 서명 받아 오기, 분실한 학생은 교무실에서 새로 받기)","aria-label":"안내·메모"});
   const share = el("input",{type:"checkbox",checked:c.memoShare !== false,disabled:!edit});
   const saveMemo = () => { if(memo.value.trim() === (c.memo || "") && share.checked === (c.memoShare !== false)) return;
     store.updateCheck(c.id, { memo:memo.value.trim(), memoShare:share.checked }); $("dayDlg").dataset.dirty = ""; say("안내·메모를 저장했어요."); };
   memo.onchange = saveMemo; share.onchange = saveMemo;
-  const memoBox = el("div",{className:"cmemo","data-autosave":"1"}, el("label",{className:"cmemo-h",htmlFor:"checkMemo"}, "안내·메모"), memo,
-    el("label",{className:"inline"}, share, " 우리 반 알림 앱에 보이기 (학생·학부모용)"));
+  const memoBox = el("div",{className:"cmemo","data-autosave":"1"}, el("label",{className:"cmemo-h",htmlFor:"checkMemo"}, c.kind === "tell" ? "알릴 내용" : "안내·메모"), memo,
+    (c.kind || "submit") === "submit" ? el("label",{className:"inline"}, share, " 우리 반 알림 앱에 보이기 (학생·학부모용)") : "");
   const kids = [grid, tools, memoBox, att.node];
   if(edit){
     const del = navBtn("지우기", () => {
@@ -2907,17 +2927,17 @@ function openCheck(id){
       store.deleteCheck(c.id); $("dayDlg").close();
     }, "지우기");
     // 다 안 걷혔어도 끝낼 수 있음 (학생 앱에서는 '마감된 제출물'로 접혀 보임)
-    const close = c.closed ? navBtn("다시 걷기 (목록에 올리기)", () => { saveMemo(); store.updateCheck(c.id, { closed:false }); $("dayDlg").close(); }, "다시 목록에 올리기")
-      : navBtn(miss.length ? "걷기 끝내기 (미제출 " + miss.length + "명)" : "걷기 끝내기", () => {
+    const close = c.closed ? navBtn(K.again, () => { saveMemo(); store.updateCheck(c.id, { closed:false }); $("dayDlg").close(); }, "다시 목록에 올리기")
+      : navBtn(miss.length ? K.done + " (" + K.miss + " " + miss.length + "명)" : K.done, () => {
           // 미제출이 남았으면 한 번 더 눌러야 끝냄 (저장과 헷갈리지 않게)
-          if(miss.length && !close.dataset.armed){ close.dataset.armed = "1"; close.textContent = "미제출 " + miss.length + "명 남았어요 · 한 번 더 누르면 끝내요"; return; }
-          saveMemo(); store.updateCheck(c.id, { closed:true }); $("dayDlg").close(); say("'" + c.title + "' 걷기를 끝냈어요. Ctrl+Z로 되돌릴 수 있어요.");
+          if(miss.length && !close.dataset.armed){ close.dataset.armed = "1"; close.textContent = K.miss + " " + miss.length + "명 남았어요 · 한 번 더 누르면 끝내요"; return; }
+          saveMemo(); store.updateCheck(c.id, { closed:true }); $("dayDlg").close(); say("'" + c.title + "' " + K.done.replace(" 끝내기", "") + "를 끝냈어요. Ctrl+Z로 되돌릴 수 있어요.");
         }, "목록에서 내리기 (학생 앱엔 마감된 제출물로)");
     const save = el("button",{type:"button",className:"btn"}, "저장");
     save.onclick = () => { saveMemo(); $("dayDlg").close(); say("✓ 저장했어요."); };
     kids.push(el("div",{className:"actions"}, del, close, el("span",{className:"spacer"}), save));
   }
-  modal(c.title, ...kids);
+  modal((c.kind && c.kind !== "submit" ? "[" + K.tag + "] " : "") + c.title, ...kids);
 }
 
 // 마감 D-day: 날짜 메모의 '마감' 표시 + 마감일이 있는 할 일
@@ -3847,16 +3867,16 @@ async function openNoteAll(){
 }
 async function openCheckAll(){
   const box = el("div",{className:"alllist"}, el("p",{className:"note"}, "불러오는 중…")), q = el("input",{type:"search",className:"field",id:"allCheckQ",placeholder:"찾을 말 (비우면 전체)"});
-  modal("제출물 전체", q, box);
+  modal("제출·배부·안내 전체", q, box);
   let list = [];
   try{ list = await call("listChecks"); if(!Array.isArray(list)) list = []; }catch(e){ return box.replaceChildren(el("p",{className:"note"}, "불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.")); }
   list.forEach(c => { if(!checks.some(x => x.id === c.id)) checks.push(c); });
   const draw = () => {
     const s = q.value.trim().toLowerCase(), hit = list.filter(c => !s || c.title.toLowerCase().includes(s));
-    box.replaceChildren(el("div",{className:"tt-wrap"}, el("table",{className:"plan"}, el("thead",{}, el("tr",{}, el("th",{}, "제출물"), el("th",{}, "마감"), el("th",{}, "낸 사람"), el("th",{}, "상태"))),
+    box.replaceChildren(el("div",{className:"tt-wrap"}, el("table",{className:"plan"}, el("thead",{}, el("tr",{}, el("th",{}, "이름"), el("th",{}, "마감"), el("th",{}, "체크"), el("th",{}, "상태"))),
       el("tbody",{}, ...(hit.length ? hit.map(c => { const miss = missingOf(c).length, tr = el("tr",{className:"logrow",tabIndex:0},
-        el("td",{}, c.title, c.files?.length ? el("small",{className:"hint"}, " 📎" + c.files.length) : ""), el("td",{className:"c"}, c.due ? dayLabel(parseYmd(c.due)) : ""),
-        el("td",{className:"c"}, ((c.size || 30) - miss) + "/" + (c.size || 30)), el("td",{className:"c"}, c.closed ? "다 걷음" : miss ? "미제출 " + miss : "모두 냄"));
+        el("td",{}, c.kind && c.kind !== "submit" ? el("small",{className:"ckind " + c.kind}, ckOf(c).tag) : "", c.title, c.files?.length ? el("small",{className:"hint"}, " 📎" + c.files.length) : ""), el("td",{className:"c"}, c.due ? dayLabel(parseYmd(c.due)) : ""),
+        el("td",{className:"c"}, ((c.size || 30) - miss) + "/" + (c.size || 30)), el("td",{className:"c"}, c.closed ? ckOf(c).closed : miss ? ckOf(c).miss + " " + miss : ckOf(c).ok));
         const go = withBack(openCheckAll, () => openCheck(c.id)); tr.onclick = go; tr.onkeydown = e => { if(e.key === "Enter") go(); }; return tr; })
         : [el("tr",{}, el("td",{colSpan:4,className:"c"}, s ? "찾는 제출물이 없어요." : "아직 제출물이 없어요."))])))),
       el("p",{className:"hint"}, "모두 " + hit.length + "개 · 줄을 누르면 체크판이 열려요"));
@@ -5369,7 +5389,7 @@ const store = {
   saveSchool: async list => apply(await call("saveEvents", events.filter(e => e.cat).concat(list))), // 학사일정 파일은 학교 일정만 바꿈
   saveEvNote: async (k, title, text, due, files) => apply(await call("saveEvNote", k, title, text, !!due, files || [])),
   saveMemo: async (k, text, due, files) => apply(await call("saveMemo", k, text, !!due, files || [])),
-  addCheck: title => { const size = students.length || 30; checks.push({ id:"tmp" + Date.now(), title, size, done:[], closed:false, createdAt:Date.now() }); renderHome(); call("addCheck", title, size).then(apply).catch(failNote); },
+  addCheck: (title, kind) => { const size = students.length || 30; checks.push({ id:"tmp" + Date.now(), title, size, kind:kind || "submit", done:[], closed:false, createdAt:Date.now() }); renderHome(); call("addCheck", title, size, kind || "submit").then(apply).catch(failNote); },
   // 번호를 연달아 누를 때는 잠깐 모았다가 한 번에 저장 (중간 결과로 화면을 덮어쓰지 않음)
   updateCheck: (id, p) => {
     const c = checks.find(x => x.id === id); if(c) Object.assign(c, p);
@@ -5446,12 +5466,12 @@ wrapUndo("updateNote", (id, p) => { const old = before(notes.find(n => n.id === 
 wrapUndo("updateCheck", (id, p) => { const old = before(checks.find(c => c.id === id), p); return ["제출물", () => store.updateCheck(id, old)]; });
 wrapUndo("addTodo", t => ["할 일 추가", () => { const x = newest(todos, y => y.text === t.text); if(x) store.deleteTodo(x.id); }]);
 wrapUndo("addNote", n => ["조·종례 추가", () => { const x = newest(notes, y => y.text === n.text && y.date === n.date); if(x) store.deleteNote(x.id); }]);
-wrapUndo("addCheck", title => ["제출물 추가", () => { const x = newest(checks, y => y.title === title); if(x) store.deleteCheck(x.id); }]);
+wrapUndo("addCheck", title => ["추가", () => { const x = newest(checks, y => y.title === title); if(x) store.deleteCheck(x.id); }]);
 wrapUndo("deleteTodo", id => { const o = structuredClone(todos.find(t => t.id === id)); return o ? ["할 일 지우기", () => store.addTodo({ text:o.text, detail:o.detail || "", due:o.due || "", area:o.area || "", cat:o.cat || "", tcat:o.tcat || "", files:o.files || [] }), () => { const x = todos.find(t => t.id === id) || newest(todos, y => y.text === o.text); if(x) store.deleteTodo(x.id); }] : null; });
 wrapUndo("deleteNote", id => { const o = structuredClone(notes.find(n => n.id === id)); return o ? ["조·종례 지우기", () => store.addNote({ date:o.date, type:o.type || "", text:o.text, detail:o.detail || "", share:o.share !== false, files:o.files || [], to:o.to || [] }), () => { const x = notes.find(n => n.id === id) || newest(notes, y => y.text === o.text && y.date === o.date); if(x) store.deleteNote(x.id); }] : null; });
 wrapUndo("deleteCheck", id => { const o = structuredClone(checks.find(c => c.id === id)); if(!o) return null;
   const again = () => { const x = checks.find(c => c.id === id) || newest(checks, y => y.title === o.title); if(x) store.deleteCheck(x.id); };
-  return ["제출물 지우기", async () => { const had = new Set(checks.map(c => c.id)); apply(await call("addCheck", o.title, o.size || 30));
+  return ["제출물 지우기", async () => { const had = new Set(checks.map(c => c.id)); apply(await call("addCheck", o.title, o.size || 30, o.kind || "submit"));
     const x = checks.find(c => !had.has(c.id) && c.title === o.title); if(x) store.updateCheck(x.id, { done:o.done || [], size:o.size || 30, closed:!!o.closed, due:o.due || "", files:o.files || [], memo:o.memo || "", memoShare:o.memoShare !== false }); }, again]; });
 // 시간표 칸 바꾸기·올리기
 { const f = saveTTNow; saveTTNow = (next, msg) => { if(!undoing){ const old = structuredClone(tt); pushUndo({ label:"시간표", run:() => f(old), redo:() => saveTTNow(next, msg) }); } return f(next, msg); }; }

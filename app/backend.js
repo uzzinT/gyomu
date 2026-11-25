@@ -472,9 +472,11 @@
     notesOn: date => DATE_RE.test(String(date)) ? structuredClone(get("notes").filter(n => n.date === date)) : [],
     searchNotes(q) { q = String(q || "").trim().toLowerCase(); if (!q) return []; return structuredClone(get("notes").filter(n => (n.text + " " + (n.detail || "")).toLowerCase().includes(q)).sort((a, b) => a.date < b.date ? 1 : -1).slice(0, 100)); },
     listNotes: () => structuredClone(get("notes").slice().sort((a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : b.createdAt - a.createdAt).slice(0, 1500)),
-    async addCheck(title, size) {
-      size = Math.min(50, Math.max(1, Math.floor(Number(size) || 30))); title = S(title, 40).trim(); if (!title) fail("걷을 것의 이름을 적어 주세요.");
-      await put("checks", get("checks").concat({ id: uuid(), title, size, done: [], closed: false, createdAt: Date.now(), due: "", files: [], memo: "", memoShare: true })); return getAll();
+    // kind: submit(제출물) · give(배부) · tell(개별 안내)
+    async addCheck(title, size, kind) {
+      size = Math.min(50, Math.max(1, Math.floor(Number(size) || 30))); title = S(title, 40).trim(); if (!title) fail("이름을 적어 주세요.");
+      kind = ["give", "tell"].includes(kind) ? kind : "submit";
+      await put("checks", get("checks").concat({ id: uuid(), title, size, kind, done: [], closed: false, createdAt: Date.now(), due: "", files: [], memo: "", memoShare: true })); return getAll();
     },
     async updateCheck(id, p) { p = p || {}; await patchRow("checks", id, o => {
       o.size = Math.min(50, Math.max(1, Number(p.size) || o.size || 30));
@@ -916,7 +918,7 @@
       events: [["date", "title", "cat"]].concat(g("events").map(e => [e.date, e.title, e.cat])),
       memos: [["date", "text", "due", "files"]].concat(g("memos").map(m => [m.date, m.text, !!m.due, J(m.files || [])])),
       notes: [["id", "date", "type", "text", "done", "createdAt", "detail", "share", "files", "to"]].concat(g("notes").map(n => [n.id, n.date, n.type, n.text, !!n.done, n.createdAt, n.detail, n.share !== false, J(n.files || []), (n.to || []).join(",")])),
-      checks: [["id", "title", "size", "done", "closed", "createdAt", "due", "files", "memo", "memoShare"]].concat(g("checks").map(x => [x.id, x.title, x.size, (x.done || []).join(","), !!x.closed, x.createdAt, x.due, J(x.files || []), x.memo || "", x.memoShare !== false])),
+      checks: [["id", "title", "size", "done", "closed", "createdAt", "due", "files", "memo", "memoShare", "kind"]].concat(g("checks").map(x => [x.id, x.title, x.size, (x.done || []).join(","), !!x.closed, x.createdAt, x.due, J(x.files || []), x.memo || "", x.memoShare !== false, x.kind || "submit"])),
       logs: [["date", "period", "cls", "text", "lesson", "done", "files"]].concat(g("logs").map(l => [l.date, l.period, l.cls, l.text, l.lesson, !!l.done, J(l.files || [])])),
       todos: [["id", "text", "detail", "due", "done", "createdAt", "area", "cat", "files"]].concat(g("todos").map(t => [t.id, t.text, t.detail, t.due, !!t.done, t.createdAt, t.area, t.cat, J(t.files || [])])),
       teachers: [["name", "homeroom", "cells"]].concat(g("teachers").map(t => [t.name, t.homeroom, J(t.cells)])),
@@ -1228,7 +1230,7 @@
       events: (tab.events || []).map(r => ({ date: dt(r[0]), title: str(r[1]), cat: str(r[2]) })).filter(e => DATE_RE.test(e.date) && e.title),
       memos: (tab.memos || []).map(r => ({ date: dt(r[0]), text: str(r[1]), due: tru(r[2]), files: fl(r[3]) })).filter(m => DATE_RE.test(m.date)),
       notes: (tab.notes || []).filter(r => r[0]).map(r => ({ id: str(r[0]), date: dt(r[1]), type: str(r[2]), text: str(r[3]), done: tru(r[4]), createdAt: num(r[5]), detail: str(r[6]), share: r[7] === "" || r[7] == null || tru(r[7]), files: fl(r[8]), to: cleanTo(String(r[9] || "").split(",").filter(Boolean)) })),
-      checks: (tab.checks || []).filter(r => r[0]).map(r => ({ id: str(r[0]), title: str(r[1]), size: num(r[2]) || 30, done: nums(r[3]), closed: tru(r[4]), createdAt: num(r[5]), due: DATE_RE.test(dt(r[6])) ? dt(r[6]) : "", files: fl(r[7]), memo: str(r[8]), memoShare: r[9] === "" || r[9] == null || tru(r[9]) })),
+      checks: (tab.checks || []).filter(r => r[0]).map(r => ({ id: str(r[0]), title: str(r[1]), size: num(r[2]) || 30, done: nums(r[3]), closed: tru(r[4]), createdAt: num(r[5]), due: DATE_RE.test(dt(r[6])) ? dt(r[6]) : "", files: fl(r[7]), memo: str(r[8]), memoShare: r[9] === "" || r[9] == null || tru(r[9]), kind: ["give", "tell"].includes(str(r[10])) ? str(r[10]) : "submit" })),
       logs: (tab.logs || []).map(r => ({ date: dt(r[0]), period: num(r[1]), cls: str(r[2]), text: str(r[3]), lesson: num(r[4]), done: tru(r[5]), files: fl(r[6]) })).filter(l => DATE_RE.test(l.date)),
       todos: (tab.todos || []).filter(r => r[0]).map(r => ({ id: str(r[0]), text: str(r[1]), detail: str(r[2]), due: DATE_RE.test(dt(r[3])) ? dt(r[3]) : "", done: tru(r[4]), createdAt: num(r[5]), area: str(r[6]), cat: str(r[7]), files: fl(r[8]) })),
       teachers: (tab.teachers || []).filter(r => r[0]).map(r => { let c = []; try { c = JSON.parse(str(r[2]) || "[]"); } catch (e) {} return { name: str(r[0]), homeroom: code(r[1]), cells: teacherCells(c) }; }),
@@ -1284,7 +1286,7 @@
     const notes = allNotes.filter(n => !n.to.length).map(({ to, ...n }) => n), only = allNotes.filter(n => n.to.length);
     const events = get("events").filter(e => (!e.cat || classCats.includes(e.cat)) && e.date >= ad(-7) && e.date <= ad(120)).map(e => ({ date: e.date, title: e.title, mine: !!e.cat })).sort((a, b) => a.date < b.date ? -1 : 1).slice(0, 200);
     const recent = x => x.due || (x.createdAt ? ymd(new Date(x.createdAt)) : "");
-    const chk = get("checks").filter(x => x.title && (!x.closed || (x.createdAt || 0) > since || (x.due && x.due >= ad(-60))));
+    const chk = get("checks").filter(x => x.title && (x.kind || "submit") === "submit" && (!x.closed || (x.createdAt || 0) > since || (x.due && x.due >= ad(-60))));
     const checks = chk.map(x => ({ id: x.id, title: x.title, due: x.due || "", closed: !!x.closed, memo: x.memo && x.memoShare !== false ? x.memo : "" }))
       .sort((a, b) => a.closed !== b.closed ? (a.closed ? 1 : -1) : a.closed ? (recent(chk.find(x => x.id === b.id)) > recent(chk.find(x => x.id === a.id)) ? 1 : -1) : (a.due || "9999") < (b.due || "9999") ? -1 : 1);
     const tt = cfgGet("classTT"), bells = Array.isArray(c.bells) ? c.bells.map(b => ({ s: String(b && b.s || ""), e: String(b && b.e || "") })) : [];
